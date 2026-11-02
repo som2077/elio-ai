@@ -1,6 +1,7 @@
 import { build } from "vite";
 import { resolve } from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
@@ -77,6 +78,20 @@ async function run() {
         },
       },
     });
+  }
+
+  // Ensure popup.js and popup.html are present and synced in both src/popup and dist/src/popup
+  const distPopupJs = resolve(__dirname, "dist/src/popup/popup.js");
+  const srcPopupJs = resolve(__dirname, "src/popup/popup.js");
+  const srcPopupHtml = resolve(__dirname, "src/popup/popup.html");
+  const distPopupHtml = resolve(__dirname, "dist/src/popup/popup.html");
+
+  if (fs.existsSync(distPopupJs)) {
+    fs.copyFileSync(distPopupJs, srcPopupJs);
+  }
+  if (fs.existsSync(srcPopupHtml)) {
+    fs.mkdirSync(resolve(__dirname, "dist/src/popup"), { recursive: true });
+    fs.copyFileSync(srcPopupHtml, distPopupHtml);
   }
 }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,40 +10,89 @@ import {
   StyleSheet,
   SafeAreaView,
   StatusBar,
-} from 'react-native';
-import { supabase, isSupabaseConfigured } from '../services/supabase';
-import { SavedVideo } from '../types/video';
-import { VideoCard } from '../components/VideoCard';
-import { SkeletonCard } from '../components/SkeletonCard';
-import { openVideoDirectly } from '../services/deepLink';
-import { ActivityCalendar } from '../components/ActivityCalendar';
-import { toDateKey, formatDisplayDate } from '../services/dateAnalytics';
-import { triggerLayoutMotion } from '../utils/motion';
+  Alert,
+} from "react-native";
+import { supabase, isSupabaseConfigured } from "../services/supabase";
+import { SavedVideo } from "../types/video";
+import { VideoCard } from "../components/VideoCard";
+import { SkeletonCard } from "../components/SkeletonCard";
+import { openVideoDirectly } from "../services/deepLink";
+import { ActivityCalendar } from "../components/ActivityCalendar";
+import { AuthScreen } from "../components/AuthScreen";
+import { QRScannerModal } from "../components/QRScannerModal";
+import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
+import { triggerLayoutMotion } from "../utils/motion";
 
 export default function HomeScreen() {
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
+
   const [videos, setVideos] = useState<SavedVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<
-    'all' | 'unread' | 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'reddit' | 'linkedin' | 'pinterest' | 'tiktok'
-  >('all');
+    | "all"
+    | "unread"
+    | "youtube"
+    | "instagram"
+    | "twitter"
+    | "facebook"
+    | "reddit"
+    | "linkedin"
+    | "pinterest"
+    | "tiktok"
+  >("all");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
 
-  const fetchVideos = async () => {
+  // Check auth session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setAuthLoading(false);
+      if (currentSession) {
+        fetchVideos(currentSession.user.id);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (newSession) {
+        fetchVideos(newSession.user.id);
+      } else {
+        setVideos([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const fetchVideos = async (userId?: string) => {
     try {
-      const { data, error } = await supabase
-        .from('saved_videos')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const targetUserId = userId || session?.user?.id;
+      let query = supabase
+        .from("saved_videos")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (targetUserId) {
+        query = query.eq("user_id", targetUserId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
-        console.warn('Supabase fetch notice:', error.message);
+        console.warn("Supabase fetch notice:", error.message);
       } else if (data) {
         setVideos(data as SavedVideo[]);
       }
     } catch (err: any) {
-      console.warn('Network issue:', err.message);
+      console.warn("Network issue:", err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,41 +100,59 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    fetchVideos();
+    if (!session?.user?.id) return;
 
-    // Realtime Supabase listener
+    // Realtime Supabase listener filtered to current user
     try {
       const channel = supabase
-        .channel('saved_videos_realtime')
+        .channel("saved_videos_realtime")
         .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'saved_videos' },
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "saved_videos",
+            filter: `user_id=eq.${session.user.id}`,
+          },
           () => {
-            fetchVideos();
-          }
+            fetchVideos(session.user.id);
+          },
         )
-      .subscribe();
+        .subscribe();
 
       return () => {
         supabase.removeChannel(channel);
       };
     } catch (e) {}
-  }, []);
+  }, [session?.user?.id]);
+
+  const handleLogout = () => {
+    Alert.alert("Sign Out", "Are you sure you want to log out of Elio AI?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          await supabase.auth.signOut();
+        },
+      },
+    ]);
+  };
 
   const toggleStatus = async (video: SavedVideo) => {
     triggerLayoutMotion();
-    const newStatus = video.status === 'watched' ? 'unread' : 'watched';
+    const newStatus = video.status === "watched" ? "unread" : "watched";
     setVideos((prev) =>
-      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v))
+      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v)),
     );
 
     await supabase
-      .from('saved_videos')
+      .from("saved_videos")
       .update({
         status: newStatus,
-        watched_at: newStatus === 'watched' ? new Date().toISOString() : null,
+        watched_at: newStatus === "watched" ? new Date().toISOString() : null,
       })
-      .eq('id', video.id);
+      .eq("id", video.id);
   };
 
   const handleFilterChange = (newFilter: typeof filter) => {
@@ -110,19 +177,33 @@ export default function HomeScreen() {
       if (vDateKey !== selectedDate) return false;
     }
 
-    if (filter === 'youtube') return v.platform === 'youtube';
-    if (filter === 'instagram') return v.platform === 'instagram';
-    if (filter === 'twitter') return v.platform === 'twitter';
-    if (filter === 'facebook') return v.platform === 'facebook';
-    if (filter === 'reddit') return v.platform === 'reddit';
-    if (filter === 'linkedin') return v.platform === 'linkedin';
-    if (filter === 'pinterest') return v.platform === 'pinterest';
-    if (filter === 'tiktok') return v.platform === 'tiktok';
-    if (filter === 'unread') return v.status === 'unread';
+    if (filter === "youtube") return v.platform === "youtube";
+    if (filter === "instagram") return v.platform === "instagram";
+    if (filter === "twitter") return v.platform === "twitter";
+    if (filter === "facebook") return v.platform === "facebook";
+    if (filter === "reddit") return v.platform === "reddit";
+    if (filter === "linkedin") return v.platform === "linkedin";
+    if (filter === "pinterest") return v.platform === "pinterest";
+    if (filter === "tiktok") return v.platform === "tiktok";
+    if (filter === "unread") return v.status === "unread";
     return true;
   });
 
-  const unreadCount = videos.filter((v) => v.status === 'unread').length;
+  const unreadCount = videos.filter((v) => v.status === "unread").length;
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={[styles.safeContainer, styles.centerContainer]}>
+        <StatusBar barStyle="light-content" backgroundColor="#0A0F1D" />
+        <ActivityIndicator size="large" color="#6366F1" />
+        <Text style={styles.loadingText}>Syncing Elio AI...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen onAuthSuccess={() => fetchVideos()} />;
+  }
 
   return (
     <SafeAreaView style={styles.safeContainer}>
@@ -136,30 +217,51 @@ export default function HomeScreen() {
           </View>
           <View>
             <Text style={styles.appTitle}>Elio AI</Text>
-            <Text style={styles.appSubtitle}>Smart Watchlist & Recall</Text>
+            <Text style={styles.appSubtitle} numberOfLines={1}>
+              {session?.user?.email || 'Smart Watchlist & Recall'}
+            </Text>
           </View>
         </View>
 
         <View style={styles.topRightActions}>
+          {/* Link Browser Extension (QR Scan) Button */}
+          <TouchableOpacity
+            style={styles.linkPcBtn}
+            activeOpacity={0.75}
+            onPress={() => setShowScanner(true)}
+          >
+            <Text style={styles.linkPcIcon}>📷</Text>
+            <Text style={styles.linkPcLabel}>Link PC</Text>
+          </TouchableOpacity>
+
           {/* Calendar Toggle Button */}
           <TouchableOpacity
-            style={[styles.calendarToggleBtn, showCalendar && styles.calendarToggleBtnActive]}
+            style={[
+              styles.calendarToggleBtn,
+              showCalendar && styles.calendarToggleBtnActive,
+            ]}
             activeOpacity={0.7}
             onPress={handleCalendarToggle}
           >
             <Text style={styles.calendarIconText}>📅</Text>
-            <Text style={[styles.calendarToggleLabel, showCalendar && styles.calendarToggleLabelActive]}>
-              {showCalendar ? 'Close' : 'Activity'}
+            <Text
+              style={[
+                styles.calendarToggleLabel,
+                showCalendar && styles.calendarToggleLabelActive,
+              ]}
+            >
+              {showCalendar ? "Close" : "Stats"}
             </Text>
           </TouchableOpacity>
 
-          {/* Counter Badge */}
-          <View style={styles.statPill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.statPillText}>
-              {unreadCount} Pending
-            </Text>
-          </View>
+          {/* Logout Button */}
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            activeOpacity={0.7}
+            onPress={handleLogout}
+          >
+            <Text style={styles.logoutIcon}>⇥</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -172,16 +274,16 @@ export default function HomeScreen() {
         >
           {(
             [
-              { key: 'all', label: 'All Items' },
-              { key: 'unread', label: '⏳ Unread' },
-              { key: 'youtube', label: '▶ YouTube' },
-              { key: 'instagram', label: '✦ Instagram' },
-              { key: 'twitter', label: '𝕏 Twitter' },
-              { key: 'facebook', label: 'f Facebook' },
-              { key: 'reddit', label: '● Reddit' },
-              { key: 'linkedin', label: 'in LinkedIn' },
-              { key: 'pinterest', label: 'P Pinterest' },
-              { key: 'tiktok', label: '♫ TikTok' },
+              { key: "all", label: "All Items" },
+              { key: "unread", label: "⏳ Unread" },
+              { key: "youtube", label: "▶ YouTube" },
+              { key: "instagram", label: "✦ Instagram" },
+              { key: "twitter", label: "𝕏 Twitter" },
+              { key: "facebook", label: "f Facebook" },
+              { key: "reddit", label: "● Reddit" },
+              { key: "linkedin", label: "in LinkedIn" },
+              { key: "pinterest", label: "P Pinterest" },
+              { key: "tiktok", label: "♫ TikTok" },
             ] as const
           ).map((tab) => (
             <TouchableOpacity
@@ -190,7 +292,12 @@ export default function HomeScreen() {
               style={[styles.chip, filter === tab.key && styles.chipActive]}
               onPress={() => handleFilterChange(tab.key)}
             >
-              <Text style={[styles.chipText, filter === tab.key && styles.chipTextActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  filter === tab.key && styles.chipTextActive,
+                ]}
+              >
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -202,7 +309,11 @@ export default function HomeScreen() {
       {!showCalendar && selectedDate && (
         <View style={styles.miniDateFilterBar}>
           <Text style={styles.miniDateFilterText}>
-            📅 Filter: <Text style={styles.miniDateHighlight}>{formatDisplayDate(selectedDate)}</Text> ({filteredVideos.length} clips)
+            📅 Filter:{" "}
+            <Text style={styles.miniDateHighlight}>
+              {formatDisplayDate(selectedDate)}
+            </Text>{" "}
+            ({filteredVideos.length} clips)
           </Text>
           <TouchableOpacity
             onPress={() => handleDateSelect(null)}
@@ -237,7 +348,11 @@ export default function HomeScreen() {
             <VideoCard
               video={item}
               onPress={() =>
-                openVideoDirectly(item.clean_url, item.platform as any, item.platform_video_id)
+                openVideoDirectly(
+                  item.clean_url,
+                  item.platform as any,
+                  item.platform_video_id,
+                )
               }
               onToggleStatus={() => toggleStatus(item)}
             />
@@ -260,12 +375,20 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.emptyHeading}>Your inbox is empty</Text>
               <Text style={styles.emptyDescription}>
-                Like videos on YouTube or Instagram in your desktop browser. They will sync here instantly!
+                Like videos on YouTube or Instagram in your desktop browser.
+                They will sync here instantly!
               </Text>
             </View>
           }
         />
       )}
+
+      {/* QR Scanner Modal to link extension */}
+      <QRScannerModal
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onSuccess={() => fetchVideos()}
+      />
     </SafeAreaView>
   );
 }
@@ -273,132 +396,166 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: '#0A0F1D', // Pure deep obsidian dark background
+    backgroundColor: "#0A0F1D", // Pure deep obsidian dark background
   },
   appBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 18,
     paddingTop: 16,
     paddingBottom: 12,
   },
   brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   logoBadge: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#1E293B',
+    backgroundColor: "#1E293B",
     borderWidth: 1,
-    borderColor: '#334155',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#334155",
+    justifyContent: "center",
+    alignItems: "center",
   },
   logoIcon: {
     fontSize: 20,
   },
   appTitle: {
     fontSize: 22,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    fontWeight: "900",
+    color: "#F8FAFC",
     letterSpacing: -0.5,
   },
   appSubtitle: {
     fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+    color: "#64748B",
+    fontWeight: "500",
   },
   topRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
-  calendarToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#131B2E',
+  linkPcBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E293B",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: "#334155",
+    gap: 5,
+  },
+  linkPcIcon: {
+    fontSize: 12,
+  },
+  linkPcLabel: {
+    color: "#818CF8",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  logoutBtn: {
+    backgroundColor: "#131B2E",
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logoutIcon: {
+    color: "#94A3B8",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  calendarToggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#131B2E",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#1E293B",
     gap: 5,
   },
   calendarToggleBtnActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#818CF8',
+    backgroundColor: "#6366F1",
+    borderColor: "#818CF8",
   },
   calendarIconText: {
     fontSize: 12,
   },
   calendarToggleLabel: {
-    color: '#94A3B8',
+    color: "#94A3B8",
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   calendarToggleLabelActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   statPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#131B2E',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#131B2E",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: "#1E293B",
     gap: 6,
   },
   liveDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#10B981',
+    backgroundColor: "#10B981",
   },
   statPillText: {
-    color: '#CBD5E1',
+    color: "#CBD5E1",
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   miniDateFilterBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#1E293B",
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginHorizontal: 18,
     marginBottom: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: "#334155",
   },
   miniDateFilterText: {
-    color: '#94A3B8',
+    color: "#94A3B8",
     fontSize: 12,
   },
   miniDateHighlight: {
-    color: '#38BDF8',
-    fontWeight: '700',
+    color: "#38BDF8",
+    fontWeight: "700",
   },
   miniDateFilterClear: {
-    backgroundColor: '#0F172A',
+    backgroundColor: "#0F172A",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
   miniDateFilterClearText: {
-    color: '#CBD5E1',
+    color: "#CBD5E1",
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   filterSection: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 18,
     paddingBottom: 14,
     gap: 8,
@@ -407,14 +564,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 24,
-    backgroundColor: '#131B2E',
+    backgroundColor: "#131B2E",
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: "#1E293B",
   },
   chipActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#818CF8',
-    shadowColor: '#6366F1',
+    backgroundColor: "#6366F1",
+    borderColor: "#818CF8",
+    shadowColor: "#6366F1",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -422,11 +579,11 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#94A3B8',
+    fontWeight: "700",
+    color: "#94A3B8",
   },
   chipTextActive: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
   listContent: {
     paddingHorizontal: 18,
@@ -434,19 +591,19 @@ const styles = StyleSheet.create({
   },
   centerContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 30,
   },
   loadingText: {
-    color: '#94A3B8',
+    color: "#94A3B8",
     fontSize: 13,
     marginTop: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 70,
     paddingHorizontal: 20,
   },
@@ -454,26 +611,26 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#131B2E',
+    backgroundColor: "#131B2E",
     borderWidth: 1,
-    borderColor: '#1E293B',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#1E293B",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 16,
   },
   emptyIcon: {
     fontSize: 32,
   },
   emptyHeading: {
-    color: '#F8FAFC',
+    color: "#F8FAFC",
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     marginBottom: 8,
   },
   emptyDescription: {
-    color: '#64748B',
+    color: "#64748B",
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 20,
     maxWidth: 280,
   },
