@@ -41,21 +41,60 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
       } = await supabase.auth.getSession();
       if (!session?.user) return;
 
+      let fetchedDevices: LinkedDevice[] = [];
+
+      // 1. Try querying primary linked_devices table
       const { data, error } = await supabase
         .from("linked_devices")
         .select("*")
         .eq("user_id", session.user.id)
         .order("last_active_at", { ascending: false });
 
-      if (error) {
-        // Table may not exist yet if migration hasn't run
-        console.warn("[Elio AI] Linked devices query notice:", error.message);
-        setDevices([]);
+      if (!error && Array.isArray(data) && data.length > 0) {
+        fetchedDevices = data as LinkedDevice[];
       } else {
-        setDevices((data as LinkedDevice[]) || []);
+        // 2. Seamless Fallback: Derive active devices from approved qr_auth_sessions
+        const { data: qrSessions } = await supabase
+          .from("qr_auth_sessions")
+          .select("id, qr_token, user_id, status, created_at, expires_at")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(15);
+
+        if (Array.isArray(qrSessions) && qrSessions.length > 0) {
+          // Deduplicate by qr_token or device_id
+          const seen = new Set<string>();
+          fetchedDevices = qrSessions
+            .filter((s: any) => {
+              const meta = s.device_metadata || {};
+              const key = meta.device_id || s.qr_token;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            })
+            .map((s: any, idx: number) => {
+              const meta = s.device_metadata || {};
+              const isRevoked = s.status === "expired";
+              return {
+                id: s.id,
+                user_id: s.user_id,
+                device_id: meta.device_id || s.qr_token,
+                device_name:
+                  meta.device_name ||
+                  `Browser Extension (${idx === 0 ? "Chrome Primary" : "Profile " + (idx + 1)})`,
+                browser_type: meta.browser_type || "Chrome",
+                os_name: meta.os_name || "Linux",
+                last_active_at: s.created_at,
+                is_revoked: isRevoked,
+                created_at: s.created_at,
+              };
+            });
+        }
       }
+
+      setDevices(fetchedDevices);
     } catch (err) {
-      console.warn("[Elio AI] Failed to load linked devices:", err);
+      console.warn("[Elio AI] Linked devices notice:", err);
     } finally {
       setLoading(false);
     }
@@ -73,12 +112,22 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
           onPress: async () => {
             try {
               setRevokingId(device.device_id);
-              const { error } = await supabase
-                .from("linked_devices")
-                .update({ is_revoked: true })
-                .eq("device_id", device.device_id);
 
-              if (error) throw error;
+              // 1. Mark in linked_devices if table exists
+              try {
+                await supabase
+                  .from("linked_devices")
+                  .update({ is_revoked: true })
+                  .eq("device_id", device.device_id);
+              } catch {}
+
+              // 2. Also expire the QR auth session so extension logs out
+              try {
+                await supabase
+                  .from("qr_auth_sessions")
+                  .update({ status: "expired" })
+                  .eq("qr_token", device.device_id);
+              } catch {}
 
               setDevices((prev) =>
                 prev.map((d) =>

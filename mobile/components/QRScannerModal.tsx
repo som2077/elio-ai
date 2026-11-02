@@ -136,7 +136,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         try {
           const { data } = await supabase
             .from("qr_auth_sessions")
-            .select("device_metadata, expires_at, status")
+            .select("*")
             .eq("qr_token", token)
             .maybeSingle();
 
