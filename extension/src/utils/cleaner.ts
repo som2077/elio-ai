@@ -92,14 +92,17 @@ export function cleanVideoUrl(rawUrl: string, platform: SocialPlatform): { clean
     }
 
     if (platform === 'reddit') {
-      // reddit.com/r/sub/comments/id/slug/
-      const match = url.pathname.match(/\/comments\/([a-zA-Z0-9]+)/);
-      if (match && match[1]) {
+      // reddit.com/r/sub/comments/id/slug/ or reddit.com/r/sub/s/shareId/
+      const match = url.pathname.match(/\/(comments|s)\/([a-zA-Z0-9]+)/);
+      if (match && match[2]) {
         return {
           cleanUrl: `https://www.reddit.com${url.pathname.split('?')[0]}`,
-          videoId: match[1],
+          videoId: match[2],
         };
       }
+      return {
+        cleanUrl: `https://www.reddit.com${url.pathname.split('?')[0]}`,
+      };
     }
 
     if (platform === 'linkedin') {
