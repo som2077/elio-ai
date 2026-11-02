@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { appleColors, appleRadii, appleTypography, appleShadows } from '../theme/appleTokens';
+import { appleColors, appleRadii, appleTypography } from '../theme/appleTokens';
 import { haptics } from '../utils/haptics';
 import { SavedVideo } from '../types/video';
 
@@ -24,16 +24,16 @@ interface FilterTab {
 }
 
 const TABS: FilterTab[] = [
-  { key: 'all', label: 'All Items', icon: 'layers-outline' },
-  { key: 'unread', label: 'Unread', icon: 'time-outline' },
+  { key: 'all', label: 'All', icon: 'layers-outline' },
+  { key: 'unread', label: 'In Queue', icon: 'time-outline' },
   { key: 'youtube', label: 'YouTube', icon: 'logo-youtube' },
   { key: 'instagram', label: 'Instagram', icon: 'logo-instagram' },
-  { key: 'twitter', label: 'Twitter', icon: 'logo-twitter' },
-  { key: 'facebook', label: 'Facebook', icon: 'logo-facebook' },
+  { key: 'twitter', label: 'X', icon: 'logo-twitter' },
   { key: 'reddit', label: 'Reddit', icon: 'logo-reddit' },
+  { key: 'tiktok', label: 'TikTok', icon: 'musical-notes-outline' },
+  { key: 'facebook', label: 'Facebook', icon: 'logo-facebook' },
   { key: 'linkedin', label: 'LinkedIn', icon: 'logo-linkedin' },
   { key: 'pinterest', label: 'Pinterest', icon: 'logo-pinterest' },
-  { key: 'tiktok', label: 'TikTok', icon: 'musical-notes-outline' },
 ];
 
 interface AppleFilterPillsProps {
@@ -42,6 +42,10 @@ interface AppleFilterPillsProps {
   onSelectFilter: (filter: FilterCategory) => void;
 }
 
+/**
+ * Telegram iOS Inspired Chat Folder Filter Tabs
+ * Features sleek capsule tabs, numeric unread count badges, and Telegram Cyan active states.
+ */
 export const AppleFilterPills: React.FC<AppleFilterPillsProps> = ({
   filter,
   videos,
@@ -67,10 +71,10 @@ export const AppleFilterPills: React.FC<AppleFilterPillsProps> = ({
           return (
             <TouchableOpacity
               key={tab.key}
-              activeOpacity={0.85}
+              activeOpacity={0.8}
               style={[
-                styles.pill,
-                isActive ? styles.pillActive : styles.pillInactive,
+                styles.folderTab,
+                isActive ? styles.folderTabActive : styles.folderTabInactive,
               ]}
               onPress={() => {
                 haptics.selection();
@@ -80,15 +84,15 @@ export const AppleFilterPills: React.FC<AppleFilterPillsProps> = ({
               {tab.icon && (
                 <Ionicons
                   name={tab.icon}
-                  size={14}
-                  color={isActive ? '#FFFFFF' : appleColors.textSecondary}
-                  style={styles.pillIcon}
+                  size={13}
+                  color={isActive ? appleColors.telegramCyan : appleColors.twitterMuted}
+                  style={styles.tabIcon}
                 />
               )}
               <Text
                 style={[
-                  styles.pillText,
-                  isActive ? styles.pillTextActive : styles.pillTextInactive,
+                  styles.tabLabel,
+                  isActive ? styles.tabLabelActive : styles.tabLabelInactive,
                 ]}
               >
                 {tab.label}
@@ -96,8 +100,8 @@ export const AppleFilterPills: React.FC<AppleFilterPillsProps> = ({
               {count > 0 && (
                 <View
                   style={[
-                    styles.countBadge,
-                    isActive ? styles.countBadgeActive : styles.countBadgeInactive,
+                    styles.countBubble,
+                    isActive ? styles.countBubbleActive : styles.countBubbleInactive,
                   ]}
                 >
                   <Text
@@ -120,56 +124,58 @@ export const AppleFilterPills: React.FC<AppleFilterPillsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: appleColors.twitterBorder,
+    backgroundColor: '#000000',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: 14,
+    gap: 7,
   },
-  pill: {
+  folderTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: appleRadii.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
   },
-  pillInactive: {
-    backgroundColor: appleColors.surfaceGlass,
+  folderTabInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: appleColors.borderGlass,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  pillActive: {
-    backgroundColor: appleColors.accent,
+  folderTabActive: {
+    backgroundColor: 'rgba(42, 171, 238, 0.12)',
     borderWidth: 1,
-    borderColor: appleColors.accentLight,
-    ...appleShadows.accentPill,
+    borderColor: appleColors.telegramCyan,
   },
-  pillIcon: {
-    marginRight: 6,
+  tabIcon: {
+    marginRight: 5,
   },
-  pillText: {
-    ...appleTypography.caption,
-    fontSize: 12,
-  },
-  pillTextInactive: {
-    color: appleColors.textSecondary,
+  tabLabel: {
+    fontSize: 12.5,
     fontWeight: '600',
+    letterSpacing: -0.1,
   },
-  pillTextActive: {
-    color: '#FFFFFF',
+  tabLabelInactive: {
+    color: appleColors.twitterMuted,
+  },
+  tabLabelActive: {
+    color: appleColors.telegramCyan,
     fontWeight: '700',
   },
-  countBadge: {
+  countBubble: {
     marginLeft: 6,
     paddingHorizontal: 6,
     paddingVertical: 1.5,
-    borderRadius: 10,
+    borderRadius: 9,
   },
-  countBadgeInactive: {
+  countBubbleInactive: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  countBadgeActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+  countBubbleActive: {
+    backgroundColor: appleColors.telegramCyan,
   },
   countText: {
     ...appleTypography.tabularNums,
@@ -180,6 +186,6 @@ const styles = StyleSheet.create({
     color: appleColors.textSecondary,
   },
   countTextActive: {
-    color: '#FFFFFF',
+    color: '#000000',
   },
 });
