@@ -1,16 +1,17 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { appleColors } from "../theme/appleTokens";
 
 export default function RootLayout() {
   return (
-    <View style={styles.container}>
+    <SafeAreaProvider style={styles.container}>
       <StatusBar
         style="light"
         backgroundColor={appleColors.canvas}
-        translucent={false}
+        translucent={true}
       />
       <Stack
         screenOptions={{
@@ -22,7 +23,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
       </Stack>
-    </View>
+    </SafeAreaProvider>
   );
 }
 
