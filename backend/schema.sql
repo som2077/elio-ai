@@ -75,18 +75,21 @@ CREATE POLICY "Users can only access their own saved videos" ON public.saved_vid
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
--- Policies for qr_auth_sessions
+-- Policies for qr_auth_sessions (Public access so extension anon can read/write and mobile auth can approve)
 DROP POLICY IF EXISTS "Allow anon insert qr session" ON public.qr_auth_sessions;
-CREATE POLICY "Allow anon insert qr session" ON public.qr_auth_sessions
-    FOR INSERT TO anon WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow insert qr session" ON public.qr_auth_sessions;
+CREATE POLICY "Allow insert qr session" ON public.qr_auth_sessions
+    FOR INSERT TO public WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow anon read qr session" ON public.qr_auth_sessions;
-CREATE POLICY "Allow anon read qr session" ON public.qr_auth_sessions
-    FOR SELECT TO anon USING (true);
+DROP POLICY IF EXISTS "Allow read qr session" ON public.qr_auth_sessions;
+CREATE POLICY "Allow read qr session" ON public.qr_auth_sessions
+    FOR SELECT TO public USING (true);
 
 DROP POLICY IF EXISTS "Allow auth update qr session" ON public.qr_auth_sessions;
-CREATE POLICY "Allow auth update qr session" ON public.qr_auth_sessions
-    FOR UPDATE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Allow update qr session" ON public.qr_auth_sessions;
+CREATE POLICY "Allow update qr session" ON public.qr_auth_sessions
+    FOR UPDATE TO public USING (true) WITH CHECK (true);
 
 -- 5. RELOAD SCHEMA CACHE
 NOTIFY pgrst, 'reload schema';
