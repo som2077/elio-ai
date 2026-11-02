@@ -59,7 +59,7 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
         // 2. Seamless Fallback: Derive active devices from approved qr_auth_sessions
         const { data: qrSessions } = await supabase
           .from("qr_auth_sessions")
-          .select("id, qr_token, user_id, status, created_at, expires_at")
+          .select("id, qr_token, user_id, status, created_at, expires_at, device_metadata")
           .eq("user_id", session.user.id)
           .order("created_at", { ascending: false })
           .limit(15);
@@ -92,6 +92,34 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
                 created_at: s.created_at,
               };
             });
+        }
+
+        // 3. Smart Fallback: If user has saved videos from browser_extension, surface it
+        if (fetchedDevices.length === 0) {
+          const { data: latestVideo } = await supabase
+            .from("saved_videos")
+            .select("created_at, source_device_name, device_id")
+            .eq("user_id", session.user.id)
+            .eq("source_client", "browser_extension")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestVideo) {
+            fetchedDevices = [
+              {
+                id: "active-sync-session",
+                user_id: session.user.id,
+                device_id: latestVideo.device_id || "browser-ext-sync",
+                device_name: latestVideo.source_device_name || "Chrome Extension",
+                browser_type: "Chrome",
+                os_name: "Linux",
+                last_active_at: latestVideo.created_at,
+                is_revoked: false,
+                created_at: latestVideo.created_at,
+              },
+            ];
+          }
         }
       }
 

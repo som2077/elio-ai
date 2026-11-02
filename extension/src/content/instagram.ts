@@ -121,7 +121,8 @@ function findPostOrReelContainer(actionElement: HTMLElement): HTMLElement {
 
   while (current && current !== document.body && current !== document.documentElement) {
     const videos = current.querySelectorAll('video');
-    if (videos.length === 1 && current.offsetHeight > 300) {
+    const h = current.offsetHeight || current.getBoundingClientRect().height;
+    if (videos.length === 1 && h > 250) {
       singleVideoContainer = current;
     } else if (videos.length > 1) {
       // Reached multi-reel feed container; stop immediately!
@@ -476,8 +477,8 @@ function extractInstagramTitle(container: HTMLElement, creator: string, isReel: 
       const text = s.textContent || '';
       if (rawCreator && text.includes(rawCreator)) {
         const m =
-          text.match(new RegExp(`"${rawCreator}"[^}]{0,400}?"text":"([^"]{4,200})"`, 'i')) ||
-          text.match(new RegExp(`"text":"([^"]{4,200})"[^}]{0,400}?"${rawCreator}"`, 'i'));
+          text.match(new RegExp(`"${rawCreator}"[\\s\\S]{0,800}?"text":"([^"]{4,200})"`, 'i')) ||
+          text.match(new RegExp(`"text":"([^"]{4,200})"[\\s\\S]{0,800}?"${rawCreator}"`, 'i'));
         if (m && m[1]) {
           const unescaped = m[1].replace(/\\u[\dA-F]{4}/gi, (match) =>
             String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16))
@@ -557,13 +558,13 @@ function findInstagramPostUrl(
         const matchNear =
           text.match(
             new RegExp(
-              `"(?:shortcode|code)":"([a-zA-Z0-9_-]{8,})"[^}]{0,300}?"username":"${rawUsername}"`,
+              `"(?:shortcode|code)":"([a-zA-Z0-9_-]{8,})"[\\s\\S]{0,800}?"username":"${rawUsername}"`,
               'i'
             )
           ) ||
           text.match(
             new RegExp(
-              `"username":"${rawUsername}"[^}]{0,300}?"(?:shortcode|code)":"([a-zA-Z0-9_-]{8,})"`,
+              `"username":"${rawUsername}"[\\s\\S]{0,800}?"(?:shortcode|code)":"([a-zA-Z0-9_-]{8,})"`,
               'i'
             )
           );

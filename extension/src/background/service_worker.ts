@@ -332,25 +332,26 @@ async function postVideoToSupabase(
         }`
       );
 
-      // Heartbeat: update last_active_at on linked_devices (non-blocking)
+      // Heartbeat: Upsert last_active_at on linked_devices (non-blocking)
       try {
-        fetch(
-          `${endpoint}/rest/v1/linked_devices?device_id=eq.${encodeURIComponent(
-            metadata.device_id
-          )}&user_id=eq.${encodeURIComponent(authSession.user_id)}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              apikey: secret,
-              Authorization: `Bearer ${secret}`,
-            },
-            body: JSON.stringify({
-              last_active_at: new Date().toISOString(),
-              device_name: metadata.device_name,
-            }),
-          }
-        ).catch(() => {});
+        fetch(`${endpoint}/rest/v1/linked_devices`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: secret,
+            Authorization: `Bearer ${authToken || secret}`,
+            Prefer: 'resolution=merge-duplicates',
+          },
+          body: JSON.stringify({
+            user_id: authSession.user_id,
+            device_id: metadata.device_id,
+            device_name: metadata.device_name,
+            browser_type: metadata.browser_type,
+            os_name: metadata.os_name,
+            last_active_at: new Date().toISOString(),
+            is_revoked: false,
+          }),
+        }).catch(() => {});
       } catch {
         // Non-blocking
       }
