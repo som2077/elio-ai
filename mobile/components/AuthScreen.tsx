@@ -11,12 +11,20 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import * as WebBrowser from "expo-web-browser";
-import { makeRedirectUri } from "expo-auth-session";
 import { supabase } from "../services/supabase";
 import { motionTokens } from "../utils/motion";
 
-WebBrowser.maybeCompleteAuthSession();
+// Safe dynamic helper
+const getRedirectUri = () => "elio-ai://auth";
+
+// Safe dynamic import to prevent native module crashes on older APK builds
+let WebBrowser: any = null;
+try {
+  WebBrowser = require("expo-web-browser");
+  WebBrowser?.maybeCompleteAuthSession?.();
+} catch {
+  WebBrowser = null;
+}
 
 interface AuthScreenProps {
   onAuthSuccess?: () => void;
@@ -60,7 +68,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     try {
       setGoogleLoading(true);
       setMessage(null);
-      const redirectUrl = makeRedirectUri({ scheme: "elio-ai" });
+      const redirectUrl = getRedirectUri();
+
+      if (!WebBrowser) {
+        throw new Error("WebBrowser module not available in this APK build. Please use Email / OTP login below or rebuild the app.");
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -117,7 +129,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     try {
       setLoading(true);
       setMessage(null);
-      const redirectUrl = makeRedirectUri({ scheme: "elio-ai" });
+      const redirectUrl = getRedirectUri();
 
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),

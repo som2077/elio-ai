@@ -9,8 +9,14 @@ import {
   Animated,
   Dimensions,
 } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import { supabase } from "../services/supabase";
+
+let ExpoCameraModule: any = null;
+try {
+  ExpoCameraModule = require("expo-camera");
+} catch {
+  ExpoCameraModule = null;
+}
 
 const { width } = Dimensions.get("window");
 const SCAN_SIZE = width * 0.72;
@@ -26,7 +32,19 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [permission, requestPermission] = useCameraPermissions();
+  let permission: any = null;
+  let requestPermission = async () => {};
+
+  try {
+    if (ExpoCameraModule?.useCameraPermissions) {
+      const [perm, reqPerm] = ExpoCameraModule.useCameraPermissions();
+      permission = perm;
+      requestPermission = reqPerm;
+    }
+  } catch {
+    permission = null;
+  }
+
   const [scannedToken, setScannedToken] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
@@ -151,8 +169,21 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       onRequestClose={handleCancel}
     >
       <View style={styles.container}>
-        {/* Permission Request View */}
-        {!permission?.granted ? (
+        {!ExpoCameraModule?.CameraView ? (
+          <View style={styles.permissionContainer}>
+            <Text style={styles.permissionTitle}>Camera Module Not Available</Text>
+            <Text style={styles.permissionDesc}>
+              This development build needs a rebuild to link native camera modules.
+              {"\n\n"}
+              To test the camera scanner, please open the project using the Expo Go app, or rebuild with:
+              {"\n"}
+              npx expo run:android
+            </Text>
+            <TouchableOpacity style={styles.permissionBtn} onPress={handleCancel}>
+              <Text style={styles.permissionBtnText}>Back to Inbox</Text>
+            </TouchableOpacity>
+          </View>
+        ) : !permission?.granted ? (
           <View style={styles.permissionContainer}>
             <Text style={styles.permissionTitle}>Camera Access Required</Text>
             <Text style={styles.permissionDesc}>
@@ -172,13 +203,13 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         ) : (
           /* Active Camera Scanner View */
           <View style={styles.cameraWrapper}>
-            <CameraView
-              style={StyleSheet.absoluteFillObject}
-              barcodeScannerSettings={{
+            {React.createElement(ExpoCameraModule.CameraView, {
+              style: StyleSheet.absoluteFillObject,
+              barcodeScannerSettings: {
                 barcodeTypes: ["qr"],
-              }}
-              onBarcodeScanned={scannedToken ? undefined : handleBarcodeScanned}
-            />
+              },
+              onBarcodeScanned: scannedToken ? undefined : handleBarcodeScanned,
+            })}
 
             {/* Top Bar Header */}
             <View style={styles.topHeader}>
