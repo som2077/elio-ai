@@ -1,16 +1,19 @@
 import { NativeModules, Platform } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 
-// Direct production credentials to guarantee mobile connectivity even without process.env in bundling
-const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  "https://msphrcukcgfchodxhgot.supabase.co";
+// Read exclusively from environment variables injected by Expo at runtime/build-time
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 
-const SUPABASE_ANON_KEY =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zcGhyY3VrY2dmY2hvZHhoZ290Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODkyNTksImV4cCI6MjEwOTE2NTI1OX0.gB69GOJ9z8r3EfcywfUoELsI1WoF11pEV1vJgbvc7xI";
+export const isSupabaseConfigured = Boolean(
+  SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith("https://")
+);
 
-export const isSupabaseConfigured = true;
+if (!isSupabaseConfigured) {
+  console.warn(
+    "[Elio AI Security Warning] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Please verify your mobile/.env configuration file."
+  );
+}
 
 // In-memory fallback to prevent crash if native module is not yet compiled into current binary
 const memoryStore: Record<string, string> = {};
@@ -104,7 +107,10 @@ const SafeAsyncStorage = {
   },
 };
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(
+  SUPABASE_URL || "https://placeholder-project.supabase.co",
+  SUPABASE_ANON_KEY || "placeholder-anon-key",
+  {
   auth: {
     storage: SafeAsyncStorage,
     autoRefreshToken: true,
