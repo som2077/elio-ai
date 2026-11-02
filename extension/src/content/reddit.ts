@@ -1,6 +1,6 @@
 import { SavedVideoPayload, cleanVideoUrl } from '../utils/cleaner';
 
-console.log('[Elio AI] Reddit Content Script initialized.');
+console.log('[Elio AI Reddit] Content script initialized on', window.location.href);
 
 let lastSavedUrl: string | null = null;
 let lastSavedTime: number = 0;
@@ -61,103 +61,139 @@ function showElioToast(title: string, message: string, isSuccess: boolean = true
 }
 
 /**
- * Checks if an element or its ancestor represents a Reddit Upvote action
+ * Checks if an element is part of a Reddit Downvote action
  */
-function isRedditUpvoteButton(el: HTMLElement): { isUpvote: boolean; isUnlike: boolean } | null {
-  if (!el || typeof el.getAttribute !== 'function') return null;
+function isRedditDownvoteElement(el: HTMLElement | null): boolean {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  const aria = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+  const name = (el.getAttribute('name') || el.getAttribute('noun') || el.getAttribute('icon-name') || '').toLowerCase();
+  const testId = (el.getAttribute('data-testid') || el.getAttribute('data-click-id') || '').toLowerCase();
+  const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase();
+
+  return (
+    aria.includes('downvote') ||
+    aria.includes('down-vote') ||
+    name === 'downvote' ||
+    name.includes('downvote') ||
+    testId.includes('downvote') ||
+    cls.includes('downmod') ||
+    cls.includes('arrow down')
+  );
+}
+
+/**
+ * Checks if an element represents a Reddit Upvote action
+ */
+function isRedditUpvoteElement(el: HTMLElement | null): boolean {
+  if (!el || typeof el.getAttribute !== 'function') return false;
+  if (isRedditDownvoteElement(el)) return false;
 
   const aria = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+  const name = (el.getAttribute('name') || el.getAttribute('noun') || el.getAttribute('icon-name') || '').toLowerCase();
   const testId = (el.getAttribute('data-testid') || el.getAttribute('data-click-id') || '').toLowerCase();
-  const name = (el.getAttribute('name') || el.getAttribute('noun') || '').toLowerCase();
-  const cls = (el.className && typeof el.className === 'string' ? el.className : '').toLowerCase();
-  const id = (el.id || '').toLowerCase();
-  const hasUpvoteAttr = el.hasAttribute('upvote') || el.hasAttribute('data-upvote');
+  const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase();
 
-  const matchesUpvote =
+  if (
     aria.includes('upvote') ||
     aria.includes('up-vote') ||
-    testId.includes('upvote') ||
     name === 'upvote' ||
-    id.includes('upvote') ||
-    hasUpvoteAttr ||
-    cls.includes('arrow up') ||
+    name.includes('upvote') ||
+    testId.includes('upvote') ||
     cls.includes('icon-upvote') ||
-    cls.includes('upvote-button');
+    cls.includes('upvote-button') ||
+    cls.includes('arrow up') ||
+    el.hasAttribute('upvote') ||
+    el.hasAttribute('data-upvote')
+  ) {
+    return true;
+  }
 
-  // Also check if child faceplate-icon or svg has upvote
-  let hasChildUpvoteIcon = false;
+  // Check child faceplate-icon or svg
   try {
-    if (!matchesUpvote && el.querySelector) {
-      const childIcon = el.querySelector('faceplate-icon[name="upvote"], svg[aria-label*="upvote" i], .icon-upvote');
-      if (childIcon) hasChildUpvoteIcon = true;
+    if (el.querySelector) {
+      const child = el.querySelector(
+        'faceplate-icon[name="upvote"], button[icon-name="upvote"], svg[aria-label*="upvote" i], .icon-upvote'
+      );
+      if (child) return true;
     }
   } catch {}
 
-  if (!matchesUpvote && !hasChildUpvoteIcon) {
-    return null;
-  }
-
-  // Check if it is an UN-UPVOTE (the button is currently pressed/active/orange)
-  const ariaPressed = el.getAttribute('aria-pressed');
-  const isUnlike =
-    aria.includes('undo') ||
-    aria.includes('remove') ||
-    ariaPressed === 'true' ||
-    cls.includes('upmod') ||
-    cls.includes('text-orangered') ||
-    cls.includes('is-upvoted') ||
-    el.getAttribute('vote-state') === 'upvoted';
-
-  return { isUpvote: true, isUnlike };
+  return false;
 }
 
 /**
  * Checks if an element represents a Reddit Save/Bookmark action
  */
-function isRedditSaveButton(el: HTMLElement): { isSave: boolean; isUnlike: boolean } | null {
-  if (!el || typeof el.getAttribute !== 'function') return null;
-
+function isRedditSaveElement(el: HTMLElement | null): boolean {
+  if (!el || typeof el.getAttribute !== 'function') return false;
   const tag = (el.tagName || '').toLowerCase();
   const aria = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
   const testId = (el.getAttribute('data-testid') || el.getAttribute('data-click-id') || '').toLowerCase();
+  const name = (el.getAttribute('name') || el.getAttribute('noun') || '').toLowerCase();
 
-  const isSave =
+  return (
     tag === 'shreddit-post-save-button' ||
     aria.includes('save') ||
     aria.includes('bookmark') ||
-    testId.includes('save');
-
-  if (!isSave) return null;
-
-  const isUnlike = aria.includes('unsave') || aria.includes('remove') || el.getAttribute('aria-pressed') === 'true';
-  return { isSave: true, isUnlike };
+    name === 'save' ||
+    name === 'bookmark' ||
+    testId.includes('save')
+  );
 }
 
 /**
  * Finds the enclosing Reddit post container across Light and Shadow DOM
  */
-function findRedditPostContainer(clickedEl: HTMLElement, path: HTMLElement[]): HTMLElement {
+function findRedditPostContainer(clickedEl?: HTMLElement | null, path?: HTMLElement[]): HTMLElement {
   // 1. Search up the composedPath
-  for (const node of path) {
-    if (!node || node === document || node === window || typeof node.getAttribute !== 'function') continue;
-    const tag = (node.tagName || '').toLowerCase();
-    if (tag === 'shreddit-post') return node;
-    if (node.getAttribute('data-testid') === 'post-container') return node;
-    if (tag === 'article' && (node.getAttribute('aria-label') || node.classList.contains('Post'))) return node;
+  if (path && Array.isArray(path)) {
+    for (const node of path) {
+      if (!node || node === (document as any) || node === (window as any) || typeof node.getAttribute !== 'function') continue;
+      const tag = (node.tagName || '').toLowerCase();
+      if (tag === 'shreddit-post') return node;
+      if (node.getAttribute('data-testid') === 'post-container') return node;
+      if (tag === 'article' && (node.getAttribute('aria-label') || node.classList.contains('Post'))) return node;
+    }
   }
 
   // 2. Check closest in Light DOM
-  const closestPost =
-    clickedEl.closest('shreddit-post') ||
-    clickedEl.closest('div[data-testid="post-container"]') ||
-    clickedEl.closest('article');
-  if (closestPost) return closestPost as HTMLElement;
+  if (clickedEl) {
+    const closestPost =
+      clickedEl.closest('shreddit-post') ||
+      clickedEl.closest('div[data-testid="post-container"]') ||
+      clickedEl.closest('article');
+    if (closestPost) return closestPost as HTMLElement;
+  }
 
-  // 3. Main post on single post page
+  // 3. Fallback to main post on single post page
   const mainPost = document.querySelector('shreddit-post, div[data-testid="post-container"], article');
   if (mainPost) return mainPost as HTMLElement;
 
   return document.body;
+}
+
+/**
+ * Checks if the post or button is currently in an active/upvoted state
+ */
+function isPostCurrentlyUpvoted(post: HTMLElement, buttonEl?: HTMLElement | null): boolean {
+  // 1. Shreddit post attribute vote-type
+  const voteType = (post.getAttribute('vote-type') || '').toLowerCase();
+  if (voteType === 'upvote') return true;
+
+  // 2. Button aria-pressed attribute
+  if (buttonEl) {
+    if (buttonEl.getAttribute('aria-pressed') === 'true') return true;
+    if (buttonEl.getAttribute('vote-state') === 'upvoted') return true;
+  }
+
+  const btn = post.querySelector('button[aria-label*="upvote" i], button[icon-name="upvote"], faceplate-tracker[noun="upvote"] button');
+  if (btn && btn.getAttribute('aria-pressed') === 'true') return true;
+
+  // 3. Old reddit
+  const oldArrow = post.querySelector('.arrow.up');
+  if (oldArrow && oldArrow.classList.contains('upmod')) return true;
+
+  return false;
 }
 
 /**
@@ -168,26 +204,28 @@ function findRedditPostUrl(post: HTMLElement): string {
   const permalink =
     post.getAttribute('permalink') ||
     post.getAttribute('content-href') ||
-    post.getAttribute('post-url');
-  if (permalink && (permalink.includes('/comments/') || permalink.includes('/r/'))) {
+    post.getAttribute('post-url') ||
+    post.getAttribute('data-permalink');
+
+  if (permalink && (permalink.includes('/comments/') || permalink.includes('/r/') || permalink.includes('/s/'))) {
     return permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
   }
 
   // 2. Search anchors inside the post
   const anchors = Array.from(
     post.querySelectorAll<HTMLAnchorElement>(
-      'a[slot="full-post-link"], a[data-click-id="body"], a[data-click-id="comments"], a[data-testid="post-title"], a[href*="/comments/"]'
+      'a[slot="full-post-link"], a[data-testid="post-title"], a[data-click-id="body"], a[data-click-id="comments"], a[href*="/comments/"], a[href*="/s/"]'
     )
   );
   for (const a of anchors) {
     const href = a.getAttribute('href') || a.href || '';
-    if (href.includes('/comments/')) {
+    if (href.includes('/comments/') || href.includes('/s/')) {
       return href.startsWith('http') ? href : `https://www.reddit.com${href}`;
     }
   }
 
   // 3. Current URL if on a post page
-  if (window.location.pathname.includes('/comments/')) {
+  if (window.location.pathname.includes('/comments/') || window.location.pathname.includes('/s/')) {
     return window.location.href;
   }
 
@@ -202,13 +240,11 @@ function findRedditPostUrl(post: HTMLElement): string {
  * Extracts clean post title
  */
 function findRedditPostTitle(post: HTMLElement): string {
-  // 1. Shreddit post-title attribute
   const attrTitle = post.getAttribute('post-title') || post.getAttribute('title');
   if (attrTitle && attrTitle.trim()) {
     return attrTitle.trim();
   }
 
-  // 2. Heading element inside post
   const heading = post.querySelector<HTMLElement>(
     'h1[slot="title"], [slot="title"], a[slot="full-post-link"], h1, h2, h3, div[data-adclicklocation="title"]'
   );
@@ -216,7 +252,6 @@ function findRedditPostTitle(post: HTMLElement): string {
     return heading.textContent.trim();
   }
 
-  // 3. Fallback to document title
   const docTitle = document.title.replace(/\s*:\s*r\/[a-zA-Z0-9_]+.*$/i, '').trim();
   if (docTitle && !docTitle.toLowerCase().includes('reddit')) {
     return docTitle;
@@ -298,6 +333,16 @@ function findRedditMedia(post: HTMLElement): { thumbnail: string; category: 'vid
     }
   }
 
+  // 4. Subreddit avatar/icon fallback
+  if (!thumbnail) {
+    const iconImg = post.querySelector<HTMLImageElement>(
+      'faceplate-img, img[src*="communityIcon"], img[src*="styles.redditmedia.com"]'
+    );
+    if (iconImg?.src) {
+      thumbnail = iconImg.src;
+    }
+  }
+
   return {
     thumbnail,
     category: isVideo ? 'video' : 'post',
@@ -307,12 +352,17 @@ function findRedditMedia(post: HTMLElement): { thumbnail: string; category: 'vid
 /**
  * Scrapes metadata of a Reddit Post or Video
  */
-function scrapeRedditPost(clickedEl: HTMLElement, path: HTMLElement[]): SavedVideoPayload | null {
-  const post = findRedditPostContainer(clickedEl, path);
+function scrapeRedditPost(post: HTMLElement): SavedVideoPayload | null {
   const rawPostUrl = findRedditPostUrl(post);
 
   if (!rawPostUrl) {
-    console.warn('[Elio AI] Could not find Reddit post URL');
+    console.warn('[Elio AI Reddit] Could not find Reddit post URL');
+    return null;
+  }
+
+  // Guard against saving home feed as a post
+  if (rawPostUrl === 'https://www.reddit.com/' || rawPostUrl === 'https://reddit.com/') {
+    console.warn('[Elio AI Reddit] Post URL resolved to home feed root. Aborting.');
     return null;
   }
 
@@ -341,20 +391,24 @@ function scrapeRedditPost(clickedEl: HTMLElement, path: HTMLElement[]): SavedVid
  */
 function sendRedditSync(payload: SavedVideoPayload) {
   const now = Date.now();
-  if (payload.clean_url === lastSavedUrl && now - lastSavedTime < 4000) return;
+  if (payload.clean_url === lastSavedUrl && now - lastSavedTime < 4000) {
+    console.log('[Elio AI Reddit] Duplicate sync throttled:', payload.clean_url);
+    return;
+  }
   lastSavedUrl = payload.clean_url;
   lastSavedTime = now;
 
   try {
     if (!chrome?.runtime?.id) {
-      console.warn('[Elio AI] Extension context invalidated.');
+      console.warn('[Elio AI Reddit] Extension context invalidated.');
       return;
     }
 
-    console.log('[Elio AI] 🚀 Sending Reddit item to Cloud:', payload);
+    console.log('[Elio AI Reddit] 🚀 Sending Reddit item to Cloud:', payload);
 
     chrome.runtime.sendMessage({ type: 'VIDEO_LIKED', payload }, (response) => {
       if (chrome.runtime.lastError) {
+        console.warn('[Elio AI Reddit] Runtime message error:', chrome.runtime.lastError.message);
         showElioToast('Saved to Elio AI', `"${(payload.title || 'Reddit post').slice(0, 32)}..."`, true);
         return;
       }
@@ -372,20 +426,30 @@ function sendRedditSync(payload: SavedVideoPayload) {
       }
     });
   } catch (err) {
-    console.error('[Elio AI] Error sending Reddit sync:', err);
+    console.error('[Elio AI Reddit] Error sending Reddit sync:', err);
   }
 }
 
-// Global click capture across Light DOM and Shadow DOM using composedPath
+// 1. Global click capture across Light DOM and Shadow DOM using composedPath
 document.addEventListener(
   'click',
   (event) => {
     const target = event.target as HTMLElement | null;
     if (!target) return;
 
-    const path = (typeof event.composedPath === 'function' ? (event.composedPath() as HTMLElement[]) : [target]) || [target];
+    const path =
+      (typeof event.composedPath === 'function' ? (event.composedPath() as HTMLElement[]) : [target]) || [target];
 
-    let action: { isUnlike: boolean } | null = null;
+    // Check if click was on downvote -> ignore immediately
+    for (const node of path) {
+      if (isRedditDownvoteElement(node)) {
+        console.log('[Elio AI Reddit] Downvote clicked. Skipping.');
+        return;
+      }
+    }
+
+    let isUpvote = false;
+    let isSave = false;
     let clickedEl: HTMLElement | null = null;
 
     // Search the full composedPath to find upvote or save button
@@ -394,36 +458,77 @@ document.addEventListener(
         continue;
       }
 
-      const upvote = isRedditUpvoteButton(node);
-      if (upvote) {
-        action = upvote;
+      if (isRedditUpvoteElement(node)) {
+        isUpvote = true;
         clickedEl = node;
         break;
       }
 
-      const save = isRedditSaveButton(node);
-      if (save) {
-        action = save;
+      if (isRedditSaveElement(node)) {
+        isSave = true;
         clickedEl = node;
         break;
       }
     }
 
-    if (!action || !clickedEl) return;
+    if (!isUpvote && !isSave) return;
+
+    const post = findRedditPostContainer(clickedEl, path);
+    const wasAlreadyUpvoted = isPostCurrentlyUpvoted(post, clickedEl);
 
     // If user clicked an already active upvote/save, they are un-upvoting -> do not sync
-    if (action.isUnlike) {
-      console.log('[Elio AI] Ignored Reddit un-upvote/unsave click.');
+    if (wasAlreadyUpvoted) {
+      console.log('[Elio AI Reddit] Un-upvoting/unsaving post. Skipping sync.');
       return;
     }
 
-    console.log('[Elio AI] Detected Reddit Upvote/Save click! Syncing...');
+    console.log('[Elio AI Reddit] Detected Upvote/Save click on post! Will scrape after DOM settles...');
     setTimeout(() => {
-      const payload = scrapeRedditPost(clickedEl!, path);
+      const payload = scrapeRedditPost(post);
       if (payload) {
         sendRedditSync(payload);
       }
-    }, 200);
+    }, 250);
   },
   true
 );
+
+// 2. MutationObserver: Watches for vote-type or aria-pressed attribute transitions
+const observer = new MutationObserver((mutations) => {
+  for (const mutation of mutations) {
+    if (mutation.type === 'attributes') {
+      const el = mutation.target as HTMLElement;
+      if (!el || typeof el.getAttribute !== 'function') continue;
+
+      // Case 1: <shreddit-post vote-type="upvote">
+      if (mutation.attributeName === 'vote-type') {
+        const voteType = (el.getAttribute('vote-type') || '').toLowerCase();
+        if (voteType === 'upvote') {
+          console.log('[Elio AI Reddit] Post vote-type changed to upvote via DOM mutation.');
+          const payload = scrapeRedditPost(el);
+          if (payload) {
+            sendRedditSync(payload);
+          }
+        }
+      }
+
+      // Case 2: button aria-pressed="true"
+      if (mutation.attributeName === 'aria-pressed' && el.getAttribute('aria-pressed') === 'true') {
+        if (isRedditUpvoteElement(el)) {
+          console.log('[Elio AI Reddit] Upvote button aria-pressed became true via DOM mutation.');
+          const post = findRedditPostContainer(el);
+          const payload = scrapeRedditPost(post);
+          if (payload) {
+            sendRedditSync(payload);
+          }
+        }
+      }
+    }
+  }
+});
+
+observer.observe(document.body, {
+  attributes: true,
+  subtree: true,
+  attributeFilter: ['vote-type', 'aria-pressed'],
+});

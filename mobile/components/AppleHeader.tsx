@@ -1,34 +1,29 @@
-import React, { useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { appleColors, appleRadii, appleTypography } from '../theme/appleTokens';
-import { haptics } from '../utils/haptics';
-import { motionTokens } from '../utils/motion';
+import React, { useRef } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { appleColors } from "../theme/appleTokens";
+import { haptics } from "../utils/haptics";
+import { motionTokens } from "../utils/motion";
 
 interface AppleHeaderProps {
   userEmail?: string;
   totalCount: number;
   unreadCount: number;
-  showCalendar: boolean;
-  onToggleCalendar: () => void;
+  layoutMode: "grid" | "list";
+  onToggleLayout: () => void;
   onOpenScanner: () => void;
-  onOpenDevices: () => void;
-  onLogout: () => void;
 }
 
 export const AppleHeader: React.FC<AppleHeaderProps> = ({
   userEmail,
   totalCount,
   unreadCount,
-  showCalendar,
-  onToggleCalendar,
+  layoutMode,
+  onToggleLayout,
   onOpenScanner,
-  onOpenDevices,
-  onLogout,
 }) => {
   const qrScale = useRef(new Animated.Value(1)).current;
-  const calScale = useRef(new Animated.Value(1)).current;
-  const menuScale = useRef(new Animated.Value(1)).current;
+  const layoutScale = useRef(new Animated.Value(1)).current;
 
   const animatePressIn = (val: Animated.Value) => {
     Animated.spring(val, {
@@ -50,27 +45,57 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
   return (
     <View style={styles.headerContainer}>
-      {/* Top Identity Row */}
-      <View style={styles.titleRow}>
-        <View style={styles.titleGroup}>
-          <Text style={styles.largeTitle}>Elio AI</Text>
-          <View style={styles.statusRow}>
-            <View style={styles.livePulseDot} />
-            <Text style={styles.statusText}>
+      {/* Brand & Greeting Block */}
+      <View style={styles.brandRow}>
+        <View style={styles.brandLeft}>
+          {/* Mascot Squircle Badge */}
+          <View style={styles.mascotBadge}>
+            <View style={styles.mascotHead}>
+              <View style={styles.mascotEyeLeft} />
+              <View style={styles.mascotEyeRight} />
+            </View>
+          </View>
+
+          <View style={styles.titleColumn}>
+            <View style={styles.titleRow}>
+              <Text style={styles.brandTitle}>Elio AI</Text>
+              <View style={styles.livePulseDot} />
+            </View>
+            <Text style={styles.subtitle}>
               {unreadCount > 0
-                ? `${unreadCount} unread • ${totalCount} saved`
-                : `All caught up • ${totalCount} saved`}
+                ? `${unreadCount} unread • ${totalCount} saved clips`
+                : `All caught up • ${totalCount} clips`}
             </Text>
           </View>
         </View>
 
-        {/* Apple HIG Action Capsule */}
-        <View style={styles.actionsGroup}>
-          {/* Link PC (QR Scan) Button */}
+        {/* Right Action Icons: Grid/List Toggle + Link PC */}
+        <View style={styles.actionsRight}>
+          {/* Grid vs List View Mode Toggle */}
+          <Animated.View style={{ transform: [{ scale: layoutScale }] }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.actionCircleBtn}
+              onPressIn={() => animatePressIn(layoutScale)}
+              onPressOut={() => animatePressOut(layoutScale)}
+              onPress={() => {
+                haptics.selection();
+                onToggleLayout();
+              }}
+            >
+              <Ionicons
+                name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
+                size={18}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Quick Link PC QR Scanner */}
           <Animated.View style={{ transform: [{ scale: qrScale }] }}>
             <TouchableOpacity
-              activeOpacity={0.88}
-              style={styles.actionPill}
+              activeOpacity={0.85}
+              style={styles.linkPill}
               onPressIn={() => animatePressIn(qrScale)}
               onPressOut={() => animatePressOut(qrScale)}
               onPress={() => {
@@ -78,69 +103,10 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
                 onOpenScanner();
               }}
             >
-              <Ionicons name="qr-code-outline" size={15} color={appleColors.accentLight} />
-              <Text style={styles.actionPillText}>Link PC</Text>
+              <Ionicons name="qr-code-outline" size={14} color="#070A11" />
+              <Text style={styles.linkPillText}>Link PC</Text>
             </TouchableOpacity>
           </Animated.View>
-
-          {/* Activity Calendar / Stats Button */}
-          <Animated.View style={{ transform: [{ scale: calScale }] }}>
-            <TouchableOpacity
-              activeOpacity={0.88}
-              style={[
-                styles.actionPill,
-                showCalendar && styles.actionPillActive,
-              ]}
-              onPressIn={() => animatePressIn(calScale)}
-              onPressOut={() => animatePressOut(calScale)}
-              onPress={() => {
-                haptics.selection();
-                onToggleCalendar();
-              }}
-            >
-              <Ionicons
-                name={showCalendar ? 'calendar' : 'calendar-outline'}
-                size={15}
-                color={showCalendar ? '#FFFFFF' : appleColors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.actionPillText,
-                  showCalendar && styles.actionPillTextActive,
-                ]}
-              >
-                {showCalendar ? 'Close' : 'Stats'}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Quick Devices Manager */}
-          <Animated.View style={{ transform: [{ scale: menuScale }] }}>
-            <TouchableOpacity
-              activeOpacity={0.88}
-              style={styles.iconCircleBtn}
-              onPressIn={() => animatePressIn(menuScale)}
-              onPressOut={() => animatePressOut(menuScale)}
-              onPress={() => {
-                haptics.light();
-                onOpenDevices();
-              }}
-            >
-              <Ionicons name="laptop-outline" size={16} color={appleColors.textSecondary} />
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Sign Out Button */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.iconCircleBtn}
-            onPress={() => {
-              haptics.warning();
-              onLogout();
-            }}
-          >
-            <Ionicons name="log-out-outline" size={16} color={appleColors.textTertiary} />
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -149,78 +115,109 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
     backgroundColor: appleColors.canvas,
-    borderBottomWidth: 1,
-    borderBottomColor: appleColors.borderSubtle,
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  titleGroup: {
+  brandLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     flex: 1,
   },
-  largeTitle: {
-    ...appleTypography.largeTitle,
+  mascotBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  mascotHead: {
+    width: 22,
+    height: 20,
+    borderRadius: 7,
+    backgroundColor: "#FFFFFF",
+    transform: [{ rotate: "12deg" }],
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  mascotEyeLeft: {
+    width: 2.5,
+    height: 5,
+    borderRadius: 1.5,
+    backgroundColor: "#070A11",
+  },
+  mascotEyeRight: {
+    width: 2.5,
+    height: 5,
+    borderRadius: 1.5,
+    backgroundColor: "#070A11",
+  },
+  titleColumn: {
+    justifyContent: "center",
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    marginTop: 4,
+  },
+  brandTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
   livePulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: appleColors.success,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: appleColors.accentLight,
   },
-  statusText: {
-    ...appleTypography.footnote,
-    ...appleTypography.tabularNums,
+  subtitle: {
     color: appleColors.textSecondary,
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 2,
   },
-  actionsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 4,
+  actionsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  actionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  actionCircleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: appleColors.accentLight,
+    paddingHorizontal: 12,
+    paddingVertical: 7.5,
+    borderRadius: 18,
     gap: 5,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: appleRadii.pill,
-    backgroundColor: appleColors.surfaceGlass,
-    borderWidth: 1,
-    borderColor: appleColors.borderGlass,
   },
-  actionPillActive: {
-    backgroundColor: appleColors.accent,
-    borderColor: appleColors.accentLight,
-  },
-  actionPillText: {
-    ...appleTypography.caption,
-    color: appleColors.textSecondary,
-    fontWeight: '700',
-  },
-  actionPillTextActive: {
-    color: '#FFFFFF',
-  },
-  iconCircleBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: appleColors.surfaceGlass,
-    borderWidth: 1,
-    borderColor: appleColors.borderGlass,
-    justifyContent: 'center',
-    alignItems: 'center',
+  linkPillText: {
+    color: "#070A11",
+    fontSize: 11.5,
+    fontWeight: "800",
+    letterSpacing: 0.1,
   },
 });

@@ -16,14 +16,23 @@
   "host_permissions": [
     "https://msphrcukcgfchodxhgot.supabase.co/*",
     "https://*.supabase.co/*",
+    "*://youtube.com/*",
     "*://*.youtube.com/*",
+    "*://instagram.com/*",
     "*://*.instagram.com/*",
+    "*://twitter.com/*",
     "*://*.twitter.com/*",
+    "*://x.com/*",
     "*://*.x.com/*",
+    "*://facebook.com/*",
     "*://*.facebook.com/*",
+    "*://reddit.com/*",
     "*://*.reddit.com/*",
+    "*://linkedin.com/*",
     "*://*.linkedin.com/*",
+    "*://pinterest.com/*",
     "*://*.pinterest.com/*",
+    "*://tiktok.com/*",
     "*://*.tiktok.com/*"
   ],
   "background": {
@@ -31,42 +40,47 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.youtube.com/*"],
+      "matches": ["*://youtube.com/*", "*://*.youtube.com/*"],
       "js": ["dist/content/youtube.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.instagram.com/*"],
+      "matches": ["*://instagram.com/*", "*://*.instagram.com/*"],
       "js": ["dist/content/instagram.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.twitter.com/*", "*://*.x.com/*"],
+      "matches": [
+        "*://twitter.com/*",
+        "*://*.twitter.com/*",
+        "*://x.com/*",
+        "*://*.x.com/*"
+      ],
       "js": ["dist/content/twitter.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.facebook.com/*"],
+      "matches": ["*://facebook.com/*", "*://*.facebook.com/*"],
       "js": ["dist/content/facebook.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.reddit.com/*"],
+      "matches": ["*://reddit.com/*", "*://*.reddit.com/*"],
       "js": ["dist/content/reddit.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.linkedin.com/*"],
+      "matches": ["*://linkedin.com/*", "*://*.linkedin.com/*"],
       "js": ["dist/content/linkedin.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.pinterest.com/*"],
+      "matches": ["*://pinterest.com/*", "*://*.pinterest.com/*"],
       "js": ["dist/content/pinterest.js"],
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.tiktok.com/*"],
+      "matches": ["*://tiktok.com/*", "*://*.tiktok.com/*"],
       "js": ["dist/content/tiktok.js"],
       "run_at": "document_idle"
     }

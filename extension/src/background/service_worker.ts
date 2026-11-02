@@ -75,11 +75,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
  */
 async function injectScriptsIntoExistingTabs() {
   const targets = [
-    { urls: ['*://*.youtube.com/*'], file: 'dist/content/youtube.js' },
-    { urls: ['*://*.instagram.com/*'], file: 'dist/content/instagram.js' },
-    { urls: ['*://*.twitter.com/*', '*://*.x.com/*'], file: 'dist/content/twitter.js' },
-    { urls: ['*://*.reddit.com/*'], file: 'dist/content/reddit.js' },
-    { urls: ['*://*.tiktok.com/*'], file: 'dist/content/tiktok.js' },
+    { urls: ['*://youtube.com/*', '*://*.youtube.com/*'], file: 'dist/content/youtube.js' },
+    { urls: ['*://instagram.com/*', '*://*.instagram.com/*'], file: 'dist/content/instagram.js' },
+    { urls: ['*://twitter.com/*', '*://*.twitter.com/*', '*://x.com/*', '*://*.x.com/*'], file: 'dist/content/twitter.js' },
+    { urls: ['*://reddit.com/*', '*://*.reddit.com/*'], file: 'dist/content/reddit.js' },
+    { urls: ['*://tiktok.com/*', '*://*.tiktok.com/*'], file: 'dist/content/tiktok.js' },
   ];
 
   for (const target of targets) {
