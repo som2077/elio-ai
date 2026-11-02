@@ -294,10 +294,7 @@ export default function HomeScreen() {
               )}
               contentContainerStyle={styles.gridContent}
               ListEmptyComponent={
-                <EmptyState
-                  filter={filter}
-                  onOpenScanner={() => setShowScanner(true)}
-                />
+                <EmptyState onLinkPress={() => setShowScanner(true)} />
               }
               refreshControl={
                 <RefreshControl
@@ -349,10 +346,7 @@ export default function HomeScreen() {
               )}
               contentContainerStyle={styles.listContent}
               ListEmptyComponent={
-                <EmptyState
-                  filter={filter}
-                  onOpenScanner={() => setShowScanner(true)}
-                />
+                <EmptyState onLinkPress={() => setShowScanner(true)} />
               }
               refreshControl={
                 <RefreshControl
@@ -446,7 +440,7 @@ export default function HomeScreen() {
       <QRScannerModal
         visible={showScanner}
         onClose={() => setShowScanner(false)}
-        onScanSuccess={() => {
+        onSuccess={() => {
           fetchVideos();
         }}
       />
