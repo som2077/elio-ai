@@ -30,6 +30,11 @@ mobile/ios/DerivedData/
 
 # Extension artifacts
 extension/web-ext-artifacts/
+extension/dist/
+extension/src/popup/popup.js
+extension/.env
+extension/.env.*
+!extension/.env.example
 
 # System & Editor files
 .DS_Store

@@ -5,6 +5,25 @@ import fs from "fs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
+// Load local environment variables from extension/.env (gitignored)
+const envVars = {};
+const envPath = resolve(__dirname, ".env");
+if (fs.existsSync(envPath)) {
+  const content = fs.readFileSync(envPath, "utf-8");
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+      const idx = trimmed.indexOf("=");
+      const key = trimmed.slice(0, idx).trim();
+      const val = trimmed.slice(idx + 1).trim();
+      envVars[key] = val;
+    }
+  }
+}
+
+const supabaseUrl = envVars.SUPABASE_URL || process.env.SUPABASE_URL || "";
+const supabaseAnonKey = envVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+
 const entries = [
   {
     name: "youtube",
@@ -62,6 +81,10 @@ async function run() {
   for (const entry of entries) {
     await build({
       configFile: false,
+      define: {
+        "process.env.SUPABASE_URL": JSON.stringify(supabaseUrl),
+        "process.env.SUPABASE_ANON_KEY": JSON.stringify(supabaseAnonKey),
+      },
       build: {
         outDir: "dist",
         emptyOutDir: false,
@@ -80,19 +103,31 @@ async function run() {
     });
   }
 
-  // Ensure popup.js and popup.html are present and synced in both src/popup and dist/src/popup
-  const distPopupJs = resolve(__dirname, "dist/src/popup/popup.js");
-  const srcPopupJs = resolve(__dirname, "src/popup/popup.js");
+  // Ensure popup.html is copied to dist/src/popup/
   const srcPopupHtml = resolve(__dirname, "src/popup/popup.html");
   const distPopupHtml = resolve(__dirname, "dist/src/popup/popup.html");
-
-  if (fs.existsSync(distPopupJs)) {
-    fs.copyFileSync(distPopupJs, srcPopupJs);
-  }
   if (fs.existsSync(srcPopupHtml)) {
     fs.mkdirSync(resolve(__dirname, "dist/src/popup"), { recursive: true });
     fs.copyFileSync(srcPopupHtml, distPopupHtml);
   }
+
+  // Copy icons to dist/icons
+  const srcIcons = resolve(__dirname, "icons");
+  const distIcons = resolve(__dirname, "dist/icons");
+  if (fs.existsSync(srcIcons)) {
+    fs.mkdirSync(distIcons, { recursive: true });
+    for (const iconFile of fs.readdirSync(srcIcons)) {
+      fs.copyFileSync(resolve(srcIcons, iconFile), resolve(distIcons, iconFile));
+    }
+  }
+
+  // Ensure no compiled artifacts linger in src/
+  const srcPopupJs = resolve(__dirname, "src/popup/popup.js");
+  if (fs.existsSync(srcPopupJs)) {
+    fs.unlinkSync(srcPopupJs);
+  }
+
+  console.log("✓ Elio AI Extension built successfully with environment variables injected.");
 }
 
 run();

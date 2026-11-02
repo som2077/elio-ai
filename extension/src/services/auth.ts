@@ -31,16 +31,26 @@ function _d(b: string): string {
   }
 }
 
-export const DEFAULT_SUPABASE_URL = "https://msphrcukcgfchodxhgot.supabase.co";
+declare const process: {
+  env?: {
+    SUPABASE_URL?: string;
+    SUPABASE_ANON_KEY?: string;
+  };
+};
+
+// Build-time injected credentials via Vite define (from extension/.env)
+export const DEFAULT_SUPABASE_URL =
+  (typeof process !== "undefined" && process.env?.SUPABASE_URL) || "";
 
 export const DEFAULT_SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zcGhyY3VrY2dmY2hvZHhoZ290Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODkyNTksImV4cCI6MjEwOTE2NTI1OX0.gB69GOJ9z8r3EfcywfUoELsI1WoF11pEV1vJgbvc7xI";
+  (typeof process !== "undefined" && process.env?.SUPABASE_ANON_KEY) || "";
 
 /**
  * Returns the Universal Smart URL for mobile deep link redirect
  */
 export function getUniversalSmartUrl(qrToken: string): string {
-  return `https://msphrcukcgfchodxhgot.supabase.co/functions/v1/app-redirect?token=${qrToken}`;
+  const base = DEFAULT_SUPABASE_URL || "https://placeholder-project.supabase.co";
+  return `${base}/functions/v1/app-redirect?token=${qrToken}`;
 }
 
 /**
@@ -311,6 +321,45 @@ export function listenForApproval(
     if (isCancelled) return;
 
     try {
+      // 1. First attempt secure RPC claim_qr_session
+      try {
+        const rpcRes = await fetch(`${endpoint}/rest/v1/rpc/claim_qr_session`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apikey,
+            Authorization: `Bearer ${apikey}`,
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ p_qr_token: qrToken }),
+        });
+
+        if (rpcRes.ok) {
+          const rpcData = await rpcRes.json();
+          if (rpcData?.status === "approved" && rpcData?.auth_payload) {
+            const payload = rpcData.auth_payload;
+            const authSession: AuthSession = {
+              user_id: payload.user_id || "",
+              email: payload.email || "",
+              access_token: payload.access_token || "",
+              refresh_token: payload.refresh_token || "",
+            };
+            await chrome.storage.local.set({ authSession });
+            stop();
+            onApproved(authSession);
+            return;
+          } else if (rpcData?.status === "expired") {
+            stop();
+            onExpired?.();
+            return;
+          }
+          // still pending, wait for next tick
+          return;
+        }
+      } catch {
+        // Fallback to direct check if RPC is unavailable
+      }
+
       const url = `${endpoint}/rest/v1/qr_auth_sessions?qr_token=eq.${encodeURIComponent(qrToken)}&select=*`;
       const response = await fetch(url, {
         method: "GET",
