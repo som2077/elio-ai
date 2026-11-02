@@ -196,8 +196,8 @@ export function listenForApproval(
     }
   };
 
-  // Start polling after 1.5 seconds
-  timerId = setTimeout(poll, 1500);
+  // Start polling immediately
+  poll();
 
   const stop = () => {
     isCancelled = true;

@@ -190,14 +190,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     qrTimerText.textContent = "Expires in 05:00";
 
     try {
-      // 1. Create session in Supabase qr_auth_sessions
-      const session = await createQRSession();
+      // 1. Check if we already have an active pending QR session in storage
+      const stored = await chrome.storage.local.get("activeQRSession");
+      let session = stored.activeQRSession;
+      const now = Date.now();
+      const isExpired =
+        !session ||
+        !session.expires_at ||
+        new Date(session.expires_at).getTime() <= now + 15000;
+
+      if (isExpired) {
+        session = await createQRSession();
+        await chrome.storage.local.set({ activeQRSession: session });
+      }
 
       // 2. Render dynamic QR Code on canvas
       await renderQRCodeToCanvas(qrCanvas, session.qr_token);
       qrLoading.classList.add("hidden");
 
-      // 3. Start 5-minute (300s) countdown timer
+      // 3. Start 5-minute countdown timer
       startCountdown(new Date(session.expires_at).getTime());
 
       // 4. Listen for real-time mobile approval
@@ -206,10 +217,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         undefined,
         session.qr_token,
         async (approvedSession) => {
+          await chrome.storage.local.remove("activeQRSession");
           cleanupListeners();
           showAuthenticatedView(approvedSession);
         },
-        () => {
+        async () => {
+          await chrome.storage.local.remove("activeQRSession");
           handleSessionExpired();
         },
       );
@@ -253,21 +266,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * Handles session expiration UI
    */
-  function handleSessionExpired() {
+  async function handleSessionExpired() {
     cleanupListeners();
+    await chrome.storage.local.remove("activeQRSession");
     qrTimerText.textContent = "Session Expired";
     qrTimer.className = "qr-timer-pill expired";
     refreshQrBtn.classList.remove("hidden");
   }
 
   // Handle Refresh QR button click
-  refreshQrBtn.addEventListener("click", () => {
+  refreshQrBtn.addEventListener("click", async () => {
+    await chrome.storage.local.remove("activeQRSession");
     showUnauthenticatedView();
   });
 
   // Handle Logout button click
   logoutBtn.addEventListener("click", async () => {
     logoutBtn.textContent = "Logging out...";
+    await chrome.storage.local.remove(["authSession", "activeQRSession"]);
     await logout();
     logoutBtn.textContent = "Logout";
     showUnauthenticatedView();

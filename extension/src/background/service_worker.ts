@@ -1,21 +1,11 @@
 // Background Service Worker for Elio AI Extension (Manifest V3)
 
 import { SavedVideoPayload } from '../utils/cleaner';
-import { AuthSession } from '../services/auth';
-
-// Runtime decoder to prevent static inspection of plain API keys
-function _d(b: string): string {
-  try {
-    return atob(b);
-  } catch {
-    return '';
-  }
-}
-
-// Base64-encoded chunks constructed dynamically at runtime
-const _p1 = 'aHR0cHM6Ly9vb2xkc3FrdXh3dnpubnlwdW14ZC5zdXBhYmFzZS5jbw==';
-const _p2 =
-  'ZXlKaGJHY2lPaUpJVXpJMU5pSXNOblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2paa1hCaHltRnpaU0lzSW5KbFppSTZJbTkxYkdSemNXRjFlbTV1ZVhCMWJYaGtJbXcwWVNJNk1UYzVNVE00TkRFek55d2laWGh3SWpveU1UQTJNelEwTVRNM2ZRLkJpTG9VOWJqZjlMNWFFRUZUb1N2SVNFM3U5cWVvaWQ2VTd5bldNZkFyVG8=';
+import {
+  AuthSession,
+  DEFAULT_SUPABASE_URL,
+  DEFAULT_SUPABASE_ANON_KEY,
+} from '../services/auth';
 
 interface StorageData {
   syncEnabled?: boolean;
@@ -74,8 +64,8 @@ async function handleVideoLiked(video: SavedVideoPayload) {
   }
 
   try {
-    const endpoint = _d(_p1);
-    const secret = _d(_p2);
+    const endpoint = DEFAULT_SUPABASE_URL;
+    const secret = DEFAULT_SUPABASE_ANON_KEY;
 
     const syncPayload = {
       ...video,

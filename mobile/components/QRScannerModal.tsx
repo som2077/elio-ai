@@ -81,19 +81,24 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     if (scannedToken || approving) return;
 
     try {
-      let token = data;
-      // If it's a URL (Universal Smart Link e.g. https://...?session=xyz or token=xyz)
-      if (data.includes("http://") || data.includes("https://")) {
-        const url = new URL(data);
-        token =
-          url.searchParams.get("session") ||
-          url.searchParams.get("token") ||
-          data;
-      } else if (data.startsWith("{")) {
-        const parsed = JSON.parse(data);
-        token = parsed.session || parsed.token || data;
-      } else if (data.startsWith("elio-auth:")) {
-        token = data.replace("elio-auth:", "");
+      const raw = (data || "").trim();
+      let token = raw;
+
+      // Extract 36-char standard UUID (e.g. 5982a65e-a7b9-43f2-a31e-b30bccca743f)
+      const uuidMatch = raw.match(
+        /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i
+      );
+      const tokenMatch = raw.match(/[?&]token=([a-zA-Z0-9-]+)/);
+      const sessionMatch = raw.match(/[?&]session=([a-zA-Z0-9-]+)/);
+
+      if (uuidMatch && uuidMatch[0]) {
+        token = uuidMatch[0];
+      } else if (tokenMatch && tokenMatch[1]) {
+        token = tokenMatch[1];
+      } else if (sessionMatch && sessionMatch[1]) {
+        token = sessionMatch[1];
+      } else if (raw.startsWith("elio-auth:")) {
+        token = raw.replace("elio-auth:", "").trim();
       }
 
       setScannedToken(token);
@@ -116,12 +121,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       } = await supabase.auth.getSession();
       if (sessionError || !session) {
         throw new Error(
-          "Active mobile session not found. Please log in first.",
+          "Active mobile session not found. Please log in to your account first."
         );
       }
 
-      // Update Supabase qr_auth_sessions table
-      const { error: updateError } = await supabase
+      // Update Supabase qr_auth_sessions table with select() to verify row was actually updated
+      const { data: updateData, error: updateError } = await supabase
         .from("qr_auth_sessions")
         .update({
           status: "approved",
@@ -133,9 +138,16 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             email: session.user.email,
           },
         })
-        .eq("qr_token", scannedToken);
+        .eq("qr_token", scannedToken)
+        .select();
 
       if (updateError) throw updateError;
+
+      if (!updateData || updateData.length === 0) {
+        throw new Error(
+          "QR session not found or expired. Please refresh the QR code on your PC."
+        );
+      }
 
       setStatusMessage({ text: "✦ Extension linked successfully!" });
       setTimeout(() => {
