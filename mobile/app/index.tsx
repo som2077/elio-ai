@@ -6,9 +6,11 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
   StyleSheet,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "../services/supabase";
@@ -21,6 +23,10 @@ import { SearchBar } from "../components/SearchBar";
 import { InsightsView } from "../components/InsightsView";
 import { DevicesView } from "../components/DevicesView";
 import { SkeletonCard } from "../components/SkeletonCard";
+import { GridSkeletonCard } from "../components/GridSkeletonCard";
+import { VideoDetailSheet } from "../components/VideoDetailSheet";
+import { ToastHUD, ToastConfig } from "../components/ToastHUD";
+import { BentoStatsStrip } from "../components/BentoStatsStrip";
 import { openVideoDirectly } from "../services/deepLink";
 import { AuthScreen } from "../components/AuthScreen";
 import { QRScannerModal } from "../components/QRScannerModal";
@@ -53,6 +59,11 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterCategory>("all");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Dynamic Island Toast HUD & Detail Modal states
+  const [toast, setToast] = useState<ToastConfig | null>(null);
+  const [detailVideo, setDetailVideo] = useState<SavedVideo | null>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
 
   // Auth session listener
   useEffect(() => {
@@ -145,10 +156,54 @@ export default function HomeScreen() {
       prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v))
     );
 
+    if (detailVideo && detailVideo.id === video.id) {
+      setDetailVideo((prev) => (prev ? { ...prev, status: newStatus } : null));
+    }
+
+    setToast({
+      message: newStatus === "watched" ? "Marked as Watched" : "Moved back to In Queue",
+      type: "success",
+    });
+
     await supabase
       .from("saved_videos")
       .update({ status: newStatus })
       .eq("id", video.id);
+  };
+
+  const handleDeleteVideo = async (video: SavedVideo) => {
+    haptics.warning();
+    triggerLayoutMotion();
+
+    // Optimistic UI removal
+    setVideos((prev) => prev.filter((v) => v.id !== video.id));
+    if (detailVideo && detailVideo.id === video.id) {
+      setShowDetailSheet(false);
+      setDetailVideo(null);
+    }
+
+    setToast({
+      message: "Clip removed from vault",
+      type: "delete",
+    });
+
+    const { error } = await supabase
+      .from("saved_videos")
+      .delete()
+      .eq("id", video.id);
+
+    if (error) {
+      console.warn("Failed to delete video:", error.message);
+      fetchVideos();
+    }
+  };
+
+  const handleCopyLink = (_url: string) => {
+    haptics.light();
+    setToast({
+      message: "Link copied to clipboard",
+      type: "link",
+    });
   };
 
   const handleLogout = async () => {
@@ -241,6 +296,17 @@ export default function HomeScreen() {
             onOpenScanner={() => setShowScanner(true)}
           />
 
+          {/* Bento Stats Telemetry Strip */}
+          <BentoStatsStrip
+            totalCount={videos.length}
+            unreadCount={unreadCount}
+            videos={videos}
+            onPressUnread={() => {
+              triggerLayoutMotion();
+              setFilter("unread");
+            }}
+          />
+
           {/* Horizontal Filter Bar */}
           <AppleFilterPills
             filter={filter}
@@ -252,11 +318,24 @@ export default function HomeScreen() {
           />
 
           {loading ? (
-            <ScrollView contentContainerStyle={styles.listContent}>
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </ScrollView>
+            layoutMode === "grid" ? (
+              <View style={styles.gridLoadingContainer}>
+                <View style={styles.gridSkeletonRow}>
+                  <GridSkeletonCard />
+                  <GridSkeletonCard />
+                </View>
+                <View style={styles.gridSkeletonRow}>
+                  <GridSkeletonCard />
+                  <GridSkeletonCard />
+                </View>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.listContent}>
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </ScrollView>
+            )
           ) : layoutMode === "grid" ? (
             /* 2-COLUMN COSMOS POSTER GRID */
             <FlatList
@@ -282,13 +361,14 @@ export default function HomeScreen() {
               renderItem={({ item }) => (
                 <VideoGridCard
                   video={item}
-                  onPress={() =>
-                    openVideoDirectly(
-                      item.clean_url,
-                      item.platform as any,
-                      item.platform_video_id
-                    )
-                  }
+                  onPress={() => {
+                    setDetailVideo(item);
+                    setShowDetailSheet(true);
+                  }}
+                  onLongPress={() => {
+                    setDetailVideo(item);
+                    setShowDetailSheet(true);
+                  }}
                   onToggleStatus={() => toggleStatus(item)}
                 />
               )}
@@ -334,13 +414,14 @@ export default function HomeScreen() {
               renderItem={({ item }) => (
                 <VideoCard
                   video={item}
-                  onPress={() =>
-                    openVideoDirectly(
-                      item.clean_url,
-                      item.platform as any,
-                      item.platform_video_id
-                    )
-                  }
+                  onPress={() => {
+                    setDetailVideo(item);
+                    setShowDetailSheet(true);
+                  }}
+                  onLongPress={() => {
+                    setDetailVideo(item);
+                    setShowDetailSheet(true);
+                  }}
                   onToggleStatus={() => toggleStatus(item)}
                 />
               )}
@@ -384,24 +465,50 @@ export default function HomeScreen() {
             renderItem={({ item }) => (
               <VideoGridCard
                 video={item}
-                onPress={() =>
-                  openVideoDirectly(
-                    item.clean_url,
-                    item.platform as any,
-                    item.platform_video_id
-                  )
-                }
+                onPress={() => {
+                  setDetailVideo(item);
+                  setShowDetailSheet(true);
+                }}
+                onLongPress={() => {
+                  setDetailVideo(item);
+                  setShowDetailSheet(true);
+                }}
                 onToggleStatus={() => toggleStatus(item)}
               />
             )}
             contentContainerStyle={styles.gridContent}
             ListEmptyComponent={
               <View style={styles.emptySearchBox}>
+                <Ionicons
+                  name={searchQuery ? "search-outline" : "compass-outline"}
+                  size={28}
+                  color={appleColors.accentLight}
+                  style={{ marginBottom: 10 }}
+                />
+                <Text style={styles.emptySearchTitle}>
+                  {searchQuery ? "No matching clips" : "Discover & Search"}
+                </Text>
                 <Text style={styles.emptySearchText}>
                   {searchQuery
-                    ? `No clips found matching "${searchQuery}"`
-                    : "Start typing to search your saved video collection"}
+                    ? `No clips found matching "${searchQuery}". Try searching for creator, title or platform.`
+                    : "Search titles, creators, platforms, and AI transcript notes."}
                 </Text>
+                {!searchQuery && (
+                  <View style={styles.suggestedTagsRow}>
+                    {["Podcasts", "Design", "Shorts", "Tech", "Tutorials"].map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        style={styles.suggestedTagPill}
+                        onPress={() => {
+                          haptics.selection();
+                          setSearchQuery(tag);
+                        }}
+                      >
+                        <Text style={styles.suggestedTagText}>#{tag}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             }
           />
@@ -450,6 +557,22 @@ export default function HomeScreen() {
         visible={showDevicesModal}
         onClose={() => setShowDevicesModal(false)}
       />
+
+      {/* Dynamic Island Floating Toast HUD */}
+      <ToastHUD toast={toast} onDismiss={() => setToast(null)} />
+
+      {/* Interactive Video Detail & Action Sheet */}
+      <VideoDetailSheet
+        video={detailVideo}
+        visible={showDetailSheet}
+        onClose={() => setShowDetailSheet(false)}
+        onPlay={(v) =>
+          openVideoDirectly(v.clean_url, v.platform as any, v.platform_video_id)
+        }
+        onToggleStatus={toggleStatus}
+        onCopyLink={handleCopyLink}
+        onDelete={handleDeleteVideo}
+      />
     </SafeAreaView>
   );
 }
@@ -472,6 +595,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
+  gridLoadingContainer: {
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    gap: 12,
+  },
+  gridSkeletonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   gridContent: {
     paddingHorizontal: 8,
     paddingTop: 6,
@@ -487,10 +619,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  emptySearchTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
   emptySearchText: {
     color: appleColors.textTertiary,
     fontSize: 13,
     textAlign: "center",
     lineHeight: 18,
+    marginBottom: 16,
+  },
+  suggestedTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+  },
+  suggestedTagPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  suggestedTagText: {
+    color: appleColors.accentLight,
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
