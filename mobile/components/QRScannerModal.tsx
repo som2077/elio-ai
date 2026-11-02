@@ -46,6 +46,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   }
 
   const [scannedToken, setScannedToken] = useState<string | null>(null);
+  const [scannedDevice, setScannedDevice] = useState<{
+    device_id?: string;
+    device_name?: string;
+    browser_type?: string;
+    os_name?: string;
+  } | null>(null);
   const [approving, setApproving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     text: string;
@@ -124,6 +130,29 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
       setStatusMessage(null);
       setScannedToken(token);
+
+      // Pre-fetch device metadata from the pending QR session
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from("qr_auth_sessions")
+            .select("device_metadata, expires_at, status")
+            .eq("qr_token", token)
+            .maybeSingle();
+
+          if (data?.device_metadata) {
+            setScannedDevice(data.device_metadata);
+          }
+          if (data?.expires_at && new Date(data.expires_at).getTime() < Date.now()) {
+            setStatusMessage({
+              text: "⚠️ QR session expired. Please click 'Refresh QR Code' on PC.",
+              isError: true,
+            });
+          }
+        } catch {
+          // Pre-fetch is optional
+        }
+      })();
     } catch {
       setStatusMessage({
         text: "⚠️ QR Code read error. Please try scanning again.",
@@ -174,9 +203,31 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         );
       }
 
+      // Upsert linked device registry for multi-device management
+      const meta = scannedDevice || updateData[0]?.device_metadata;
+      if (meta && meta.device_id) {
+        try {
+          await supabase.from("linked_devices").upsert(
+            {
+              user_id: session.user.id,
+              device_id: meta.device_id,
+              device_name: meta.device_name || "Browser Extension",
+              browser_type: meta.browser_type || "Chrome",
+              os_name: meta.os_name || "Unknown",
+              last_active_at: new Date().toISOString(),
+              is_revoked: false,
+            },
+            { onConflict: "user_id,device_id" }
+          );
+        } catch (linkErr) {
+          console.warn("[Elio AI] Linked devices sync notice:", linkErr);
+        }
+      }
+
       setStatusMessage({ text: "✦ Extension linked successfully!" });
       setTimeout(() => {
         setScannedToken(null);
+        setScannedDevice(null);
         setApproving(false);
         onSuccess?.();
         onClose();
@@ -290,6 +341,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 <Text style={styles.approvalTitle}>
                   Authorize Browser Extension?
                 </Text>
+
+                {scannedDevice?.device_name ? (
+                  <View style={styles.devicePill}>
+                    <Text style={styles.devicePillText}>
+                      💻 {scannedDevice.device_name}
+                    </Text>
+                  </View>
+                ) : null}
+
                 <Text style={styles.approvalDesc}>
                   Your saved videos from Chrome/Brave will automatically sync to
                   your Elio AI mobile inbox.
@@ -525,6 +585,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#F8FAFC",
     marginBottom: 6,
+  },
+  devicePill: {
+    backgroundColor: "rgba(99, 102, 241, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(99, 102, 241, 0.35)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  devicePillText: {
+    color: "#818CF8",
+    fontSize: 12,
+    fontWeight: "700",
   },
   approvalDesc: {
     fontSize: 13,

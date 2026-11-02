@@ -352,6 +352,30 @@ function captureVideoFrame(video: HTMLVideoElement): string {
 }
 
 /**
+ * Validates whether an extracted string is a real caption or just UI noise
+ */
+function isGarbageTitle(str: string): boolean {
+  if (!str) return true;
+  const s = str.trim().toLowerCase();
+  if (s.length < 3) return true;
+  if (
+    s.includes("audio image") ||
+    s.includes("profile picture") ||
+    s.includes("profile photo") ||
+    s.includes("profile icon") ||
+    s.includes("avatar")
+  ) {
+    return true;
+  }
+  if (s.includes("photo by") && (s.includes("on") || s.includes("in"))) return true;
+  if (s.includes("may be an image of") || s.includes("image may contain")) return true;
+  if (s === "reels" || s === "reel" || s === "post" || s === "original audio" || s === "audio") return true;
+  if (s.includes("likes") && s.includes("comments")) return true;
+  if (s.includes("view more on instagram") || s.includes("log in to instagram")) return true;
+  return false;
+}
+
+/**
  * Searches for high-quality thumbnail image for the post or reel
  */
 function findInstagramMediaThumbnail(container: HTMLElement): string {
@@ -365,7 +389,7 @@ function findInstagramMediaThumbnail(container: HTMLElement): string {
     }
   }
 
-  // 2. Search for media images (exclude small avatars / profile pictures)
+  // 2. Search for media images (exclude small avatars / profile pictures / audio images)
   const imgs = Array.from(container.querySelectorAll<HTMLImageElement>('img'));
   for (const img of imgs) {
     const src = img.src || img.getAttribute('src') || '';
@@ -373,8 +397,17 @@ function findInstagramMediaThumbnail(container: HTMLElement): string {
     const w = img.naturalWidth || img.width || 0;
     const h = img.naturalHeight || img.height || 0;
 
-    if (alt.includes('profile') || alt.includes('avatar') || alt.includes('प्रोफ़ाइल')) continue;
-    if (w > 0 && w < 120 && h > 0 && h < 120) continue;
+    if (
+      alt.includes('profile') ||
+      alt.includes('avatar') ||
+      alt.includes('audio image') ||
+      alt.includes('audio') ||
+      alt.includes('प्रोफ़ाइल')
+    ) {
+      continue;
+    }
+
+    if (w > 0 && w < 140 && h > 0 && h < 140) continue;
 
     if (src.includes('cdninstagram') || src.includes('fbcdn.net') || w >= 150 || h >= 150) {
       if (!src.startsWith('blob:') && !src.startsWith('data:image/svg')) {
@@ -399,7 +432,7 @@ function extractInstagramTitle(container: HTMLElement, creator: string, isReel: 
   // 1. Check document.title quotes if on a direct post/reel page
   if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
     const titleMatch = document.title.match(/on Instagram:\s*["“](.*?)["”]/s);
-    if (titleMatch && titleMatch[1]?.trim()) {
+    if (titleMatch && titleMatch[1]?.trim() && !isGarbageTitle(titleMatch[1])) {
       return titleMatch[1].trim().slice(0, 150);
     }
   }
@@ -408,39 +441,48 @@ function extractInstagramTitle(container: HTMLElement, creator: string, isReel: 
   const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
   if (ogTitle) {
     const m = ogTitle.match(/on Instagram:\s*["“](.*?)["”]/s);
-    if (m && m[1]?.trim()) {
+    if (m && m[1]?.trim() && !isGarbageTitle(m[1])) {
       return m[1].trim().slice(0, 150);
     }
   }
 
-  // 3. Check dir="auto" elements (Instagram standard for user captions)
+  const ogDesc = document.querySelector('meta[property="og:description"]')?.getAttribute('content');
+  if (ogDesc) {
+    const m = ogDesc.match(/["“](.*?)["”]/s);
+    if (m && m[1]?.trim() && !isGarbageTitle(m[1])) {
+      return m[1].trim().slice(0, 150);
+    }
+  }
+
+  // 3. Check container h1 or caption classes (primary caption on post page or feed item)
+  const captionEl = container.querySelector('h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx');
+  const captionText = captionEl?.textContent?.trim();
+  if (captionText && captionText.length > 5 && captionText !== creator && !isGarbageTitle(captionText)) {
+    return captionText.slice(0, 150);
+  }
+
+  // 4. Check dir="auto" elements (Instagram standard for user captions)
   const dirSpans = Array.from(container.querySelectorAll<HTMLElement>('span[dir="auto"], div[dir="auto"]'));
   for (const el of dirSpans) {
     const text = el.textContent?.trim() || '';
     if (
-      text.length > 6 &&
+      text.length > 5 &&
       text !== creator &&
       !text.startsWith('@') &&
       !text.toLowerCase().includes('verified') &&
       !text.toLowerCase().includes('follow') &&
-      !text.toLowerCase().includes('original audio')
+      !text.toLowerCase().includes('original audio') &&
+      !isGarbageTitle(text)
     ) {
       return text.slice(0, 150);
     }
   }
 
-  // 4. Check container h1 or caption classes
-  const captionEl = container.querySelector('h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx');
-  const captionText = captionEl?.textContent?.trim();
-  if (captionText && captionText.length > 5 && captionText !== creator) {
-    return captionText.slice(0, 150);
-  }
-
   // 5. Check img[alt]
-  const imgAlt = container.querySelector('img[alt]:not([alt=""]):not([alt*="profile picture"])')?.getAttribute('alt');
-  if (imgAlt && imgAlt.length > 10) {
+  const imgAlt = container.querySelector('img[alt]:not([alt=""]):not([alt*="profile"]):not([alt*="Audio"])')?.getAttribute('alt');
+  if (imgAlt && imgAlt.length > 10 && !isGarbageTitle(imgAlt)) {
     const quoteMatch = imgAlt.match(/["“](.*?)["”]/);
-    if (quoteMatch && quoteMatch[1]) {
+    if (quoteMatch && quoteMatch[1] && !isGarbageTitle(quoteMatch[1])) {
       return quoteMatch[1].slice(0, 150);
     }
     return imgAlt.slice(0, 150);

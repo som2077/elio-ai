@@ -551,6 +551,11 @@
             Open Elio AI on your phone & scan to link this browser.
           </div>
 
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: #a1a1aa; margin-top: 4px; margin-bottom: 8px;">
+            <span>💻</span>
+            <span id="unauthDeviceName">Detecting browser...</span>
+          </div>
+
           <div class="qr-canvas-box">
             <canvas id="qrCanvas" width="160" height="160"></canvas>
             <div id="qrLoading" class="qr-loading-overlay">
@@ -586,6 +591,15 @@
             <div class="user-email-text" id="userEmail">Loading account...</div>
           </div>
           <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+
+        <!-- Device Info & Nickname -->
+        <div class="device-card" style="display: flex; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 8px 12px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+            <span style="font-size: 14px;">💻</span>
+            <span id="deviceNameLabel" style="font-size: 12px; font-weight: 500; color: #d1d5db; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">Chrome on Linux</span>
+          </div>
+          <button id="renameDeviceBtn" style="background: rgba(255, 255, 255, 0.08); border: none; color: #a1a1aa; cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 6px;">✎ Rename</button>
         </div>
 
         <!-- Sync Toggle Card -->

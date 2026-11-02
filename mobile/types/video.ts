@@ -29,8 +29,23 @@ export interface SavedVideo {
   user_notes?: string;
   tags?: string[];
   source_client: string;
+  device_id?: string;
+  source_device_name?: string;
   remind_at?: string;
   watched_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface LinkedDevice {
+  id: string;
+  user_id: string;
+  device_id: string;
+  device_name: string;
+  browser_type: string;
+  os_name: string;
+  user_agent?: string;
+  last_active_at: string;
+  is_revoked: boolean;
+  created_at: string;
 }

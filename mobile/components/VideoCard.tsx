@@ -145,7 +145,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onPress, onToggleSt
               </Text>
             </View>
 
-            <Text style={styles.timestamp}>{formattedDate}</Text>
+            <View style={styles.metaRight}>
+              {video.source_device_name ? (
+                <View style={styles.deviceSourceBadge}>
+                  <Text style={styles.deviceSourceText} numberOfLines={1}>
+                    💻 {video.source_device_name}
+                  </Text>
+                </View>
+              ) : null}
+              <Text style={styles.timestamp}>{formattedDate}</Text>
+            </View>
           </View>
 
           {/* Bottom Actions Row */}
@@ -338,6 +347,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
+  },
+  metaRight: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  deviceSourceBadge: {
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    maxWidth: 130,
+  },
+  deviceSourceText: {
+    color: '#818CF8',
+    fontSize: 9,
+    fontWeight: '700',
   },
   timestamp: {
     color: '#64748B',

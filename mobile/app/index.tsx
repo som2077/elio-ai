@@ -20,6 +20,7 @@ import { openVideoDirectly } from "../services/deepLink";
 import { ActivityCalendar } from "../components/ActivityCalendar";
 import { AuthScreen } from "../components/AuthScreen";
 import { QRScannerModal } from "../components/QRScannerModal";
+import { LinkedDevicesModal } from "../components/LinkedDevicesModal";
 import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
 import { triggerLayoutMotion } from "../utils/motion";
 
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
+  const [showDevices, setShowDevices] = useState(false);
 
   const [videos, setVideos] = useState<SavedVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,6 +226,16 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.topRightActions}>
+          {/* Linked Browsers Management Button */}
+          <TouchableOpacity
+            style={styles.devicesBtn}
+            activeOpacity={0.75}
+            onPress={() => setShowDevices(true)}
+          >
+            <Text style={styles.devicesIcon}>💻</Text>
+            <Text style={styles.devicesLabel}>Devices</Text>
+          </TouchableOpacity>
+
           {/* Link Browser Extension (QR Scan) Button */}
           <TouchableOpacity
             style={styles.linkPcBtn}
@@ -389,6 +401,13 @@ export default function HomeScreen() {
         onClose={() => setShowScanner(false)}
         onSuccess={() => fetchVideos()}
       />
+
+      {/* Linked Devices Management Modal */}
+      <LinkedDevicesModal
+        visible={showDevices}
+        onClose={() => setShowDevices(false)}
+        onLinkNewDevice={() => setShowScanner(true)}
+      />
     </SafeAreaView>
   );
 }
@@ -439,6 +458,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  devicesBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#131B2E",
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    gap: 4,
+  },
+  devicesIcon: {
+    fontSize: 12,
+  },
+  devicesLabel: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "700",
   },
   linkPcBtn: {
     flexDirection: "row",

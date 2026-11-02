@@ -19,6 +19,8 @@ export interface SavedVideoPayload {
   creator_name?: string;
   thumbnail_url?: string;
   source_client: 'browser_extension' | 'mobile_share';
+  device_id?: string;
+  source_device_name?: string;
 }
 
 /**

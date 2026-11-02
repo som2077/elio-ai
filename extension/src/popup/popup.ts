@@ -8,6 +8,8 @@ import {
   listenForApproval,
   logout,
   AuthSession,
+  getDeviceMetadata,
+  updateDeviceNickname,
   DEFAULT_SUPABASE_URL,
   DEFAULT_SUPABASE_ANON_KEY,
 } from "../services/auth";
@@ -40,12 +42,26 @@ document.addEventListener("DOMContentLoaded", async () => {
   const refreshQrBtn = document.getElementById(
     "refreshQrBtn",
   ) as HTMLButtonElement;
+  const unauthDeviceName = document.getElementById("unauthDeviceName") as HTMLElement;
 
   // Auth view elements
   const userEmail = document.getElementById("userEmail") as HTMLElement;
   const logoutBtn = document.getElementById("logoutBtn") as HTMLButtonElement;
   const syncToggle = document.getElementById("syncToggle") as HTMLInputElement;
   const recentList = document.getElementById("recentList") as HTMLElement;
+  const deviceNameLabel = document.getElementById("deviceNameLabel") as HTMLElement;
+  const renameDeviceBtn = document.getElementById("renameDeviceBtn") as HTMLButtonElement;
+
+  // Setup device nickname rename handler
+  renameDeviceBtn?.addEventListener("click", async () => {
+    const meta = await getDeviceMetadata();
+    const newName = prompt("Enter a nickname for this browser extension:", meta.device_name);
+    if (newName && newName.trim() && newName.trim() !== meta.device_name) {
+      await updateDeviceNickname(newName.trim());
+      if (deviceNameLabel) deviceNameLabel.textContent = newName.trim();
+      if (unauthDeviceName) unauthDeviceName.textContent = newName.trim();
+    }
+  });
 
   /**
    * Initializes or updates popup based on current authentication state
@@ -127,6 +143,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     liveStatusText.textContent = "SYNC ACTIVE";
 
     userEmail.textContent = session.email || "Linked Mobile Device";
+
+    const meta = await getDeviceMetadata();
+    if (deviceNameLabel) deviceNameLabel.textContent = meta.device_name;
 
     // Load storage settings & recent clips
     const data: PopupStorageData = await chrome.storage.local.get([
@@ -248,6 +267,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     liveDot.classList.add("dot-pending");
     liveStatusText.textContent = "SCAN QR";
+
+    const meta = await getDeviceMetadata();
+    if (unauthDeviceName) unauthDeviceName.textContent = meta.device_name;
 
     // Show loading overlay
     qrLoading.classList.remove("hidden");

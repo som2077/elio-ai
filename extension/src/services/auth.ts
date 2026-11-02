@@ -10,6 +10,13 @@ export interface AuthSession {
   refresh_token: string;
 }
 
+export interface DeviceMetadata {
+  device_id: string;
+  device_name: string;
+  browser_type: string;
+  os_name: string;
+}
+
 export interface QRSession {
   qr_token: string;
   expires_at: string;
@@ -37,18 +44,159 @@ export function getUniversalSmartUrl(qrToken: string): string {
 }
 
 /**
+ * Returns or generates a persistent device UUID for this browser profile
+ */
+export async function getOrCreateDeviceId(): Promise<string> {
+  try {
+    const data = await chrome.storage.local.get("device_id");
+    if (data.device_id) {
+      return data.device_id as string;
+    }
+    const newId = crypto.randomUUID();
+    await chrome.storage.local.set({ device_id: newId });
+    return newId;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+/**
+ * Detects browser brand, OS, and friendly nickname for this browser profile
+ */
+export async function getDeviceMetadata(): Promise<DeviceMetadata> {
+  const device_id = await getOrCreateDeviceId();
+
+  // Detect browser type
+  let browser_type = "Chrome";
+  const ua = navigator.userAgent;
+  if ((navigator as any).brave && typeof (navigator as any).brave.isBrave === "function") {
+    browser_type = "Brave";
+  } else if (ua.includes("Edg/")) {
+    browser_type = "Edge";
+  } else if (ua.includes("OPR/") || ua.includes("Opera")) {
+    browser_type = "Opera";
+  } else if (ua.includes("Firefox")) {
+    browser_type = "Firefox";
+  }
+
+  // Detect OS
+  let os_name = "Linux";
+  if (ua.includes("Win")) os_name = "Windows";
+  else if (ua.includes("Mac")) os_name = "macOS";
+  else if (ua.includes("CrOS")) os_name = "ChromeOS";
+  else if (ua.includes("Android")) os_name = "Android";
+
+  // Check custom user nickname
+  let device_name = `${browser_type} on ${os_name}`;
+  try {
+    const custom = await chrome.storage.local.get("device_nickname");
+    if (custom.device_nickname && typeof custom.device_nickname === "string") {
+      device_name = custom.device_nickname.trim();
+    }
+  } catch {
+    // Keep default name
+  }
+
+  return {
+    device_id,
+    device_name,
+    browser_type,
+    os_name,
+  };
+}
+
+/**
+ * Updates the friendly nickname of this browser extension instance
+ */
+export async function updateDeviceNickname(
+  newName: string,
+  endpoint: string = DEFAULT_SUPABASE_URL,
+  apikey: string = DEFAULT_SUPABASE_ANON_KEY
+): Promise<void> {
+  const trimmed = newName.trim();
+  if (!trimmed) return;
+
+  await chrome.storage.local.set({ device_nickname: trimmed });
+
+  // Sync to Supabase if logged in
+  try {
+    const session = await getAuthSession();
+    const deviceId = await getOrCreateDeviceId();
+    if (session?.user_id) {
+      await fetch(
+        `${endpoint}/rest/v1/linked_devices?device_id=eq.${encodeURIComponent(
+          deviceId
+        )}&user_id=eq.${encodeURIComponent(session.user_id)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: apikey,
+            Authorization: `Bearer ${apikey}`,
+          },
+          body: JSON.stringify({ device_name: trimmed }),
+        }
+      );
+    }
+  } catch {
+    // Non-blocking
+  }
+}
+
+/**
+ * Checks if this device has been revoked on mobile
+ */
+export async function checkDeviceRevocation(
+  endpoint: string = DEFAULT_SUPABASE_URL,
+  apikey: string = DEFAULT_SUPABASE_ANON_KEY
+): Promise<boolean> {
+  try {
+    const session = await getAuthSession();
+    if (!session?.user_id) return false;
+
+    const deviceId = await getOrCreateDeviceId();
+    const res = await fetch(
+      `${endpoint}/rest/v1/linked_devices?device_id=eq.${encodeURIComponent(
+        deviceId
+      )}&user_id=eq.${encodeURIComponent(session.user_id)}&select=is_revoked`,
+      {
+        headers: {
+          apikey: apikey,
+          Authorization: `Bearer ${apikey}`,
+        },
+      }
+    );
+
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0 && rows[0].is_revoked === true) {
+        console.warn("[Elio AI] Device has been revoked by user on mobile.");
+        await logout();
+        return true;
+      }
+    }
+  } catch {
+    // Suppress network notice
+  }
+  return false;
+}
+
+/**
  * Creates a pending row in Supabase qr_auth_sessions
- * status: 'pending', qr_token: randomUUID, expires_at: 5 mins from now
+ * status: 'pending', qr_token: randomUUID, expires_at: 15 mins from now
+ * includes device_metadata for seamless multi-device recognition on mobile
  */
 export async function createQRSession(
   endpoint: string = DEFAULT_SUPABASE_URL,
   apikey: string = DEFAULT_SUPABASE_ANON_KEY,
 ): Promise<QRSession> {
   const qr_token = crypto.randomUUID();
-  const expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  // 15 minutes TTL for generous scanning buffer
+  const expires_at = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   const universal_url = getUniversalSmartUrl(qr_token);
+  const metadata = await getDeviceMetadata();
 
-  const response = await fetch(`${endpoint}/rest/v1/qr_auth_sessions`, {
+  let response = await fetch(`${endpoint}/rest/v1/qr_auth_sessions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -60,8 +208,30 @@ export async function createQRSession(
       qr_token,
       status: "pending",
       expires_at,
+      device_metadata: metadata,
     }),
   });
+
+  // If Supabase schema does not have device_metadata column yet, gracefully retry without it
+  if (!response.ok && response.status === 400) {
+    console.warn(
+      "[Elio AI] Supabase schema does not have device_metadata column yet. Falling back..."
+    );
+    response = await fetch(`${endpoint}/rest/v1/qr_auth_sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apikey,
+        Authorization: `Bearer ${apikey}`,
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        qr_token,
+        status: "pending",
+        expires_at,
+      }),
+    });
+  }
 
   if (!response.ok) {
     const errText = await response.text();

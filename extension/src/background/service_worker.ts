@@ -5,6 +5,9 @@ import {
   AuthSession,
   DEFAULT_SUPABASE_URL,
   DEFAULT_SUPABASE_ANON_KEY,
+  getDeviceMetadata,
+  checkDeviceRevocation,
+  logout,
 } from '../services/auth';
 
 interface StorageData {
@@ -228,12 +231,22 @@ async function postVideoToSupabase(
   authSession: AuthSession
 ): Promise<boolean> {
   try {
+    // Check revocation first
+    const isRevoked = await checkDeviceRevocation();
+    if (isRevoked) {
+      console.warn('[Elio AI] Device has been revoked. Sync cancelled.');
+      return false;
+    }
+
     const endpoint = DEFAULT_SUPABASE_URL;
     const secret = DEFAULT_SUPABASE_ANON_KEY;
+    const metadata = await getDeviceMetadata();
 
     const syncPayload = {
       ...video,
       user_id: authSession.user_id,
+      device_id: metadata.device_id,
+      source_device_name: metadata.device_name,
     };
 
     let authToken = authSession.access_token || secret;
@@ -248,6 +261,28 @@ async function postVideoToSupabase(
       },
       body: JSON.stringify(syncPayload),
     });
+
+    // If 400 Bad Request (e.g. device_id column not in schema cache yet), retry without device fields
+    if (response.status === 400) {
+      console.warn('[Elio AI] Supabase schema does not have device columns yet. Retrying standard payload...');
+      const fallbackPayload = {
+        ...video,
+        user_id: authSession.user_id,
+      };
+      delete (fallbackPayload as any).device_id;
+      delete (fallbackPayload as any).source_device_name;
+
+      response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: secret,
+          Authorization: `Bearer ${authToken}`,
+          Prefer: 'resolution=ignore-duplicates',
+        },
+        body: JSON.stringify(fallbackPayload),
+      });
+    }
 
     // If 401 Unauthorized (user session token expired), automatically retry with anon key
     if (response.status === 401) {
@@ -266,10 +301,34 @@ async function postVideoToSupabase(
 
     if (response.ok) {
       console.log(
-        `[Elio AI] Video safely committed to cloud inbox for user ${
+        `[Elio AI] Video safely committed from ${metadata.device_name} for user ${
           authSession.email || authSession.user_id
         }`
       );
+
+      // Heartbeat: update last_active_at on linked_devices (non-blocking)
+      try {
+        fetch(
+          `${endpoint}/rest/v1/linked_devices?device_id=eq.${encodeURIComponent(
+            metadata.device_id
+          )}&user_id=eq.${encodeURIComponent(authSession.user_id)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: secret,
+              Authorization: `Bearer ${secret}`,
+            },
+            body: JSON.stringify({
+              last_active_at: new Date().toISOString(),
+              device_name: metadata.device_name,
+            }),
+          }
+        ).catch(() => {});
+      } catch {
+        // Non-blocking
+      }
+
       return true;
     } else {
       console.error('[Elio AI] Supabase sync returned status:', response.status);
