@@ -150,25 +150,30 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
               <Text style={styles.platformText}>{platformInfo.name}</Text>
             </View>
 
+            {/* Telegram-style double-checkmark status pill */}
             <TouchableOpacity
               activeOpacity={0.7}
               style={[
                 styles.statusPill,
-                isUnread ? styles.statusPillUnread : styles.statusPillWatched,
+                !isUnread ? styles.statusPillWatched : styles.statusPillUnread,
               ]}
               onPress={() => {
                 haptics.selection();
                 onToggleStatus();
               }}
             >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: isUnread ? appleColors.accentLight : "#8E8E93" },
-                ]}
+              <Ionicons
+                name={!isUnread ? "checkmark-done" : "time-outline"}
+                size={12}
+                color={!isUnread ? "#FFFFFF" : appleColors.telegramCyan}
               />
-              <Text style={styles.statusPillText}>
-                {isUnread ? "NEW" : "DONE"}
+              <Text
+                style={[
+                  styles.statusPillText,
+                  !isUnread && styles.statusPillTextWatched,
+                ]}
+              >
+                {!isUnread ? "SEEN" : "QUEUE"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -209,11 +214,11 @@ const styles = StyleSheet.create({
     margin: 6,
   },
   cardContainer: {
-    backgroundColor: "#0D111D",
-    borderRadius: 18,
+    backgroundColor: "#000000",
+    borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: appleColors.twitterBorder,
     ...Platform.select({
       ios: {
         shadowColor: "#000000",
@@ -286,30 +291,28 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 10,
     borderWidth: 0.5,
     gap: 4,
   },
   statusPillUnread: {
-    backgroundColor: "rgba(0, 229, 255, 0.15)",
-    borderColor: "rgba(0, 229, 255, 0.35)",
+    backgroundColor: "rgba(42, 171, 238, 0.15)",
+    borderColor: "rgba(42, 171, 238, 0.35)",
   },
   statusPillWatched: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderColor: "rgba(255, 255, 255, 0.12)",
-  },
-  statusDot: {
-    width: 4.5,
-    height: 4.5,
-    borderRadius: 3,
+    backgroundColor: appleColors.telegramCyan,
+    borderColor: appleColors.telegramCyan,
   },
   statusPillText: {
-    color: "#FFFFFF",
+    color: appleColors.telegramCyan,
     fontSize: 8.5,
     fontWeight: "900",
     letterSpacing: 0.3,
+  },
+  statusPillTextWatched: {
+    color: "#000000",
   },
   playFab: {
     position: "absolute",
