@@ -3,6 +3,7 @@ import { SavedVideoPayload, cleanVideoUrl } from '../utils/cleaner';
 console.log('[Elio AI] Instagram Content Script initialized.');
 
 let lastSavedUrl: string | null = null;
+let lastSavedTime: number = 0;
 
 function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | null {
   // 1. Identify post container (Reel, feed item, or modal)
@@ -71,8 +72,10 @@ function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | nu
 }
 
 function sendInstagramSync(payload: SavedVideoPayload) {
-  if (payload.clean_url === lastSavedUrl) return;
+  const now = Date.now();
+  if (payload.clean_url === lastSavedUrl && now - lastSavedTime < 3000) return;
   lastSavedUrl = payload.clean_url;
+  lastSavedTime = now;
 
   try {
     if (!chrome?.runtime?.id) return;

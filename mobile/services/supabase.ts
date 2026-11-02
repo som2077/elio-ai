@@ -32,12 +32,13 @@ const SafeAsyncStorage = {
       }
 
       const hasNative = Boolean(
-        NativeModules?.RNCAsyncStorage || 
-        NativeModules?.RNC_AsyncSQLiteDBStorage
+        NativeModules?.RNCAsyncStorage ||
+        NativeModules?.RNC_AsyncSQLiteDBStorage,
       );
 
       if (hasNative) {
-        const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+        const AsyncStorage =
+          require("@react-native-async-storage/async-storage").default;
         return await AsyncStorage.getItem(key);
       }
       return memoryStore[key] || null;
@@ -58,12 +59,13 @@ const SafeAsyncStorage = {
       }
 
       const hasNative = Boolean(
-        NativeModules?.RNCAsyncStorage || 
-        NativeModules?.RNC_AsyncSQLiteDBStorage
+        NativeModules?.RNCAsyncStorage ||
+        NativeModules?.RNC_AsyncSQLiteDBStorage,
       );
 
       if (hasNative) {
-        const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+        const AsyncStorage =
+          require("@react-native-async-storage/async-storage").default;
         await AsyncStorage.setItem(key, value);
         return;
       }
@@ -85,12 +87,13 @@ const SafeAsyncStorage = {
       }
 
       const hasNative = Boolean(
-        NativeModules?.RNCAsyncStorage || 
-        NativeModules?.RNC_AsyncSQLiteDBStorage
+        NativeModules?.RNCAsyncStorage ||
+        NativeModules?.RNC_AsyncSQLiteDBStorage,
       );
 
       if (hasNative) {
-        const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+        const AsyncStorage =
+          require("@react-native-async-storage/async-storage").default;
         await AsyncStorage.removeItem(key);
         return;
       }

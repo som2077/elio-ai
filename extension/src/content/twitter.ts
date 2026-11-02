@@ -3,6 +3,7 @@ import { SavedVideoPayload, cleanVideoUrl } from '../utils/cleaner';
 console.log('[Elio AI] Twitter/X Content Script initialized.');
 
 let lastSavedUrl: string | null = null;
+let lastSavedTime: number = 0;
 
 function scrapeTweet(targetEl: HTMLElement): SavedVideoPayload | null {
   const article =
@@ -56,8 +57,10 @@ function scrapeTweet(targetEl: HTMLElement): SavedVideoPayload | null {
 }
 
 function sendTwitterSync(payload: SavedVideoPayload) {
-  if (payload.clean_url === lastSavedUrl) return;
+  const now = Date.now();
+  if (payload.clean_url === lastSavedUrl && now - lastSavedTime < 3000) return;
   lastSavedUrl = payload.clean_url;
+  lastSavedTime = now;
 
   try {
     if (!chrome?.runtime?.id) return;

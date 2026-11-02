@@ -8,6 +8,8 @@ import {
   listenForApproval,
   logout,
   AuthSession,
+  DEFAULT_SUPABASE_URL,
+  DEFAULT_SUPABASE_ANON_KEY,
 } from "../services/auth";
 
 interface PopupStorageData {
@@ -51,7 +53,47 @@ document.addEventListener("DOMContentLoaded", async () => {
   async function init() {
     cleanupListeners();
 
-    const session = await getAuthSession();
+    let session = await getAuthSession();
+
+    // If not in local storage yet, check if pending activeQRSession was approved on Supabase
+    if (!session || !session.user_id) {
+      try {
+        const stored = await chrome.storage.local.get("activeQRSession");
+        if (stored.activeQRSession?.qr_token) {
+          const res = await fetch(
+            `${DEFAULT_SUPABASE_URL}/rest/v1/qr_auth_sessions?qr_token=eq.${encodeURIComponent(
+              stored.activeQRSession.qr_token
+            )}&select=*`,
+            {
+              headers: {
+                apikey: DEFAULT_SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${DEFAULT_SUPABASE_ANON_KEY}`,
+                Accept: "application/json",
+              },
+            }
+          );
+          if (res.ok) {
+            const rows = await res.json();
+            if (Array.isArray(rows) && rows.length > 0 && rows[0].status === "approved") {
+              const row = rows[0];
+              const payload = row.auth_payload || {};
+              session = {
+                user_id: payload.user_id || row.user_id || "",
+                email: payload.email || "",
+                access_token: payload.access_token || "",
+                refresh_token: payload.refresh_token || "",
+              };
+              if (session.user_id && session.access_token) {
+                await chrome.storage.local.set({ authSession: session });
+                await chrome.storage.local.remove("activeQRSession");
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Elio AI] Direct session check notice:", err);
+      }
+    }
 
     if (session && session.user_id) {
       showAuthenticatedView(session);
@@ -97,6 +139,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     renderRecentSaves(data.recentSaves || []);
+
+    // Proactively sync and display the latest videos from Supabase
+    if (session.access_token && session.user_id) {
+      try {
+        const resp = await fetch(
+          `${DEFAULT_SUPABASE_URL}/rest/v1/saved_videos?user_id=eq.${session.user_id}&order=created_at.desc&limit=15`,
+          {
+            headers: {
+              apikey: DEFAULT_SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+        if (resp.ok) {
+          const cloudVideos = await resp.json();
+          if (Array.isArray(cloudVideos) && cloudVideos.length > 0) {
+            renderRecentSaves(cloudVideos);
+            await chrome.storage.local.set({ recentSaves: cloudVideos });
+          }
+        }
+      } catch (err) {
+        // Suppress network notice; local recentSaves already visible
+      }
+    }
   }
 
   /**

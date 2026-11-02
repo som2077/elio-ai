@@ -12,8 +12,9 @@
       }
     }
   },
-  "permissions": ["storage", "activeTab", "alarms"],
+  "permissions": ["storage", "activeTab", "alarms", "scripting"],
   "host_permissions": [
+    "https://msphrcukcgfchodxhgot.supabase.co/*",
     "*://*.youtube.com/*",
     "*://*.instagram.com/*",
     "*://*.twitter.com/*",
@@ -25,7 +26,7 @@
     "*://*.tiktok.com/*"
   ],
   "background": {
-    "scripts": ["dist/background/service_worker.js"]
+    "service_worker": "dist/background/service_worker.js"
   },
   "content_scripts": [
     {
