@@ -82,6 +82,8 @@ async function run() {
     await build({
       configFile: false,
       define: {
+        __SUPABASE_URL__: JSON.stringify(supabaseUrl),
+        __SUPABASE_ANON_KEY__: JSON.stringify(supabaseAnonKey),
         "process.env.SUPABASE_URL": JSON.stringify(supabaseUrl),
         "process.env.SUPABASE_ANON_KEY": JSON.stringify(supabaseAnonKey),
       },
@@ -121,10 +123,11 @@ async function run() {
     }
   }
 
-  // Ensure no compiled artifacts linger in src/
+  // Also keep src/popup/popup.js synced for backward compatibility with cached manifests (gitignored)
+  const distPopupJs = resolve(__dirname, "dist/src/popup/popup.js");
   const srcPopupJs = resolve(__dirname, "src/popup/popup.js");
-  if (fs.existsSync(srcPopupJs)) {
-    fs.unlinkSync(srcPopupJs);
+  if (fs.existsSync(distPopupJs)) {
+    fs.copyFileSync(distPopupJs, srcPopupJs);
   }
 
   console.log("✓ Elio AI Extension built successfully with environment variables injected.");

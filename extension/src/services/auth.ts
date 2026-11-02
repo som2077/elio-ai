@@ -31,19 +31,15 @@ function _d(b: string): string {
   }
 }
 
-declare const process: {
-  env?: {
-    SUPABASE_URL?: string;
-    SUPABASE_ANON_KEY?: string;
-  };
-};
+declare const __SUPABASE_URL__: string;
+declare const __SUPABASE_ANON_KEY__: string;
 
 // Build-time injected credentials via Vite define (from extension/.env)
-export const DEFAULT_SUPABASE_URL =
-  (typeof process !== "undefined" && process.env?.SUPABASE_URL) || "";
+export const DEFAULT_SUPABASE_URL: string =
+  typeof __SUPABASE_URL__ !== "undefined" ? __SUPABASE_URL__ : "";
 
-export const DEFAULT_SUPABASE_ANON_KEY =
-  (typeof process !== "undefined" && process.env?.SUPABASE_ANON_KEY) || "";
+export const DEFAULT_SUPABASE_ANON_KEY: string =
+  typeof __SUPABASE_ANON_KEY__ !== "undefined" ? __SUPABASE_ANON_KEY__ : "";
 
 /**
  * Returns the Universal Smart URL for mobile deep link redirect
