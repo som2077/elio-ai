@@ -9,9 +9,9 @@ import {
   RefreshControl,
   StyleSheet,
   SafeAreaView,
-  StatusBar,
   Alert,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
 import { SavedVideo } from '../types/video';
@@ -197,7 +197,7 @@ export default function HomeScreen() {
   if (authLoading) {
     return (
       <SafeAreaView style={[styles.safeContainer, styles.centerContainer]}>
-        <StatusBar barStyle="light-content" backgroundColor={appleColors.canvas} />
+        <StatusBar style="light" backgroundColor={appleColors.canvas} translucent={false} />
         <ActivityIndicator size="large" color={appleColors.accent} />
         <Text style={styles.loadingText}>Syncing Elio AI...</Text>
       </SafeAreaView>
@@ -210,7 +210,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeContainer}>
-      <StatusBar barStyle="light-content" backgroundColor={appleColors.canvas} />
+      <StatusBar style="light" backgroundColor={appleColors.canvas} translucent={false} />
 
       {/* Apple-Grade Header */}
       <AppleHeader

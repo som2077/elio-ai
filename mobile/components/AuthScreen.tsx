@@ -8,6 +8,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { supabase } from "../services/supabase";
 import { motionTokens } from "../utils/motion";
 
@@ -143,6 +144,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" backgroundColor="#080C14" translucent={false} />
       <View style={styles.content}>
         {/* Brand Header */}
         <View style={styles.header}>

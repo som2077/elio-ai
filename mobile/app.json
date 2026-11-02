@@ -7,6 +7,12 @@
     "icon": "./assets/icon.png",
     "scheme": "elio-ai",
     "userInterfaceStyle": "dark",
+    "backgroundColor": "#070A13",
+    "androidStatusBar": {
+      "barStyle": "light-content",
+      "backgroundColor": "#070A13",
+      "translucent": false
+    },
     "splash": {
       "image": "./assets/splash.png",
       "backgroundColor": "#0A0F1D"
