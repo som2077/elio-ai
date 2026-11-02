@@ -58,7 +58,13 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
           <View style={styles.titleColumn}>
             <View style={styles.titleRow}>
-              <Text style={styles.brandTitle}>Elio AI</Text>
+              <Text style={styles.brandTitle}>Elio</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={appleColors.twitterBlue}
+                style={{ marginLeft: 2 }}
+              />
               <View style={styles.livePulseDot} />
             </View>
             <Text style={styles.subtitle}>
@@ -118,7 +124,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 10,
-    backgroundColor: appleColors.canvas,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: appleColors.twitterBorder,
   },
   brandRow: {
     flexDirection: "row",
@@ -208,7 +216,7 @@ const styles = StyleSheet.create({
   linkPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: appleColors.accentLight,
+    backgroundColor: appleColors.telegramCyan,
     paddingHorizontal: 12,
     paddingVertical: 7.5,
     borderRadius: 18,
