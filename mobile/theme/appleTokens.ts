@@ -22,6 +22,14 @@ export const appleColors = {
   accentGlow: 'rgba(99, 102, 241, 0.35)',
   accentLight: '#818CF8',
 
+  // Twitter (X) & Telegram accents
+  twitterBlue: '#1D9BF0',
+  twitterGreen: '#00BA7C',
+  twitterBorder: '#2F3336',
+  twitterMuted: '#71767B',
+  telegramCyan: '#2AABEE',
+  telegramDark: '#17212B',
+
   // Status & semantic colors
   success: '#10B981',
   successGlow: 'rgba(16, 185, 129, 0.3)',
