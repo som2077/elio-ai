@@ -8,6 +8,7 @@ import {
   getDeviceMetadata,
   checkDeviceRevocation,
   logout,
+  refreshAuthSession,
 } from '../services/auth';
 
 interface StorageData {
@@ -284,19 +285,44 @@ async function postVideoToSupabase(
       });
     }
 
-    // If 401 Unauthorized (user session token expired), automatically retry with anon key
+    // If 401 Unauthorized (access_token expired), refresh session and retry with fresh token
     if (response.status === 401) {
-      console.warn('[Elio AI] User token returned 401. Retrying with persistent credentials...');
-      response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: secret,
-          Authorization: `Bearer ${secret}`,
-          Prefer: 'resolution=ignore-duplicates',
-        },
-        body: JSON.stringify(syncPayload),
-      });
+      console.warn('[Elio AI] User access token expired (401). Refreshing session...');
+      const refreshed = await refreshAuthSession(endpoint, secret);
+      if (refreshed?.access_token) {
+        authToken = refreshed.access_token;
+        authSession = refreshed;
+        response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: secret,
+            Authorization: `Bearer ${authToken}`,
+            Prefer: 'resolution=ignore-duplicates',
+          },
+          body: JSON.stringify({
+            ...syncPayload,
+            user_id: refreshed.user_id,
+          }),
+        });
+
+        // Retry fallback if needed
+        if (response.status === 400) {
+          const fallbackPayload = { ...video, user_id: refreshed.user_id };
+          delete (fallbackPayload as any).device_id;
+          delete (fallbackPayload as any).source_device_name;
+          response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: secret,
+              Authorization: `Bearer ${authToken}`,
+              Prefer: 'resolution=ignore-duplicates',
+            },
+            body: JSON.stringify(fallbackPayload),
+          });
+        }
+      }
     }
 
     if (response.ok) {

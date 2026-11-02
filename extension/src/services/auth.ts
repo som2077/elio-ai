@@ -381,12 +381,86 @@ export function listenForApproval(
 }
 
 /**
+ * Decodes JWT and checks if it's expired or about to expire in next 60 seconds
+ */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const payloadPart = token.split(".")[1];
+    if (!payloadPart) return true;
+    const decoded = JSON.parse(atob(payloadPart));
+    if (!decoded.exp) return false;
+    return decoded.exp * 1000 < Date.now() + 60000;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Refreshes an expired authSession using Supabase /auth/v1/token?grant_type=refresh_token
+ */
+export async function refreshAuthSession(
+  endpoint: string = DEFAULT_SUPABASE_URL,
+  apikey: string = DEFAULT_SUPABASE_ANON_KEY
+): Promise<AuthSession | null> {
+  try {
+    const data = await chrome.storage.local.get("authSession");
+    const session = data.authSession as AuthSession | undefined;
+    if (!session || !session.refresh_token) {
+      console.warn("[Elio AI Auth] Cannot refresh session: no refresh_token present.");
+      return null;
+    }
+
+    console.log("[Elio AI Auth] Refreshing expired access token...");
+    const res = await fetch(`${endpoint}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: apikey,
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn("[Elio AI Auth] Token refresh failed:", res.status, errText);
+      return null;
+    }
+
+    const json = await res.json();
+    if (json.access_token) {
+      const updatedSession: AuthSession = {
+        user_id: json.user?.id || session.user_id,
+        email: json.user?.email || session.email,
+        access_token: json.access_token,
+        refresh_token: json.refresh_token || session.refresh_token,
+      };
+
+      await chrome.storage.local.set({ authSession: updatedSession });
+      console.log("[Elio AI Auth] Token refreshed successfully for:", updatedSession.email);
+      return updatedSession;
+    }
+  } catch (err) {
+    console.error("[Elio AI Auth] Error during token refresh:", err);
+  }
+  return null;
+}
+
+/**
  * Gets current authSession from chrome.storage.local
+ * Automatically refreshes the session if access_token has expired!
  */
 export async function getAuthSession(): Promise<AuthSession | null> {
   try {
     const result = await chrome.storage.local.get("authSession");
-    return (result.authSession as AuthSession) || null;
+    let session = (result.authSession as AuthSession) || null;
+    if (session && session.access_token && isTokenExpired(session.access_token)) {
+      console.log("[Elio AI Auth] Stored access_token is expired. Auto-refreshing...");
+      const refreshed = await refreshAuthSession();
+      if (refreshed) {
+        session = refreshed;
+      }
+    }
+    return session;
   } catch (err) {
     console.error("[Elio AI Auth] Failed to read auth session:", err);
     return null;

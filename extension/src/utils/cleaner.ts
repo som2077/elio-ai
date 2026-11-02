@@ -63,8 +63,9 @@ export function cleanVideoUrl(rawUrl: string, platform: SocialPlatform): { clean
         'direct',
       ]);
       if (match && match[2] && !invalidShortcodes.has(match[2].toLowerCase()) && match[2].length >= 5) {
+        const type = match[1] === 'p' ? 'p' : 'reel';
         return {
-          cleanUrl: `https://www.instagram.com/reel/${match[2]}/`,
+          cleanUrl: `https://www.instagram.com/${type}/${match[2]}/`,
           videoId: match[2],
         };
       }

@@ -462,6 +462,14 @@ function extractInstagramTitle(container: HTMLElement, creator: string, isReel: 
 }
 
 /**
+ * Builds normalized Instagram post or reel URL
+ */
+function buildInstagramUrl(type: string, code: string): string {
+  const normalizedType = type === 'p' ? 'p' : 'reel';
+  return `https://www.instagram.com/${normalizedType}/${code}/`;
+}
+
+/**
  * Finds the exact Reel or Post URL
  * Rejects reserved paths like /reels/audio/ and searches script tags when needed
  */
@@ -471,11 +479,12 @@ function findInstagramPostUrl(
   creator: string
 ): string | null {
   // 1. Direct shortcode in window.location.pathname
-  const locMatch = window.location.pathname.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-  if (locMatch && locMatch[1]) {
-    const code = locMatch[1];
+  const locMatch = window.location.pathname.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+  if (locMatch && locMatch[2]) {
+    const type = locMatch[1];
+    const code = locMatch[2];
     if (code.length >= 7 && !INVALID_SHORTCODES.has(code.toLowerCase())) {
-      return `https://www.instagram.com/reel/${code}/`;
+      return buildInstagramUrl(type, code);
     }
   }
 
@@ -483,9 +492,9 @@ function findInstagramPostUrl(
   const timeEl = container.querySelector('time');
   const timeAnchor = timeEl?.closest('a') as HTMLAnchorElement | null;
   if (timeAnchor?.href) {
-    const m = timeAnchor.href.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-    if (m && m[1] && m[1].length >= 7 && !INVALID_SHORTCODES.has(m[1].toLowerCase())) {
-      return `https://www.instagram.com/reel/${m[1]}/`;
+    const m = timeAnchor.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+    if (m && m[2] && m[2].length >= 7 && !INVALID_SHORTCODES.has(m[2].toLowerCase())) {
+      return buildInstagramUrl(m[1], m[2]);
     }
   }
 
@@ -495,9 +504,9 @@ function findInstagramPostUrl(
   );
   for (const a of containerAnchors) {
     const href = a.href || a.getAttribute('href') || '';
-    const m = href.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-    if (m && m[1] && m[1].length >= 7 && !INVALID_SHORTCODES.has(m[1].toLowerCase())) {
-      return `https://www.instagram.com/reel/${m[1]}/`;
+    const m = href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+    if (m && m[2] && m[2].length >= 7 && !INVALID_SHORTCODES.has(m[2].toLowerCase())) {
+      return buildInstagramUrl(m[1], m[2]);
     }
   }
 
@@ -540,111 +549,91 @@ function findInstagramPostUrl(
 
 /**
  * Robust multilingual detection of Like and Save buttons on Instagram
+ * Accurately determines if the user is liking vs unliking
  */
-function getInstagramActionType(target: HTMLElement): 'like' | 'save' | null {
-  let svg: SVGElement | null = null;
-  if (target.tagName.toLowerCase() === 'svg') {
-    svg = target as unknown as SVGElement;
-  } else {
-    svg =
-      target.querySelector('svg') ||
-      target.closest('svg') ||
-      target.closest('button, div[role="button"], span')?.querySelector('svg') ||
-      null;
+function getInstagramAction(target: HTMLElement): { type: 'like' | 'save'; isUnlike: boolean } | null {
+  const btn =
+    target.closest('button, div[role="button"], a[role="button"], span[role="button"]') ||
+    target.closest('span') ||
+    target;
+
+  const svg =
+    (target.tagName.toLowerCase() === 'svg' ? (target as unknown as SVGElement) : null) ||
+    target.querySelector('svg') ||
+    target.closest('svg') ||
+    btn.querySelector('svg');
+
+  const btnAria = (btn.getAttribute('aria-label') || btn.getAttribute('title') || '').toLowerCase();
+  const svgAria = (svg?.getAttribute('aria-label') || svg?.querySelector('title')?.textContent || '').toLowerCase();
+  const combinedAria = `${btnAria} ${svgAria}`.toLowerCase();
+
+  const fill = (svg?.getAttribute('fill') || svg?.getAttribute('color') || '').toLowerCase();
+  let isRed =
+    fill.includes('255, 48, 64') ||
+    fill.includes('#ff3040') ||
+    fill.includes('237, 73, 86');
+
+  if (!isRed && svg) {
+    try {
+      const computed = window.getComputedStyle(svg);
+      const col = (computed.color || computed.fill || '').toLowerCase();
+      if (col.includes('255, 48, 64') || col.includes('237, 73, 86')) {
+        isRed = true;
+      }
+    } catch {}
   }
 
-  const targetLabel = (target.getAttribute('aria-label') || target.getAttribute('title') || '').toLowerCase();
-  if (
-    targetLabel.includes('like') ||
-    targetLabel.includes('unlike') ||
-    targetLabel.includes('पसंद') ||
-    targetLabel.includes('लाइक')
-  ) {
-    return 'like';
-  }
-  if (targetLabel.includes('save') || targetLabel.includes('bookmark') || targetLabel.includes('सहेजें')) {
-    return 'save';
-  }
+  // Check if it's an UNLIKE action (user clicked an already red heart)
+  const isUnlike =
+    combinedAria.includes('unlike') ||
+    combinedAria.includes('पसंद हटाएं') ||
+    combinedAria.includes('gefällt mir nicht') ||
+    combinedAria.includes('ya no me gusta') ||
+    combinedAria.includes('ne plus aimer') ||
+    isRed;
 
-  if (!svg) return null;
+  // Check if it's a LIKE button
+  const isLike =
+    combinedAria.includes('like') ||
+    combinedAria.includes('पसंद') ||
+    combinedAria.includes('लाइक') ||
+    combinedAria.includes('gefällt mir') ||
+    combinedAria.includes('me gusta') ||
+    combinedAria.includes('aimer');
 
-  const svgAria = (svg.getAttribute('aria-label') || '').toLowerCase();
-  const svgTitle = (svg.querySelector('title')?.textContent || '').toLowerCase();
-  const parentAria = (svg.parentElement?.getAttribute('aria-label') || '').toLowerCase();
-  const combined = `${svgAria} ${svgTitle} ${parentAria}`;
-
-  if (
-    combined.includes('like') ||
-    combined.includes('unlike') ||
-    combined.includes('पसंद') ||
-    combined.includes('लाइक') ||
-    combined.includes('gefällt mir') ||
-    combined.includes('me gusta') ||
-    combined.includes('aimer')
-  ) {
-    return 'like';
-  }
-
-  if (
-    combined.includes('save') ||
-    combined.includes('bookmark') ||
-    combined.includes('सहेजें') ||
-    combined.includes('speichern') ||
-    combined.includes('guardar') ||
-    combined.includes('enregistrer')
-  ) {
-    return 'save';
-  }
-
-  const pathD = svg.querySelector('path')?.getAttribute('d') || '';
-  if (
+  // Check SVG path for Instagram's heart icon
+  const pathD = svg?.querySelector('path')?.getAttribute('d') || '';
+  const isHeartPath =
     pathD.includes('16.792') ||
     pathD.includes('34.6') ||
     pathD.includes('21.35') ||
     pathD.includes('M12 21') ||
     pathD.includes('3.904') ||
     pathD.includes('9.122') ||
-    pathD.includes('7.222')
-  ) {
-    return 'like';
+    pathD.includes('7.222') ||
+    pathD.includes('M34.6 3.1c-4.5');
+
+  if (isLike || isHeartPath) {
+    return { type: 'like', isUnlike };
   }
 
-  if (pathD.includes('20 22') || pathD.includes('14.815') || pathD.includes('6.912')) {
-    return 'save';
-  }
+  // Check if it's a SAVE / Bookmark button
+  const isSave =
+    combinedAria.includes('save') ||
+    combinedAria.includes('bookmark') ||
+    combinedAria.includes('सहेजें') ||
+    combinedAria.includes('speichern') ||
+    combinedAria.includes('guardar');
 
-  const color = (svg.getAttribute('color') || svg.getAttribute('fill') || '').toLowerCase();
-  if (color.includes('255, 48, 64') || color.includes('#ff3040') || color.includes('237, 73, 86')) {
-    return 'like';
+  const isBookmarkPath = pathD.includes('20 22') || pathD.includes('14.815') || pathD.includes('6.912');
+
+  if (isSave || isBookmarkPath) {
+    const isUnsave =
+      combinedAria.includes('unsave') || combinedAria.includes('remove') || combinedAria.includes('हटाएं');
+    return { type: 'save', isUnlike: isUnsave };
   }
 
   return null;
-}
-
-/**
- * Checks whether the post/reel heart button is in the LIKED state (Red heart or aria-label="Unlike")
- */
-function isPostLikedState(container: HTMLElement): boolean {
-  const svgs = Array.from(container.querySelectorAll('svg'));
-  for (const svg of svgs) {
-    const aria = (svg.getAttribute('aria-label') || svg.querySelector('title')?.textContent || '').toLowerCase();
-    const color = (svg.getAttribute('color') || svg.getAttribute('fill') || '').toLowerCase();
-
-    const isRed =
-      color.includes('255, 48, 64') ||
-      color.includes('#ff3040') ||
-      color.includes('237, 73, 86');
-
-    const isUnlike =
-      aria.includes('unlike') ||
-      aria.includes('पसंद हटाएं') ||
-      aria.includes('gefällt mir nicht');
-
-    if (isRed || isUnlike) {
-      return true;
-    }
-  }
-  return false;
 }
 
 /**
@@ -730,21 +719,22 @@ document.addEventListener(
     const target = event.target as HTMLElement | null;
     if (!target) return;
 
-    const action = getInstagramActionType(target);
-    if (action === 'like' || action === 'save') {
-      console.log(`[Elio AI] Detected Instagram ${action} click!`);
-      // Wait for Instagram's UI to update heart fill / state
-      setTimeout(() => {
-        const container = findPostOrReelContainer(target);
-        // Only sync if the item is in liked/saved state
-        if (action === 'save' || isPostLikedState(container)) {
-          const payload = scrapeInstagramPost(target);
-          if (payload) {
-            sendInstagramSync(payload);
-          }
-        }
-      }, 300);
+    const action = getInstagramAction(target);
+    if (!action) return;
+
+    // If target was already 'Unlike', user is unliking -> do not sync
+    if (action.isUnlike) {
+      console.log(`[Elio AI] Ignored Instagram un-${action.type} click.`);
+      return;
     }
+
+    console.log(`[Elio AI] Detected Instagram ${action.type} click! Syncing...`);
+    setTimeout(() => {
+      const payload = scrapeInstagramPost(target);
+      if (payload) {
+        sendInstagramSync(payload);
+      }
+    }, 150);
   },
   true
 );
@@ -768,7 +758,7 @@ document.addEventListener(
         if (payload) {
           sendInstagramSync(payload);
         }
-      }, 350);
+      }, 200);
     }
   },
   true
@@ -798,7 +788,7 @@ document.addEventListener(
             sendInstagramSync(payload);
           }
         }
-      }, 350);
+      }, 200);
     }
   },
   true
