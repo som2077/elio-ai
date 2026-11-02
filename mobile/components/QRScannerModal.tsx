@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from "react-native";
 import { supabase } from "../services/supabase";
+import { haptics } from "../utils/haptics";
 
 let ExpoCameraModule: any = null;
 try {
@@ -129,6 +130,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
       }
 
       setStatusMessage(null);
+      haptics.success();
       setScannedToken(token);
 
       // Pre-fetch device metadata from the pending QR session
