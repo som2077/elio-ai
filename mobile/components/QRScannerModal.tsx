@@ -82,9 +82,24 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
 
     try {
       const raw = (data || "").trim();
+
+      // Check if user accidentally scanned Metro / Expo terminal QR code
+      if (
+        raw.includes("expo-development-client") ||
+        raw.includes("exp://") ||
+        raw.includes("192.168.") ||
+        raw.includes(":8081")
+      ) {
+        setStatusMessage({
+          text: "⚠️ Yeh Metro terminal ka QR code hai! Kripya Chrome browser me Elio AI extension ka popup khol kar uska QR code scan karein.",
+          isError: true,
+        });
+        return;
+      }
+
       let token = raw;
 
-      // Extract 36-char standard UUID (e.g. 5982a65e-a7b9-43f2-a31e-b30bccca743f)
+      // Extract 36-char standard UUID (e.g. 07adc75b-7d38-446f-b9a6-766b99fd4898)
       const uuidMatch = raw.match(
         /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i
       );
@@ -99,11 +114,21 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
         token = sessionMatch[1];
       } else if (raw.startsWith("elio-auth:")) {
         token = raw.replace("elio-auth:", "").trim();
+      } else {
+        setStatusMessage({
+          text: "⚠️ Invalid QR Code. Kripya Chrome browser me Elio AI extension popup ka QR code scan karein.",
+          isError: true,
+        });
+        return;
       }
 
+      setStatusMessage(null);
       setScannedToken(token);
     } catch {
-      setScannedToken(data);
+      setStatusMessage({
+        text: "⚠️ QR Code read error. Please try scanning again.",
+        isError: true,
+      });
     }
   };
 
