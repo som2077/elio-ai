@@ -1,4 +1,4 @@
-package com.clipper.android
+package com.elioai.android
 
 import android.app.Application
 import android.content.res.Configuration

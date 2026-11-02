@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "Clipper.app"
-               BlueprintName = "Clipper"
-               ReferencedContainer = "container:Clipper.xcodeproj">
+               BuildableName = "ElioAI.app"
+               BlueprintName = "ElioAI"
+               ReferencedContainer = "container:ElioAI.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "ClipperTests.xctest"
-               BlueprintName = "ClipperTests"
-               ReferencedContainer = "container:Clipper.xcodeproj">
+               BuildableName = "ElioAITests.xctest"
+               BlueprintName = "ElioAITests"
+               ReferencedContainer = "container:ElioAI.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Clipper.app"
-            BlueprintName = "Clipper"
-            ReferencedContainer = "container:Clipper.xcodeproj">
+            BuildableName = "ElioAI.app"
+            BlueprintName = "ElioAI"
+            ReferencedContainer = "container:ElioAI.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "Clipper.app"
-            BlueprintName = "Clipper"
-            ReferencedContainer = "container:Clipper.xcodeproj">
+            BuildableName = "ElioAI.app"
+            BlueprintName = "ElioAI"
+            ReferencedContainer = "container:ElioAI.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

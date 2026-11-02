@@ -1,4 +1,4 @@
-// Background Service Worker for Clipper Extension (Manifest V3)
+// Background Service Worker for Elio AI Extension (Manifest V3)
 
 import { SavedVideoPayload } from '../utils/cleaner';
 import { AuthSession } from '../services/auth';

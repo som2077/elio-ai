@@ -23,7 +23,7 @@ export default defineConfig({
           return 'content/[name].js';
         },
         format: 'iife',
-        name: 'Clipper',
+        name: 'ElioAI',
         inlineDynamicImports: false,
       },
     },

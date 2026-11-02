@@ -1,4 +1,4 @@
-package com.clipper.android
+package com.elioai.android
 
 import android.os.Build
 import android.os.Bundle
