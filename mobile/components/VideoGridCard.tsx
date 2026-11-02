@@ -18,12 +18,14 @@ interface VideoGridCardProps {
   video: SavedVideo;
   onPress: () => void;
   onToggleStatus: () => void;
+  onLongPress?: () => void;
 }
 
 export const VideoGridCard: React.FC<VideoGridCardProps> = ({
   video,
   onPress,
   onToggleStatus,
+  onLongPress,
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -107,6 +109,13 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
           haptics.light();
           onPress();
         }}
+        onLongPress={() => {
+          if (onLongPress) {
+            haptics.selection();
+            onLongPress();
+          }
+        }}
+        delayLongPress={260}
       >
         {/* Poster Media Image */}
         <View style={styles.imageBox}>

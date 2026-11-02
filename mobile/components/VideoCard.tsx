@@ -15,6 +15,7 @@ interface VideoCardProps {
   video: SavedVideo;
   onPress: () => void;
   onToggleStatus: () => void;
+  onLongPress?: () => void;
   onDelete?: () => void;
 }
 
@@ -22,6 +23,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   video,
   onPress,
   onToggleStatus,
+  onLongPress,
   onDelete,
 }) => {
   const isWatched = video.status === 'watched';
@@ -96,6 +98,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         activeOpacity={0.92}
         style={[styles.card, isWatched && styles.cardWatched]}
         onPress={onPress}
+        onLongPress={() => {
+          if (onLongPress) {
+            haptics.selection();
+            onLongPress();
+          }
+        }}
+        delayLongPress={260}
         onPressIn={handleCardPressIn}
         onPressOut={handleCardPressOut}
       >
@@ -205,18 +214,37 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             </TouchableOpacity>
 
             {/* Quick Open Action Button */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.openBtn}
-              onPress={onPress}
-            >
-              <Text style={styles.openBtnText}>Open</Text>
-              <Ionicons
-                name="arrow-forward"
-                size={12}
-                color={appleColors.accentLight}
-              />
-            </TouchableOpacity>
+            <View style={styles.actionRightRow}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.openBtn}
+                onPress={onPress}
+              >
+                <Text style={styles.openBtnText}>Open</Text>
+                <Ionicons
+                  name="arrow-forward"
+                  size={12}
+                  color={appleColors.accentLight}
+                />
+              </TouchableOpacity>
+
+              {Boolean(onLongPress) && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.moreBtn}
+                  onPress={() => {
+                    haptics.selection();
+                    onLongPress!();
+                  }}
+                >
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={15}
+                    color={appleColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -373,6 +401,11 @@ const styles = StyleSheet.create({
   statusLabelActive: {
     color: appleColors.success,
   },
+  actionRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   openBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -388,5 +421,15 @@ const styles = StyleSheet.create({
     ...appleTypography.caption,
     color: appleColors.accentLight,
     fontWeight: '700',
+  },
+  moreBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: appleColors.surfaceTertiary,
+    borderWidth: 1,
+    borderColor: appleColors.borderGlass,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
