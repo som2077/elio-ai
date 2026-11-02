@@ -107,8 +107,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           <Image
             source={{
               uri:
-                video.thumbnail_url ||
-                'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80',
+                video.thumbnail_url &&
+                !video.thumbnail_url.includes('.mp4') &&
+                !video.thumbnail_url.includes('.m3u8')
+                  ? video.thumbnail_url
+                  : 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80',
             }}
             style={styles.thumbnail}
             resizeMode="cover"

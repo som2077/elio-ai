@@ -285,74 +285,149 @@ function findRedditCreator(post: HTMLElement): string {
 }
 
 /**
- * Extracts thumbnail and media type
+ * Verifies if a URL is a valid image (and NOT a video file like .mp4/.m3u8)
  */
-function findRedditMedia(post: HTMLElement): { thumbnail: string; category: 'video' | 'post' } {
-  const video = post.querySelector('video') as HTMLVideoElement | null;
+function isValidImageUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const clean = url.trim().toLowerCase();
+  if (clean.length < 15) return false;
+  if (clean.startsWith('blob:') || clean.startsWith('data:image/svg')) return false;
+
+  // Crucial: Reject video streams and manifests!
+  if (
+    clean.includes('.mp4') ||
+    clean.includes('.m3u8') ||
+    clean.includes('.webm') ||
+    clean.includes('/cmaf_') ||
+    clean.includes('hlsplaylist')
+  ) {
+    return false;
+  }
+
+  // Reject tiny community icons/avatars
+  if (clean.includes('communityicon') || clean.includes('avatar') || clean.includes('snoo') || clean.includes('width=48')) {
+    return false;
+  }
+
+  return clean.startsWith('http://') || clean.startsWith('https://');
+}
+
+/**
+ * Attempts to extract an image thumbnail directly from Reddit's DOM
+ */
+function extractDomThumbnail(post: HTMLElement): string {
   const shredditPlayer = post.querySelector('shreddit-player, shreddit-player-2, [data-testid="shreddit-player"]');
+  const video = post.querySelector('video') as HTMLVideoElement | null;
 
-  const isVideo =
-    Boolean(video) ||
-    Boolean(shredditPlayer) ||
-    post.hasAttribute('is-video') ||
-    post.getAttribute('post-type') === 'video';
-
-  let thumbnail = '';
-
-  // 1. Video poster attribute
-  if (video?.poster && !video.poster.startsWith('blob:') && video.poster.length > 20) {
-    thumbnail = video.poster;
-  } else if (shredditPlayer) {
-    thumbnail =
+  // 1. Check shreddit-player poster attribute directly
+  if (shredditPlayer) {
+    const playerPoster =
+      shredditPlayer.getAttribute('poster') ||
       shredditPlayer.getAttribute('poster-url') ||
-      shredditPlayer.getAttribute('preview') ||
-      '';
+      shredditPlayer.getAttribute('preview');
+    if (isValidImageUrl(playerPoster)) return playerPoster!;
+
+    // Check shreddit-player shadow DOM
+    try {
+      if ((shredditPlayer as any).shadowRoot) {
+        const shadowVideo = (shredditPlayer as any).shadowRoot.querySelector('video');
+        const shadowPoster = shadowVideo?.getAttribute('poster');
+        if (isValidImageUrl(shadowPoster)) return shadowPoster;
+
+        const shadowImg = (shredditPlayer as any).shadowRoot.querySelector('img');
+        const shadowImgSrc = shadowImg?.currentSrc || shadowImg?.src || shadowImg?.getAttribute('src');
+        if (isValidImageUrl(shadowImgSrc)) return shadowImgSrc;
+      }
+    } catch {}
   }
 
-  // 2. Image inside post
-  if (!thumbnail) {
-    const img = post.querySelector<HTMLImageElement>(
-      'img[alt="Post image"], img[src*="preview.redd.it"], img[src*="i.redd.it"], img[src*="external-preview"], shreddit-aspect-ratio img, img'
-    );
-    if (
-      img?.src &&
-      !img.src.startsWith('data:image/svg') &&
-      !img.src.includes('avatar') &&
-      !img.src.includes('communityIcon') &&
-      !img.src.includes('snoo')
-    ) {
-      thumbnail = img.src;
+  // 2. Check HTML5 video poster (only if valid image and NOT .mp4)
+  if (video?.poster && isValidImageUrl(video.poster)) {
+    return video.poster;
+  }
+
+  // 3. Check high-res Reddit image containers inside the post
+  const imgSelectors = [
+    'img[src*="preview.redd.it"]',
+    'img[src*="i.redd.it"]',
+    'img[src*="external-preview.redd.it"]',
+    'shreddit-aspect-ratio img',
+    'figure img',
+    'img[alt="Post image"]',
+    'img[data-testid="post-image"]',
+  ];
+
+  for (const sel of imgSelectors) {
+    const found = post.querySelectorAll<HTMLImageElement>(sel);
+    for (const img of Array.from(found)) {
+      const src = img.currentSrc || img.src || img.getAttribute('src');
+      if (isValidImageUrl(src)) return src;
     }
   }
 
-  // 3. Fallback to OpenGraph image on single post view
-  if (!thumbnail && window.location.pathname.includes('/comments/')) {
-    const ogImg = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
-    if (ogImg && !ogImg.includes('redditstatic.com')) {
-      thumbnail = ogImg;
-    }
+  // 4. Any other non-icon image inside post
+  const anyImgs = post.querySelectorAll<HTMLImageElement>('img');
+  for (const img of Array.from(anyImgs)) {
+    const src = img.currentSrc || img.src || img.getAttribute('src');
+    if (isValidImageUrl(src)) return src;
   }
 
-  // 4. Subreddit avatar/icon fallback
-  if (!thumbnail) {
-    const iconImg = post.querySelector<HTMLImageElement>(
-      'faceplate-img, img[src*="communityIcon"], img[src*="styles.redditmedia.com"]'
-    );
-    if (iconImg?.src) {
-      thumbnail = iconImg.src;
-    }
+  // 5. OpenGraph image on single post view
+  if (window.location.pathname.includes('/comments/')) {
+    const ogImg =
+      document.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      document.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
+    if (isValidImageUrl(ogImg)) return ogImg;
   }
 
-  return {
-    thumbnail,
-    category: isVideo ? 'video' : 'post',
-  };
+  return '';
+}
+
+/**
+ * Fetches the post JSON directly via same-origin session to retrieve the full-resolution preview image
+ */
+async function fetchRedditPostThumbnail(rawPostUrl: string): Promise<string> {
+  try {
+    const cleanBase = rawPostUrl.split('?')[0].replace(/\/+$/, '');
+    if (!cleanBase.includes('/comments/')) return '';
+
+    const jsonUrl = `${cleanBase}.json`;
+    console.log('[Elio AI Reddit] Fetching high-res thumbnail from Reddit JSON:', jsonUrl);
+    const res = await fetch(jsonUrl, { credentials: 'same-origin' });
+    if (!res.ok) return '';
+
+    const data = await res.json();
+    const postData = data?.[0]?.data?.children?.[0]?.data;
+    if (!postData) return '';
+
+    // 1. Preview source image (unescape &amp;)
+    const previewUrl = postData.preview?.images?.[0]?.source?.url;
+    if (isValidImageUrl(previewUrl)) {
+      return previewUrl.replace(/&amp;/g, '&');
+    }
+
+    // 2. Direct thumbnail if valid
+    if (isValidImageUrl(postData.thumbnail)) {
+      return postData.thumbnail;
+    }
+
+    // 3. Media oembed thumbnail
+    const oembedThumb =
+      postData.secure_media?.oembed?.thumbnail_url ||
+      postData.media?.oembed?.thumbnail_url;
+    if (isValidImageUrl(oembedThumb)) {
+      return oembedThumb;
+    }
+  } catch (err) {
+    console.warn('[Elio AI Reddit] JSON thumbnail fetch notice:', err);
+  }
+  return '';
 }
 
 /**
  * Scrapes metadata of a Reddit Post or Video
  */
-function scrapeRedditPost(post: HTMLElement): SavedVideoPayload | null {
+async function scrapeRedditPost(post: HTMLElement): Promise<SavedVideoPayload | null> {
   const rawPostUrl = findRedditPostUrl(post);
 
   if (!rawPostUrl) {
@@ -371,11 +446,31 @@ function scrapeRedditPost(post: HTMLElement): SavedVideoPayload | null {
 
   const title = findRedditPostTitle(post);
   const creator = findRedditCreator(post);
-  const { thumbnail, category } = findRedditMedia(post);
+
+  const video = post.querySelector('video') as HTMLVideoElement | null;
+  const shredditPlayer = post.querySelector('shreddit-player, shreddit-player-2, [data-testid="shreddit-player"]');
+  const isVideo =
+    Boolean(video) ||
+    Boolean(shredditPlayer) ||
+    post.hasAttribute('is-video') ||
+    post.getAttribute('post-type') === 'video';
+
+  // 1. Try instant DOM extraction
+  let thumbnail = extractDomThumbnail(post);
+
+  // 2. If DOM extraction did not yield a valid image, fetch via same-origin JSON
+  if (!isValidImageUrl(thumbnail)) {
+    thumbnail = await fetchRedditPostThumbnail(rawPostUrl);
+  }
+
+  // 3. Fallback to clean curated tech/social backdrop if post has no media
+  if (!isValidImageUrl(thumbnail)) {
+    thumbnail = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80';
+  }
 
   return {
     platform: 'reddit',
-    category: category,
+    category: isVideo ? 'video' : 'post',
     original_url: rawPostUrl,
     clean_url: finalCleanUrl,
     platform_video_id: videoId,
@@ -484,14 +579,22 @@ document.addEventListener(
 
     console.log('[Elio AI Reddit] Detected Upvote/Save click on post! Will scrape after DOM settles...');
     setTimeout(() => {
-      const payload = scrapeRedditPost(post);
-      if (payload) {
-        sendRedditSync(payload);
-      }
+      handlePostSync(post);
     }, 250);
   },
   true
 );
+
+async function handlePostSync(post: HTMLElement) {
+  try {
+    const payload = await scrapeRedditPost(post);
+    if (payload) {
+      sendRedditSync(payload);
+    }
+  } catch (err) {
+    console.error('[Elio AI Reddit] Sync error:', err);
+  }
+}
 
 // 2. MutationObserver: Watches for vote-type or aria-pressed attribute transitions
 const observer = new MutationObserver((mutations) => {
@@ -505,10 +608,7 @@ const observer = new MutationObserver((mutations) => {
         const voteType = (el.getAttribute('vote-type') || '').toLowerCase();
         if (voteType === 'upvote') {
           console.log('[Elio AI Reddit] Post vote-type changed to upvote via DOM mutation.');
-          const payload = scrapeRedditPost(el);
-          if (payload) {
-            sendRedditSync(payload);
-          }
+          handlePostSync(el);
         }
       }
 
@@ -517,10 +617,7 @@ const observer = new MutationObserver((mutations) => {
         if (isRedditUpvoteElement(el)) {
           console.log('[Elio AI Reddit] Upvote button aria-pressed became true via DOM mutation.');
           const post = findRedditPostContainer(el);
-          const payload = scrapeRedditPost(post);
-          if (payload) {
-            sendRedditSync(payload);
-          }
+          handlePostSync(post);
         }
       }
     }
