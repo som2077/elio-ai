@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -65,6 +65,12 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
   };
 
   const platform = getPlatformIcon(video.platform);
+  const [imageError, setImageError] = useState(false);
+  const hasValidThumbnail =
+    Boolean(video.thumbnail_url) &&
+    !imageError &&
+    !video.thumbnail_url?.includes(".mp4") &&
+    !video.thumbnail_url?.includes(".m3u8");
 
   return (
     <Animated.View style={[styles.container, { transform: [{ scale }] }]}>
@@ -80,15 +86,16 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
       >
         {/* Spotlight Media Header */}
         <View style={styles.mediaContainer}>
-          {video.thumbnail_url ? (
+          {hasValidThumbnail ? (
             <Image
               source={{ uri: video.thumbnail_url }}
               style={styles.mediaImage}
               resizeMode="cover"
+              onError={() => setImageError(true)}
             />
           ) : (
             <View style={styles.fallbackMedia}>
-              <Ionicons name={platform.icon} size={44} color={appleColors.textTertiary} />
+              <Ionicons name={platform.icon} size={44} color={platform.color || appleColors.textTertiary} />
             </View>
           )}
 

@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -89,6 +89,12 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
 
   const platformInfo = getPlatformDetails(video.platform);
   const isUnread = video.status === "unread";
+  const [imageError, setImageError] = useState(false);
+  const hasValidThumbnail =
+    Boolean(video.thumbnail_url) &&
+    !imageError &&
+    !video.thumbnail_url?.includes(".mp4") &&
+    !video.thumbnail_url?.includes(".m3u8");
 
   return (
     <Animated.View style={[styles.cardWrapper, { transform: [{ scale }] }]}>
@@ -104,18 +110,19 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
       >
         {/* Poster Media Image */}
         <View style={styles.imageBox}>
-          {video.thumbnail_url ? (
+          {hasValidThumbnail ? (
             <Image
               source={{ uri: video.thumbnail_url }}
               style={styles.posterImage}
               resizeMode="cover"
+              onError={() => setImageError(true)}
             />
           ) : (
             <View style={styles.placeholderBox}>
               <Ionicons
                 name={platformInfo.icon}
                 size={36}
-                color={appleColors.textTertiary}
+                color={platformInfo.color || appleColors.textTertiary}
               />
             </View>
           )}
