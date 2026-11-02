@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,18 +11,28 @@ import {
   SafeAreaView,
   StatusBar,
   Alert,
-} from "react-native";
-import { supabase, isSupabaseConfigured } from "../services/supabase";
-import { SavedVideo } from "../types/video";
-import { VideoCard } from "../components/VideoCard";
-import { SkeletonCard } from "../components/SkeletonCard";
-import { openVideoDirectly } from "../services/deepLink";
-import { ActivityCalendar } from "../components/ActivityCalendar";
-import { AuthScreen } from "../components/AuthScreen";
-import { QRScannerModal } from "../components/QRScannerModal";
-import { LinkedDevicesModal } from "../components/LinkedDevicesModal";
-import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
-import { triggerLayoutMotion } from "../utils/motion";
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../services/supabase';
+import { SavedVideo } from '../types/video';
+import { VideoCard } from '../components/VideoCard';
+import { SkeletonCard } from '../components/SkeletonCard';
+import { openVideoDirectly } from '../services/deepLink';
+import { ActivityCalendar } from '../components/ActivityCalendar';
+import { AuthScreen } from '../components/AuthScreen';
+import { QRScannerModal } from '../components/QRScannerModal';
+import { LinkedDevicesModal } from '../components/LinkedDevicesModal';
+import { AppleHeader } from '../components/AppleHeader';
+import { AppleFilterPills, FilterCategory } from '../components/AppleFilterPills';
+import { EmptyState } from '../components/EmptyState';
+import { toDateKey, formatDisplayDate } from '../services/dateAnalytics';
+import { triggerLayoutMotion } from '../utils/motion';
+import {
+  appleColors,
+  appleRadii,
+  appleTypography,
+} from '../theme/appleTokens';
+import { haptics } from '../utils/haptics';
 
 export default function HomeScreen() {
   const [session, setSession] = useState<any>(null);
@@ -33,18 +43,7 @@ export default function HomeScreen() {
   const [videos, setVideos] = useState<SavedVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<
-    | "all"
-    | "unread"
-    | "youtube"
-    | "instagram"
-    | "twitter"
-    | "facebook"
-    | "reddit"
-    | "linkedin"
-    | "pinterest"
-    | "tiktok"
-  >("all");
+  const [filter, setFilter] = useState<FilterCategory>('all');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState<boolean>(false);
 
@@ -78,23 +77,23 @@ export default function HomeScreen() {
     try {
       const targetUserId = userId || session?.user?.id;
       let query = supabase
-        .from("saved_videos")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .from('saved_videos')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (targetUserId) {
-        query = query.eq("user_id", targetUserId);
+        query = query.eq('user_id', targetUserId);
       }
 
       const { data, error } = await query;
 
       if (error) {
-        console.warn("Supabase fetch notice:", error.message);
+        console.warn('Supabase fetch notice:', error.message);
       } else if (data) {
         setVideos(data as SavedVideo[]);
       }
     } catch (err: any) {
-      console.warn("Network issue:", err.message);
+      console.warn('Network issue:', err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -107,33 +106,35 @@ export default function HomeScreen() {
     // Realtime Supabase listener filtered to current user
     try {
       const channel = supabase
-        .channel("saved_videos_realtime")
+        .channel('saved_videos_realtime')
         .on(
-          "postgres_changes",
+          'postgres_changes',
           {
-            event: "*",
-            schema: "public",
-            table: "saved_videos",
+            event: '*',
+            schema: 'public',
+            table: 'saved_videos',
             filter: `user_id=eq.${session.user.id}`,
           },
           () => {
             fetchVideos(session.user.id);
-          },
+          }
         )
         .subscribe();
 
       return () => {
         supabase.removeChannel(channel);
       };
-    } catch (e) {}
+    } catch {
+      // Ignored safely
+    }
   }, [session?.user?.id]);
 
   const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure you want to log out of Elio AI?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('Sign Out', 'Are you sure you want to log out of Elio AI?', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: "Sign Out",
-        style: "destructive",
+        text: 'Sign Out',
+        style: 'destructive',
         onPress: async () => {
           await supabase.auth.signOut();
         },
@@ -143,27 +144,27 @@ export default function HomeScreen() {
 
   const toggleStatus = async (video: SavedVideo) => {
     triggerLayoutMotion();
-    const newStatus = video.status === "watched" ? "unread" : "watched";
+    const newStatus = video.status === 'watched' ? 'unread' : 'watched';
     setVideos((prev) =>
-      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v)),
+      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v))
     );
 
     await supabase
-      .from("saved_videos")
+      .from('saved_videos')
       .update({
         status: newStatus,
-        watched_at: newStatus === "watched" ? new Date().toISOString() : null,
+        watched_at: newStatus === 'watched' ? new Date().toISOString() : null,
       })
-      .eq("id", video.id);
+      .eq('id', video.id);
   };
 
-  const handleFilterChange = (newFilter: typeof filter) => {
+  const handleFilterChange = (newFilter: FilterCategory) => {
     triggerLayoutMotion();
     setFilter(newFilter);
   };
 
   const handleCalendarToggle = () => {
-    triggerLayoutMotion(350);
+    triggerLayoutMotion(300);
     setShowCalendar((prev) => !prev);
   };
 
@@ -179,25 +180,25 @@ export default function HomeScreen() {
       if (vDateKey !== selectedDate) return false;
     }
 
-    if (filter === "youtube") return v.platform === "youtube";
-    if (filter === "instagram") return v.platform === "instagram";
-    if (filter === "twitter") return v.platform === "twitter";
-    if (filter === "facebook") return v.platform === "facebook";
-    if (filter === "reddit") return v.platform === "reddit";
-    if (filter === "linkedin") return v.platform === "linkedin";
-    if (filter === "pinterest") return v.platform === "pinterest";
-    if (filter === "tiktok") return v.platform === "tiktok";
-    if (filter === "unread") return v.status === "unread";
+    if (filter === 'youtube') return v.platform === 'youtube';
+    if (filter === 'instagram') return v.platform === 'instagram';
+    if (filter === 'twitter') return v.platform === 'twitter';
+    if (filter === 'facebook') return v.platform === 'facebook';
+    if (filter === 'reddit') return v.platform === 'reddit';
+    if (filter === 'linkedin') return v.platform === 'linkedin';
+    if (filter === 'pinterest') return v.platform === 'pinterest';
+    if (filter === 'tiktok') return v.platform === 'tiktok';
+    if (filter === 'unread') return v.status === 'unread';
     return true;
   });
 
-  const unreadCount = videos.filter((v) => v.status === "unread").length;
+  const unreadCount = videos.filter((v) => v.status === 'unread').length;
 
   if (authLoading) {
     return (
       <SafeAreaView style={[styles.safeContainer, styles.centerContainer]}>
-        <StatusBar barStyle="light-content" backgroundColor="#0A0F1D" />
-        <ActivityIndicator size="large" color="#6366F1" />
+        <StatusBar barStyle="light-content" backgroundColor={appleColors.canvas} />
+        <ActivityIndicator size="large" color={appleColors.accent} />
         <Text style={styles.loadingText}>Syncing Elio AI...</Text>
       </SafeAreaView>
     );
@@ -209,126 +210,45 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0F1D" />
+      <StatusBar barStyle="light-content" backgroundColor={appleColors.canvas} />
 
-      {/* Top App Bar */}
-      <View style={styles.appBar}>
-        <View style={styles.brandRow}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoIcon}>✦</Text>
-          </View>
-          <View>
-            <Text style={styles.appTitle}>Elio AI</Text>
-            <Text style={styles.appSubtitle} numberOfLines={1}>
-              {session?.user?.email || 'Smart Watchlist & Recall'}
-            </Text>
-          </View>
-        </View>
+      {/* Apple-Grade Header */}
+      <AppleHeader
+        userEmail={session?.user?.email}
+        totalCount={videos.length}
+        unreadCount={unreadCount}
+        showCalendar={showCalendar}
+        onToggleCalendar={handleCalendarToggle}
+        onOpenScanner={() => setShowScanner(true)}
+        onOpenDevices={() => setShowDevices(true)}
+        onLogout={handleLogout}
+      />
 
-        <View style={styles.topRightActions}>
-          {/* Linked Browsers Management Button */}
-          <TouchableOpacity
-            style={styles.devicesBtn}
-            activeOpacity={0.75}
-            onPress={() => setShowDevices(true)}
-          >
-            <Text style={styles.devicesIcon}>💻</Text>
-            <Text style={styles.devicesLabel}>Devices</Text>
-          </TouchableOpacity>
+      {/* Apple-Style Segmented Filter Bar */}
+      <AppleFilterPills
+        filter={filter}
+        videos={videos}
+        onSelectFilter={handleFilterChange}
+      />
 
-          {/* Link Browser Extension (QR Scan) Button */}
-          <TouchableOpacity
-            style={styles.linkPcBtn}
-            activeOpacity={0.75}
-            onPress={() => setShowScanner(true)}
-          >
-            <Text style={styles.linkPcIcon}>📷</Text>
-            <Text style={styles.linkPcLabel}>Link PC</Text>
-          </TouchableOpacity>
-
-          {/* Calendar Toggle Button */}
-          <TouchableOpacity
-            style={[
-              styles.calendarToggleBtn,
-              showCalendar && styles.calendarToggleBtnActive,
-            ]}
-            activeOpacity={0.7}
-            onPress={handleCalendarToggle}
-          >
-            <Text style={styles.calendarIconText}>📅</Text>
-            <Text
-              style={[
-                styles.calendarToggleLabel,
-                showCalendar && styles.calendarToggleLabelActive,
-              ]}
-            >
-              {showCalendar ? "Close" : "Stats"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Logout Button */}
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            activeOpacity={0.7}
-            onPress={handleLogout}
-          >
-            <Text style={styles.logoutIcon}>⇥</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Filter Tabs (Horizontal Scrollable) */}
-      <View style={{ marginBottom: 14 }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterSection}
-        >
-          {(
-            [
-              { key: "all", label: "All Items" },
-              { key: "unread", label: "⏳ Unread" },
-              { key: "youtube", label: "▶ YouTube" },
-              { key: "instagram", label: "✦ Instagram" },
-              { key: "twitter", label: "𝕏 Twitter" },
-              { key: "facebook", label: "f Facebook" },
-              { key: "reddit", label: "● Reddit" },
-              { key: "linkedin", label: "in LinkedIn" },
-              { key: "pinterest", label: "P Pinterest" },
-              { key: "tiktok", label: "♫ TikTok" },
-            ] as const
-          ).map((tab) => (
-            <TouchableOpacity
-              key={tab.key}
-              activeOpacity={0.7}
-              style={[styles.chip, filter === tab.key && styles.chipActive]}
-              onPress={() => handleFilterChange(tab.key)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  filter === tab.key && styles.chipTextActive,
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Mini Active Date Filter Banner (when calendar is closed but date is selected) */}
+      {/* Date Filter Active Banner */}
       {!showCalendar && selectedDate && (
         <View style={styles.miniDateFilterBar}>
-          <Text style={styles.miniDateFilterText}>
-            📅 Filter:{" "}
-            <Text style={styles.miniDateHighlight}>
-              {formatDisplayDate(selectedDate)}
-            </Text>{" "}
-            ({filteredVideos.length} clips)
-          </Text>
+          <View style={styles.miniDateFilterLeft}>
+            <Ionicons name="calendar" size={14} color={appleColors.accentLight} />
+            <Text style={styles.miniDateFilterText}>
+              Filter:{' '}
+              <Text style={styles.miniDateHighlight}>
+                {formatDisplayDate(selectedDate)}
+              </Text>{' '}
+              ({filteredVideos.length} clips)
+            </Text>
+          </View>
           <TouchableOpacity
-            onPress={() => handleDateSelect(null)}
+            onPress={() => {
+              haptics.selection();
+              handleDateSelect(null);
+            }}
             style={styles.miniDateFilterClear}
           >
             <Text style={styles.miniDateFilterClearText}>Reset ✕</Text>
@@ -363,7 +283,7 @@ export default function HomeScreen() {
                 openVideoDirectly(
                   item.clean_url,
                   item.platform as any,
-                  item.platform_video_id,
+                  item.platform_video_id
                 )
               }
               onToggleStatus={() => toggleStatus(item)}
@@ -374,23 +294,15 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
+                haptics.light();
                 setRefreshing(true);
                 fetchVideos();
               }}
-              tintColor="#6366F1"
+              tintColor={appleColors.accentLight}
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconCircle}>
-                <Text style={styles.emptyIcon}>🎬</Text>
-              </View>
-              <Text style={styles.emptyHeading}>Your inbox is empty</Text>
-              <Text style={styles.emptyDescription}>
-                Like videos on YouTube or Instagram in your desktop browser.
-                They will sync here instantly!
-              </Text>
-            </View>
+            <EmptyState onLinkPress={() => setShowScanner(true)} />
           }
         />
       )}
@@ -415,261 +327,60 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: "#0A0F1D", // Pure deep obsidian dark background
-  },
-  appBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  brandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  logoBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "#1E293B",
-    borderWidth: 1,
-    borderColor: "#334155",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoIcon: {
-    fontSize: 20,
-  },
-  appTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-    color: "#F8FAFC",
-    letterSpacing: -0.5,
-  },
-  appSubtitle: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  topRightActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  devicesBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#131B2E",
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    gap: 4,
-  },
-  devicesIcon: {
-    fontSize: 12,
-  },
-  devicesLabel: {
-    color: "#94A3B8",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  linkPcBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1E293B",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#334155",
-    gap: 5,
-  },
-  linkPcIcon: {
-    fontSize: 12,
-  },
-  linkPcLabel: {
-    color: "#818CF8",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  logoutBtn: {
-    backgroundColor: "#131B2E",
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoutIcon: {
-    color: "#94A3B8",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  calendarToggleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#131B2E",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    gap: 5,
-  },
-  calendarToggleBtnActive: {
-    backgroundColor: "#6366F1",
-    borderColor: "#818CF8",
-  },
-  calendarIconText: {
-    fontSize: 12,
-  },
-  calendarToggleLabel: {
-    color: "#94A3B8",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  calendarToggleLabelActive: {
-    color: "#FFFFFF",
-  },
-  statPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#131B2E",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    gap: 6,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#10B981",
-  },
-  statPillText: {
-    color: "#CBD5E1",
-    fontSize: 12,
-    fontWeight: "700",
+    backgroundColor: appleColors.canvas,
   },
   miniDateFilterBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#1E293B",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: appleColors.surfaceSecondary,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginHorizontal: 18,
+    paddingVertical: 9,
+    marginHorizontal: 20,
     marginBottom: 12,
-    borderRadius: 10,
+    borderRadius: appleRadii.control,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: appleColors.borderGlass,
+  },
+  miniDateFilterLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   miniDateFilterText: {
-    color: "#94A3B8",
-    fontSize: 12,
+    ...appleTypography.footnote,
+    color: appleColors.textSecondary,
   },
   miniDateHighlight: {
-    color: "#38BDF8",
-    fontWeight: "700",
+    color: appleColors.accentLight,
+    fontWeight: '700',
   },
   miniDateFilterClear: {
-    backgroundColor: "#0F172A",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    backgroundColor: appleColors.surfaceTertiary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: appleRadii.pill,
+    borderWidth: 1,
+    borderColor: appleColors.borderGlass,
   },
   miniDateFilterClearText: {
-    color: "#CBD5E1",
+    ...appleTypography.caption,
     fontSize: 10,
-    fontWeight: "700",
-  },
-  filterSection: {
-    flexDirection: "row",
-    paddingHorizontal: 18,
-    paddingBottom: 14,
-    gap: 8,
-  },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 24,
-    backgroundColor: "#131B2E",
-    borderWidth: 1,
-    borderColor: "#1E293B",
-  },
-  chipActive: {
-    backgroundColor: "#6366F1",
-    borderColor: "#818CF8",
-    shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#94A3B8",
-  },
-  chipTextActive: {
-    color: "#FFFFFF",
+    color: appleColors.textPrimary,
   },
   listContent: {
-    paddingHorizontal: 18,
-    paddingBottom: 30,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
   },
   centerContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 30,
   },
   loadingText: {
-    color: "#94A3B8",
-    fontSize: 13,
+    ...appleTypography.subhead,
+    color: appleColors.textSecondary,
     marginTop: 14,
-    fontWeight: "500",
-  },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 70,
-    paddingHorizontal: 20,
-  },
-  emptyIconCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "#131B2E",
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  emptyIcon: {
-    fontSize: 32,
-  },
-  emptyHeading: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    color: "#64748B",
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 280,
   },
 });
