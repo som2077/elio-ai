@@ -9,8 +9,11 @@ import {
   FlatList,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../services/supabase";
 import { LinkedDevice } from "../types/video";
+import { appleColors, appleRadii, appleTypography } from "../theme/appleTokens";
+import { haptics } from "../utils/haptics";
 
 interface LinkedDevicesModalProps {
   visible: boolean;
@@ -223,6 +226,11 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.sheetContainer}>
+          {/* iOS Bottom Sheet Grab Handle */}
+          <View style={styles.grabBarWrap}>
+            <View style={styles.grabBar} />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
             <View>
@@ -231,8 +239,14 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
                 Extensions syncing likes to this mobile inbox
               </Text>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <Text style={styles.closeBtnText}>✕</Text>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => {
+                haptics.light();
+                onClose();
+              }}
+            >
+              <Ionicons name="close" size={18} color={appleColors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -283,43 +297,56 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
     justifyContent: "flex-end",
   },
   sheetContainer: {
-    backgroundColor: "#0B0F19",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: appleColors.canvasElevated,
+    borderTopLeftRadius: appleRadii.sheet,
+    borderTopRightRadius: appleRadii.sheet,
     maxHeight: "85%",
     minHeight: 400,
     borderTopWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: appleColors.borderSpecularTop,
+  },
+  grabBarWrap: {
+    alignItems: "center",
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  grabBar: {
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: appleColors.borderSubtle,
   },
   headerTitle: {
+    ...appleTypography.headline,
     fontSize: 18,
-    fontWeight: "800",
-    color: "#F8FAFC",
+    color: appleColors.textPrimary,
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: "#94A3B8",
+    ...appleTypography.footnote,
+    color: appleColors.textSecondary,
     marginTop: 2,
   },
   closeBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#1E293B",
+    backgroundColor: appleColors.surfaceGlass,
+    borderWidth: 1,
+    borderColor: appleColors.borderGlass,
     justifyContent: "center",
     alignItems: "center",
   },

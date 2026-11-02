@@ -6,28 +6,39 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 /**
- * Standard Motion Tokens adhering to Motion System v4.2
- * Focused on responsiveness, usability, and spatial continuity.
+ * Apple WWDC Designing Fluid Interfaces Spring Parameters
+ * Damping 1.0 = critically damped (smooth settle, zero overshoot)
+ * Damping 0.8 = momentum bounce (used for flick releases and physical pops)
  */
 export const motionTokens = {
-  duration: {
-    fast: 160,    // ms (micro-interactions, button taps)
-    normal: 260,  // ms (card transitions, layout flow)
-    slow: 400,    // ms (calendar drawer, modal reveals)
-  },
-  easing: {
-    smooth: [0.22, 1, 0.36, 1] as const,
-    sharp: [0.4, 0, 0.2, 1] as const,
+  spring: {
+    // Non-distracting layout transition (critically damped)
+    settle: {
+      damping: 1.0,
+      mass: 1,
+      stiffness: 180,
+    },
+    // Tactile bouncy response (button pop, checkmark burst)
+    bouncy: {
+      damping: 0.78,
+      mass: 0.8,
+      stiffness: 220,
+    },
   },
   scale: {
-    pressed: 0.98,
-    buttonTap: 0.94,
-    bounce: 1.08,
+    pressed: 0.96,       // Apple touch-down physical depression
+    buttonTap: 0.92,     // Compact control tap
+    checkmarkBurst: 1.14,// Checkmark completion pop
+  },
+  duration: {
+    fast: 140,
+    normal: 240,
+    sheet: 340,
   },
 };
 
 /**
- * Trigger smooth native layout transition across React Native state updates
+ * Trigger smooth Apple-style native layout transition across React Native state updates
  */
 export const triggerLayoutMotion = (duration = motionTokens.duration.normal) => {
   try {
@@ -38,15 +49,15 @@ export const triggerLayoutMotion = (duration = motionTokens.duration.normal) => 
         property: LayoutAnimation.Properties.opacity,
       },
       update: {
-        type: LayoutAnimation.Types.easeInEaseOut,
-        springDamping: 0.8,
+        type: LayoutAnimation.Types.spring,
+        springDamping: 0.82,
       },
       delete: {
         type: LayoutAnimation.Types.easeInEaseOut,
         property: LayoutAnimation.Properties.opacity,
       },
     });
-  } catch (err) {
-    // Graceful fallback for environments where layout animation is restricted
+  } catch {
+    // Graceful fallback
   }
 };

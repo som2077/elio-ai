@@ -1,6 +1,14 @@
 import React, { useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SavedVideo } from '../types/video';
+import {
+  appleColors,
+  appleRadii,
+  appleTypography,
+  appleShadows,
+} from '../theme/appleTokens';
+import { haptics } from '../utils/haptics';
 import { motionTokens } from '../utils/motion';
 
 interface VideoCardProps {
@@ -10,21 +18,27 @@ interface VideoCardProps {
   onDelete?: () => void;
 }
 
-export const VideoCard: React.FC<VideoCardProps> = ({ video, onPress, onToggleStatus, onDelete }) => {
-  const isYouTube = video.platform === 'youtube';
+export const VideoCard: React.FC<VideoCardProps> = ({
+  video,
+  onPress,
+  onToggleStatus,
+  onDelete,
+}) => {
   const isWatched = video.status === 'watched';
+  const platformConfig =
+    appleColors.platforms[video.platform as keyof typeof appleColors.platforms] ||
+    appleColors.platforms.youtube;
 
-  // Motion interaction animated values
+  // Spring animation values
   const cardScale = useRef(new Animated.Value(1)).current;
-  const statusScale = useRef(new Animated.Value(1)).current;
-  const openBtnScale = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(1)).current;
 
   const handleCardPressIn = () => {
     Animated.spring(cardScale, {
       toValue: motionTokens.scale.pressed,
       useNativeDriver: true,
-      speed: 40,
-      bounciness: 3,
+      damping: motionTokens.spring.settle.damping,
+      stiffness: motionTokens.spring.settle.stiffness,
     }).start();
   };
 
@@ -32,30 +46,43 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onPress, onToggleSt
     Animated.spring(cardScale, {
       toValue: 1,
       useNativeDriver: true,
-      speed: 40,
-      bounciness: 4,
+      damping: motionTokens.spring.bouncy.damping,
+      stiffness: motionTokens.spring.bouncy.stiffness,
     }).start();
   };
 
-  const handleStatusPress = () => {
-    // Tactile bounce micro-interaction for status toggle
+  const handleToggle = () => {
+    if (!isWatched) {
+      haptics.success();
+    } else {
+      haptics.light();
+    }
+
+    // Apple tactile checkmark pop
     Animated.sequence([
-      Animated.timing(statusScale, {
+      Animated.timing(checkmarkScale, {
         toValue: motionTokens.scale.buttonTap,
-        duration: 90,
+        duration: 80,
         useNativeDriver: true,
       }),
-      Animated.spring(statusScale, {
+      Animated.spring(checkmarkScale, {
+        toValue: motionTokens.scale.checkmarkBurst,
+        speed: 40,
+        bounciness: 8,
+        useNativeDriver: true,
+      }),
+      Animated.spring(checkmarkScale, {
         toValue: 1,
-        speed: 35,
-        bounciness: 6,
+        speed: 30,
+        bounciness: 4,
         useNativeDriver: true,
       }),
     ]).start();
+
     onToggleStatus();
   };
 
-  // Format date cleanly
+  // Format date with tabular numbers
   const formattedDate = new Date(video.created_at).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
@@ -72,111 +99,120 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onPress, onToggleSt
         onPressIn={handleCardPressIn}
         onPressOut={handleCardPressOut}
       >
-        {/* Thumbnail Container */}
+        {/* Top Light-Catching Specular Highlight */}
+        <View style={styles.specularRim} />
+
+        {/* Thumbnail Area */}
         <View style={styles.thumbnailWrapper}>
           <Image
             source={{
               uri:
                 video.thumbnail_url ||
-                (isYouTube
-                  ? 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80'
-                  : 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=600&auto=format&fit=crop&q=80'),
+                'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80',
             }}
             style={styles.thumbnail}
+            resizeMode="cover"
           />
-          
-          {/* Subtle Dark Gradient Overlay */}
-          <View style={styles.gradientOverlay} />
 
-          {/* Platform Badge */}
+          {/* Inset Outline to prevent dark bleed */}
+          <View style={styles.thumbnailOutline} />
+
+          {/* Platform Tag */}
           <View
             style={[
-              styles.platformBadge,
-              video.platform === 'youtube' && styles.ytBadge,
-              video.platform === 'instagram' && styles.igBadge,
-              video.platform === 'twitter' && styles.xBadge,
-              video.platform === 'facebook' && styles.fbBadge,
-              video.platform === 'reddit' && styles.redditBadge,
-              video.platform === 'linkedin' && styles.linkedinBadge,
-              video.platform === 'pinterest' && styles.pinterestBadge,
-              video.platform === 'tiktok' && styles.tiktokBadge,
+              styles.platformPill,
+              { backgroundColor: platformConfig.bg, borderColor: platformConfig.border },
             ]}
           >
-            <Text style={styles.platformBadgeText}>
-              {video.platform === 'youtube' && '▶ YouTube'}
-              {video.platform === 'instagram' && '✦ Instagram'}
-              {video.platform === 'twitter' && '𝕏 Twitter'}
-              {video.platform === 'facebook' && 'f Facebook'}
-              {video.platform === 'reddit' && '● Reddit'}
-              {video.platform === 'linkedin' && 'in LinkedIn'}
-              {video.platform === 'pinterest' && 'P Pinterest'}
-              {video.platform === 'tiktok' && '♫ TikTok'}
+            <Text style={[styles.platformPillText, { color: platformConfig.color }]}>
+              {platformConfig.label}
             </Text>
           </View>
 
-          {/* Category Pill (Short/Reel/Video) */}
-          <View style={styles.categoryPill}>
-            <Text style={styles.categoryText}>{(video.category || 'VIDEO').toUpperCase()}</Text>
-          </View>
-
-          {/* Play Icon Hint in Center */}
-          <View style={styles.playHintContainer}>
-            <View style={styles.playHintCircle}>
-              <Text style={styles.playHintIcon}>▶</Text>
+          {/* Category Tag (Video / Short / Reel) */}
+          {video.category && (
+            <View style={styles.categoryPill}>
+              <Text style={styles.categoryPillText}>{video.category.toUpperCase()}</Text>
             </View>
-          </View>
+          )}
+
+          {/* Watched Overlay */}
+          {isWatched && (
+            <View style={styles.watchedOverlay}>
+              <Ionicons name="checkmark-circle" size={24} color={appleColors.success} />
+              <Text style={styles.watchedOverlayText}>Watched</Text>
+            </View>
+          )}
         </View>
 
         {/* Card Body */}
         <View style={styles.body}>
-          <Text style={[styles.title, isWatched && styles.titleWatched]} numberOfLines={2}>
-            {video.title || 'Untitled Clip'}
-          </Text>
-
+          {/* Creator & Date Row */}
           <View style={styles.metaRow}>
-            <View style={styles.creatorInfo}>
-              <View style={styles.creatorAvatar}>
-                <Text style={styles.creatorAvatarText}>
-                  {(video.creator_name || 'U').charAt(0).toUpperCase()}
+            {video.creator_name ? (
+              <View style={styles.creatorGroup}>
+                <Ionicons
+                  name="person-circle-outline"
+                  size={14}
+                  color={appleColors.textSecondary}
+                />
+                <Text style={styles.creatorText} numberOfLines={1}>
+                  {video.creator_name}
                 </Text>
               </View>
-              <Text style={styles.creatorName} numberOfLines={1}>
-                {video.creator_name || (isYouTube ? 'YouTube Channel' : '@creator')}
-              </Text>
-            </View>
-
-            <View style={styles.metaRight}>
-              {video.source_device_name ? (
-                <View style={styles.deviceSourceBadge}>
-                  <Text style={styles.deviceSourceText} numberOfLines={1}>
-                    💻 {video.source_device_name}
-                  </Text>
-                </View>
-              ) : null}
-              <Text style={styles.timestamp}>{formattedDate}</Text>
-            </View>
+            ) : null}
+            <Text style={styles.dateText}>{formattedDate}</Text>
           </View>
 
-          {/* Bottom Actions Row */}
-          <View style={styles.footer}>
-            <Animated.View style={{ transform: [{ scale: statusScale }] }}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[styles.statusBtn, isWatched ? styles.statusBtnWatched : styles.statusBtnActive]}
-                onPress={handleStatusPress}
-              >
-                <Text style={[styles.statusBtnText, isWatched ? styles.statusBtnTextWatched : styles.statusBtnTextActive]}>
-                  {isWatched ? '✓ Watched' : '● Mark as Done'}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
+          {/* Title */}
+          <Text
+            style={[styles.title, isWatched && styles.titleWatched]}
+            numberOfLines={2}
+          >
+            {video.title || 'Untitled Social Clip'}
+          </Text>
 
+          {/* Bottom Action Footer */}
+          <View style={styles.footer}>
+            {/* Apple Reminders-Style Circular Status Toggle */}
             <TouchableOpacity
               activeOpacity={0.7}
-              style={styles.openNativeBtn}
+              style={styles.statusToggleBtn}
+              onPress={handleToggle}
+            >
+              <Animated.View
+                style={[
+                  styles.statusCircle,
+                  isWatched && styles.statusCircleActive,
+                  { transform: [{ scale: checkmarkScale }] },
+                ]}
+              >
+                {isWatched && (
+                  <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                )}
+              </Animated.View>
+              <Text
+                style={[
+                  styles.statusLabel,
+                  isWatched && styles.statusLabelActive,
+                ]}
+              >
+                {isWatched ? 'Completed' : 'Mark Watched'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Quick Open Action Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.openBtn}
               onPress={onPress}
             >
-              <Text style={styles.openNativeBtnText}>Open Video ↗</Text>
+              <Text style={styles.openBtnText}>Open</Text>
+              <Ionicons
+                name="arrow-forward"
+                size={12}
+                color={appleColors.accentLight}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -187,186 +223,118 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onPress, onToggleSt
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#131B2E', // Deep premium obsidian dark
-    borderRadius: 16,
-    marginBottom: 16,
+    backgroundColor: appleColors.surfaceSecondary,
+    borderRadius: appleRadii.card,
+    marginBottom: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#1E293B',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
+    borderColor: appleColors.borderGlass,
+    ...appleShadows.card,
   },
   cardWatched: {
-    opacity: 0.55,
-    borderColor: '#1A2338',
+    opacity: 0.72,
+    backgroundColor: '#0A0F1E',
+  },
+  specularRim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: appleColors.borderSpecularTop,
+    zIndex: 2,
   },
   thumbnailWrapper: {
     width: '100%',
-    height: 190,
+    height: 180,
+    backgroundColor: '#070A13',
     position: 'relative',
-    backgroundColor: '#0A0F1D',
+    overflow: 'hidden',
   },
   thumbnail: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
-  gradientOverlay: {
+  thumbnailOutline: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 15, 29, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  platformBadge: {
+  platformPill: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  ytBadge: {
-    backgroundColor: '#DC2626',
-  },
-  igBadge: {
-    backgroundColor: '#D946EF',
-  },
-  xBadge: {
-    backgroundColor: '#0F1419',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: appleRadii.pill,
     borderWidth: 1,
-    borderColor: '#38444D',
   },
-  fbBadge: {
-    backgroundColor: '#1877F2',
-  },
-  redditBadge: {
-    backgroundColor: '#FF4500',
-  },
-  linkedinBadge: {
-    backgroundColor: '#0A66C2',
-  },
-  pinterestBadge: {
-    backgroundColor: '#E60023',
-  },
-  tiktokBadge: {
-    backgroundColor: '#000000',
-    borderWidth: 1,
-    borderColor: '#25F4EE',
-  },
-  platformBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+  platformPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   categoryPill: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    top: 10,
+    right: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  categoryText: {
-    color: '#94A3B8',
-    fontSize: 10,
+  categoryPillText: {
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 0.6,
+    color: '#F8FAFC',
+    letterSpacing: 0.5,
   },
-  playHintContainer: {
+  watchedOverlay: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 10, 19, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
-  playHintCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  playHintIcon: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginLeft: 3,
+  watchedOverlayText: {
+    ...appleTypography.caption,
+    color: appleColors.success,
+    fontWeight: '700',
   },
   body: {
     padding: 14,
-  },
-  title: {
-    color: '#F1F5F9',
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 22,
-    marginBottom: 10,
-  },
-  titleWatched: {
-    textDecorationLine: 'line-through',
-    color: '#64748B',
   },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 6,
   },
-  creatorInfo: {
+  creatorGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
     flex: 1,
-    marginRight: 10,
-  },
-  creatorAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#334155',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginRight: 8,
   },
-  creatorAvatarText: {
-    color: '#E2E8F0',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  creatorName: {
-    color: '#94A3B8',
-    fontSize: 12,
+  creatorText: {
+    ...appleTypography.subhead,
+    color: appleColors.textSecondary,
     fontWeight: '600',
-    flex: 1,
   },
-  metaRight: {
-    alignItems: 'flex-end',
-    gap: 2,
+  dateText: {
+    ...appleTypography.footnote,
+    ...appleTypography.tabularNums,
+    color: appleColors.textTertiary,
   },
-  deviceSourceBadge: {
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-    maxWidth: 130,
+  title: {
+    ...appleTypography.headline,
+    marginBottom: 12,
   },
-  deviceSourceText: {
-    color: '#818CF8',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  timestamp: {
-    color: '#64748B',
-    fontSize: 11,
+  titleWatched: {
+    color: appleColors.textSecondary,
   },
   footer: {
     flexDirection: 'row',
@@ -374,47 +342,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: appleColors.borderSubtle,
   },
-  statusBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+  statusToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  statusBtnActive: {
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
+  statusCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: appleColors.textTertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  statusBtnWatched: {
-    backgroundColor: '#064E3B',
-    borderWidth: 1,
-    borderColor: '#059669',
+  statusCircleActive: {
+    backgroundColor: appleColors.success,
+    borderColor: appleColors.success,
   },
-  statusBtnText: {
-    fontSize: 12,
+  statusLabel: {
+    ...appleTypography.footnote,
     fontWeight: '600',
+    color: appleColors.textSecondary,
   },
-  statusBtnTextActive: {
-    color: '#94A3B8',
+  statusLabelActive: {
+    color: appleColors.success,
   },
-  statusBtnTextWatched: {
-    color: '#34D399',
+  openBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: appleColors.surfaceTertiary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: appleRadii.pill,
+    borderWidth: 1,
+    borderColor: appleColors.borderGlass,
   },
-  openNativeBtn: {
-    backgroundColor: '#6366F1',
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  openNativeBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+  openBtnText: {
+    ...appleTypography.caption,
+    color: appleColors.accentLight,
     fontWeight: '700',
   },
 });

@@ -1,24 +1,25 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
+import { appleColors, appleRadii } from '../theme/appleTokens';
 
 /**
- * Skeleton Loader with looped opacity pulse (1.5s comfortable duration)
- * Aligned with Motion System v4.2 skeleton loading pattern.
+ * Apple-grade Shimmer Skeleton Loader
+ * Matched with Apple concentric card geometry and smooth harmonic pulse.
  */
 export const SkeletonCard: React.FC = () => {
-  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+  const pulseAnim = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 0.8,
-          duration: 750,
+          toValue: 0.75,
+          duration: 850,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 750,
+          toValue: 0.35,
+          duration: 850,
           useNativeDriver: true,
         }),
       ])
@@ -32,14 +33,14 @@ export const SkeletonCard: React.FC = () => {
       <View style={styles.thumbnailSkeleton} />
       <View style={styles.body}>
         <View style={styles.titleLine} />
-        <View style={[styles.titleLine, { width: '65%', marginTop: 8 }]} />
+        <View style={[styles.titleLine, { width: '60%', marginTop: 8 }]} />
         <View style={styles.metaRow}>
           <View style={styles.avatarSkeleton} />
           <View style={styles.creatorSkeleton} />
         </View>
         <View style={styles.footerRow}>
           <View style={styles.btnSkeleton} />
-          <View style={[styles.btnSkeleton, { width: 90 }]} />
+          <View style={[styles.btnSkeleton, { width: 70 }]} />
         </View>
       </View>
     </Animated.View>
@@ -48,17 +49,17 @@ export const SkeletonCard: React.FC = () => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#131B2E',
-    borderRadius: 16,
-    marginBottom: 16,
+    backgroundColor: appleColors.surfaceSecondary,
+    borderRadius: appleRadii.card,
+    marginBottom: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: appleColors.borderGlass,
   },
   thumbnailSkeleton: {
     width: '100%',
-    height: 190,
-    backgroundColor: '#1E293B',
+    height: 180,
+    backgroundColor: appleColors.surfaceTertiary,
   },
   body: {
     padding: 14,
@@ -66,39 +67,39 @@ const styles = StyleSheet.create({
   titleLine: {
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#243048',
-    width: '92%',
+    backgroundColor: appleColors.surfaceTertiary,
+    width: '90%',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 14,
-    marginBottom: 14,
+    marginTop: 12,
+    marginBottom: 12,
     gap: 8,
   },
   avatarSkeleton: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#243048',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: appleColors.surfaceTertiary,
   },
   creatorSkeleton: {
-    width: 100,
+    width: 90,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#243048',
+    backgroundColor: appleColors.surfaceTertiary,
   },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: appleColors.borderSubtle,
   },
   btnSkeleton: {
-    width: 110,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#243048',
+    width: 100,
+    height: 26,
+    borderRadius: appleRadii.pill,
+    backgroundColor: appleColors.surfaceTertiary,
   },
 });
