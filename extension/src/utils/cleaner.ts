@@ -26,7 +26,8 @@ export interface SavedVideoPayload {
  */
 export function cleanVideoUrl(rawUrl: string, platform: SocialPlatform): { cleanUrl: string; videoId?: string } {
   try {
-    const url = new URL(rawUrl);
+    const base = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://www.instagram.com';
+    const url = new URL(rawUrl, base);
 
     if (platform === 'youtube') {
       if (url.pathname.includes('/watch')) {

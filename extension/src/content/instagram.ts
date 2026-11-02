@@ -6,7 +6,7 @@ let lastSavedUrl: string | null = null;
 let lastSavedTime: number = 0;
 
 /**
- * Modern floating HUD toast on Instagram to visually confirm video saved
+ * Modern floating HUD toast on Instagram to visually confirm video/post saved
  */
 function showElioToast(title: string, message: string, isSuccess: boolean = true) {
   try {
@@ -61,93 +61,195 @@ function showElioToast(title: string, message: string, isSuccess: boolean = true
 }
 
 /**
- * Finds the nearest container for the Reel or Post
+ * Universal container locator for modern Instagram Web (Reels, Posts, Carousels, Modals)
  */
-function findInstagramContainer(actionElement: HTMLElement): HTMLElement {
-  // 1. If in modal dialog
+function findPostOrReelContainer(actionElement: HTMLElement): HTMLElement {
+  // 1. If in a modal dialog
   const dialog = actionElement.closest('div[role="dialog"]');
   if (dialog) return dialog as HTMLElement;
 
-  // 2. If inside an article (standard feed post)
-  const article = actionElement.closest('article');
+  // 2. If inside a traditional article or section
+  const article = actionElement.closest('article, section');
   if (article) return article as HTMLElement;
 
-  // 3. If inside a section (Reels fullscreen / scroll snap container)
-  const section = actionElement.closest('section');
-  if (section) return section as HTMLElement;
+  // 3. Walk up parents to find the nearest element holding this post's media and permalink
+  let current: HTMLElement | null = actionElement;
+  let candidateContainer: HTMLElement | null = null;
 
-  // 4. Walk up parent elements looking for the closest parent that contains a <video> element
-  let parent = actionElement.parentElement;
-  while (parent && parent !== document.body && parent !== document.documentElement) {
-    if (parent.querySelector('video')) {
-      return parent;
+  while (current && current !== document.body && current !== document.documentElement) {
+    const hasMedia = current.querySelector('video, img');
+    const hasPostLink = current.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], time');
+
+    if (hasMedia && hasPostLink) {
+      candidateContainer = current;
+      // If this element has sibling posts or has a distinct bounding box, it's the post container
+      if (
+        current.tagName === 'ARTICLE' ||
+        current.tagName === 'SECTION' ||
+        current.getAttribute('role') === 'presentation' ||
+        (current.offsetHeight > 300 && current.offsetWidth > 300)
+      ) {
+        return current;
+      }
     }
-    parent = parent.parentElement;
+    current = current.parentElement;
   }
 
-  // 5. Fallback: find currently visible active video on screen
+  if (candidateContainer) return candidateContainer;
+
+  // 4. Fallback: find active video on screen if currently watching Reels
   const videos = Array.from(document.querySelectorAll('video'));
   const activeVideo = videos.find((v) => !v.paused && v.offsetHeight > 200);
   if (activeVideo) {
-    const parentContainer =
+    const parent =
       activeVideo.closest('section') ||
       activeVideo.closest('article') ||
       activeVideo.parentElement?.parentElement;
-    if (parentContainer) return parentContainer as HTMLElement;
+    if (parent) return parent as HTMLElement;
   }
 
   return document.body;
 }
 
 /**
- * Identifies the canonical URL of the Instagram Reel or Post
+ * Extracts the canonical URL of the Instagram Reel or Post
  */
-function extractInstagramUrl(container: HTMLElement): string {
+function extractInstagramPermalink(actionElement: HTMLElement, container: HTMLElement): string {
   const currentUrl = window.location.href;
 
-  // 1. Check window.location.href first (often /reel/ID or /reels/ID on desktop)
-  if (currentUrl.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/)) {
-    return currentUrl;
+  // 1. If current URL is already a specific post/reel (e.g. /p/ID/, /reel/ID/)
+  const directMatch = currentUrl.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+  if (directMatch && directMatch[2]) {
+    // If not a generic /reels/ feed URL
+    if (!currentUrl.endsWith('/reels/') && !currentUrl.endsWith('/reels')) {
+      const type = directMatch[1] === 'reels' ? 'reel' : directMatch[1];
+      return `https://www.instagram.com/${type}/${directMatch[2]}/`;
+    }
   }
 
-  // 2. Search inside the container for permalink anchor tags
+  // 2. Check for <time> anchor inside container (Most standard Instagram post identifier)
+  const timeEl = container.querySelector('time');
+  const timeAnchor = timeEl?.closest('a') as HTMLAnchorElement | null;
+  if (timeAnchor && timeAnchor.href) {
+    const match = timeAnchor.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+    if (match && match[2]) {
+      const type = match[1] === 'reels' ? 'reel' : match[1];
+      return `https://www.instagram.com/${type}/${match[2]}/`;
+    }
+  }
+
+  // 3. Search inside container for any post or reel anchor
   const permalinks = Array.from(
     container.querySelectorAll<HTMLAnchorElement>(
       'a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"]'
     )
   );
-
   for (const a of permalinks) {
-    const href = a.href;
-    const match = href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-    if (match && match[2]) {
-      return href;
-    }
-  }
-
-  // 3. Check for comments or timestamp links
-  const commentLink = container.querySelector(
-    'a[href*="/comments/"], a[href*="/audio/"]'
-  ) as HTMLAnchorElement | null;
-  if (commentLink && commentLink.href) {
-    const match = commentLink.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-    if (match && match[2]) {
-      return `https://www.instagram.com/reel/${match[2]}/`;
-    }
-  }
-
-  // 4. Check global document if there is any reel URL present in visible area
-  const globalLinks = Array.from(
-    document.querySelectorAll<HTMLAnchorElement>('a[href*="/reel/"], a[href*="/reels/"]')
-  );
-  for (const a of globalLinks) {
     const match = a.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
     if (match && match[2]) {
-      return a.href;
+      const type = match[1] === 'reels' ? 'reel' : match[1];
+      return `https://www.instagram.com/${type}/${match[2]}/`;
     }
+  }
+
+  // 4. Look around the clicked actionElement (walk up 6 parent levels)
+  let p: HTMLElement | null = actionElement;
+  for (let i = 0; i < 6 && p; i++) {
+    const nearby = p.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]') as HTMLAnchorElement | null;
+    if (nearby && nearby.href) {
+      const match = nearby.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+      if (match && match[2]) {
+        const type = match[1] === 'reels' ? 'reel' : match[1];
+        return `https://www.instagram.com/${type}/${match[2]}/`;
+      }
+    }
+    p = p.parentElement;
   }
 
   return currentUrl;
+}
+
+/**
+ * Robust multilingual detection of Like and Save buttons on Instagram
+ */
+function getInstagramActionType(target: HTMLElement): 'like' | 'save' | null {
+  // Find associated SVG
+  let svg: SVGElement | null = null;
+  if (target.tagName.toLowerCase() === 'svg') {
+    svg = target as unknown as SVGElement;
+  } else {
+    svg =
+      target.querySelector('svg') ||
+      target.closest('svg') ||
+      target.closest('button, div[role="button"], span')?.querySelector('svg') ||
+      null;
+  }
+
+  // Check aria-label / title attributes on target itself
+  const targetLabel = (target.getAttribute('aria-label') || target.getAttribute('title') || '').toLowerCase();
+  if (targetLabel.includes('like') || targetLabel.includes('unlike') || targetLabel.includes('पसंद') || targetLabel.includes('लाइक')) {
+    return 'like';
+  }
+  if (targetLabel.includes('save') || targetLabel.includes('bookmark') || targetLabel.includes('सहेजें')) {
+    return 'save';
+  }
+
+  if (!svg) return null;
+
+  // Check labels on SVG and its parent elements
+  const svgAria = (svg.getAttribute('aria-label') || '').toLowerCase();
+  const svgTitle = (svg.querySelector('title')?.textContent || '').toLowerCase();
+  const parentAria = (svg.parentElement?.getAttribute('aria-label') || '').toLowerCase();
+  const combined = `${svgAria} ${svgTitle} ${parentAria}`;
+
+  if (
+    combined.includes('like') ||
+    combined.includes('unlike') ||
+    combined.includes('पसंद') ||
+    combined.includes('लाइक') ||
+    combined.includes('gefällt mir') ||
+    combined.includes('me gusta') ||
+    combined.includes('aimer')
+  ) {
+    return 'like';
+  }
+
+  if (
+    combined.includes('save') ||
+    combined.includes('bookmark') ||
+    combined.includes('सहेजें') ||
+    combined.includes('speichern') ||
+    combined.includes('guardar') ||
+    combined.includes('enregistrer')
+  ) {
+    return 'save';
+  }
+
+  // Check Instagram's unique mathematical SVG path definitions for Heart and Bookmark
+  const pathD = svg.querySelector('path')?.getAttribute('d') || '';
+  if (
+    pathD.includes('16.792') ||
+    pathD.includes('34.6') ||
+    pathD.includes('21.35') ||
+    pathD.includes('M12 21') ||
+    pathD.includes('3.904') ||
+    pathD.includes('9.122') ||
+    pathD.includes('7.222')
+  ) {
+    return 'like';
+  }
+
+  if (pathD.includes('20 22') || pathD.includes('14.815') || pathD.includes('6.912')) {
+    return 'save';
+  }
+
+  // Check if filled red color (Instagram Red)
+  const color = (svg.getAttribute('color') || svg.getAttribute('fill') || '').toLowerCase();
+  if (color.includes('255, 48, 64') || color.includes('#ff3040') || color.includes('237, 73, 86')) {
+    return 'like';
+  }
+
+  return null;
 }
 
 /**
@@ -200,18 +302,18 @@ function extractCreator(container: HTMLElement): string {
  * Scrapes metadata of an Instagram Reel or Post
  */
 function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | null {
-  const container = findInstagramContainer(actionElement);
-  const postUrl = extractInstagramUrl(container);
+  const container = findPostOrReelContainer(actionElement);
+  const postUrl = extractInstagramPermalink(actionElement, container);
 
   const { cleanUrl, videoId } = cleanVideoUrl(postUrl, 'instagram');
   if (!cleanUrl) return null;
 
   const creator = extractCreator(container);
 
-  // Thumbnail extraction
+  // Thumbnail extraction (video poster or post image)
   const videoEl = container.querySelector('video') as HTMLVideoElement | null;
   const imgEl = container.querySelector(
-    'img[style*="object-fit"], img[crossorigin], div[role="button"] img'
+    'img[src*="instagram"], img[src*="cdninstagram"], img[style*="object-fit"], img[crossorigin], img'
   ) as HTMLImageElement | null;
 
   let thumbnail = videoEl?.poster || imgEl?.src || '';
@@ -235,6 +337,14 @@ function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | nu
     if (text && text.length > 4 && text !== creator) {
       caption = text;
       break;
+    }
+  }
+
+  // Fallback to image alt text if caption not found in text elements
+  if (!caption && imgEl) {
+    const alt = imgEl.getAttribute('alt') || '';
+    if (alt && alt.length > 8) {
+      caption = alt;
     }
   }
 
@@ -272,20 +382,20 @@ function sendInstagramSync(payload: SavedVideoPayload) {
       return;
     }
 
-    console.log('[Elio AI] 🚀 Sending Instagram Reel to Cloud:', payload);
+    console.log('[Elio AI] 🚀 Sending Instagram item to Cloud:', payload);
 
     chrome.runtime.sendMessage({ type: 'VIDEO_LIKED', payload }, (response) => {
       if (chrome.runtime.lastError) {
-        showElioToast('Saved to Elio AI', `"${(payload.title || 'Instagram Reel').slice(0, 32)}..."`, true);
+        showElioToast('Saved to Elio AI', `"${(payload.title || 'Instagram post').slice(0, 32)}..."`, true);
         return;
       }
 
       if (response && response.synced) {
-        showElioToast('Synced to Elio AI', `"${(payload.title || 'Instagram Reel').slice(0, 30)}..." synced to mobile`, true);
+        showElioToast('Synced to Elio AI', `"${(payload.title || 'Instagram post').slice(0, 30)}..." synced to mobile`, true);
       } else if (response && response.reason === 'unauthenticated') {
         showElioToast('Saved Locally', 'Open extension to link with phone', false);
       } else {
-        showElioToast('Synced to Elio AI', `"${(payload.title || 'Instagram Reel').slice(0, 30)}..."`, true);
+        showElioToast('Synced to Elio AI', `"${(payload.title || 'Instagram post').slice(0, 30)}..."`, true);
       }
     });
   } catch (err) {
@@ -300,54 +410,33 @@ document.addEventListener(
     const target = event.target as HTMLElement | null;
     if (!target) return;
 
-    // Check button or SVG matching like or bookmark
-    const actionBtn = target.closest(
-      'button, div[role="button"], span[role="link"], svg[aria-label]'
-    ) as HTMLElement | null;
-    if (!actionBtn) return;
-
-    const svg = actionBtn.tagName.toLowerCase() === 'svg' ? actionBtn : actionBtn.querySelector('svg');
-    const ariaLabel = (svg?.getAttribute('aria-label') || actionBtn.getAttribute('aria-label') || '').toLowerCase();
-
-    // Check if it is a like or bookmark action
-    const isLikeAction =
-      ariaLabel === 'like' ||
-      ariaLabel === 'gefällt mir' ||
-      ariaLabel.includes('like') && !ariaLabel.includes('unlike');
-
-    const isSaveAction =
-      ariaLabel === 'save' ||
-      ariaLabel === 'bookmark' ||
-      (ariaLabel.includes('save') && !ariaLabel.includes('unsave')) ||
-      (ariaLabel.includes('bookmark') && !ariaLabel.includes('remove'));
-
-    if (isLikeAction || isSaveAction) {
-      console.log(`[Elio AI] Detected Instagram like/save click: ${ariaLabel}`);
+    const action = getInstagramActionType(target);
+    if (action) {
+      console.log(`[Elio AI] Detected Instagram ${action} click!`);
       setTimeout(() => {
-        const payload = scrapeInstagramPost(actionBtn);
+        const payload = scrapeInstagramPost(target);
         if (payload) {
           sendInstagramSync(payload);
         }
-      }, 300);
+      }, 250);
     }
   },
   true
 );
 
-// 2. Double click capture on video (Double tap to like)
+// 2. Double-click capture on video or photo (Double tap to like)
 document.addEventListener(
   'dblclick',
   (event) => {
     const target = event.target as HTMLElement | null;
     if (!target) return;
 
-    const isVideoOrReelArea =
+    const isMedia =
       target.tagName.toLowerCase() === 'video' ||
-      Boolean(target.closest('video')) ||
-      Boolean(target.closest('section')) ||
-      Boolean(target.closest('article'));
+      target.tagName.toLowerCase() === 'img' ||
+      Boolean(target.closest('video, img'));
 
-    if (isVideoOrReelArea) {
+    if (isMedia) {
       console.log('[Elio AI] Detected Instagram double-click to like!');
       setTimeout(() => {
         const payload = scrapeInstagramPost(target);
@@ -377,9 +466,9 @@ document.addEventListener(
 
       console.log("[Elio AI] Detected Instagram 'L' key like shortcut!");
       setTimeout(() => {
-        const activeVideo = document.querySelector('video') as HTMLElement | null;
-        if (activeVideo) {
-          const payload = scrapeInstagramPost(activeVideo);
+        const activeMedia = (document.querySelector('video') || document.querySelector('article img')) as HTMLElement | null;
+        if (activeMedia) {
+          const payload = scrapeInstagramPost(activeMedia);
           if (payload) {
             sendInstagramSync(payload);
           }
@@ -402,19 +491,22 @@ const observer = new MutationObserver((mutations) => {
 
       if (svg) {
         const ariaLabel = (svg.getAttribute('aria-label') || '').toLowerCase();
-        const color = svg.getAttribute('color') || '';
-        const fill = svg.getAttribute('fill') || '';
+        const titleText = (svg.querySelector('title')?.textContent || '').toLowerCase();
+        const color = (svg.getAttribute('color') || svg.getAttribute('fill') || '').toLowerCase();
 
         // Instagram sets aria-label to 'Unlike' or changes color to Instagram red
-        const isNowLiked =
-          ariaLabel === 'unlike' ||
+        const isRedHeart =
           color.includes('255, 48, 64') ||
-          fill.includes('255, 48, 64') ||
           color.includes('#ff3040') ||
-          fill.includes('#ff3040');
+          color.includes('237, 73, 86');
 
-        if (isNowLiked) {
-          const payload = scrapeInstagramPost(svg);
+        const isUnlikeState =
+          ariaLabel.includes('unlike') ||
+          titleText.includes('unlike') ||
+          ariaLabel.includes('पसंद हटाएं');
+
+        if (isRedHeart || isUnlikeState) {
+          const payload = scrapeInstagramPost(svg as HTMLElement);
           if (payload) {
             sendInstagramSync(payload);
           }
