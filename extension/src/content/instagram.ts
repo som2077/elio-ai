@@ -112,6 +112,58 @@ function findPostOrReelContainer(actionElement: HTMLElement): HTMLElement {
 }
 
 /**
+ * Exhaustive post URL finder: searches upward through parents for <time> anchor or permalinks
+ */
+function findInstagramPostUrl(actionElement: HTMLElement): string | null {
+  const currentUrl = window.location.href;
+  const urlMatch = currentUrl.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+  if (urlMatch && urlMatch[2]) {
+    if (!currentUrl.endsWith('/reels/') && !currentUrl.endsWith('/reels')) {
+      const type = urlMatch[1] === 'reels' ? 'reel' : urlMatch[1];
+      return `https://www.instagram.com/${type}/${urlMatch[2]}/`;
+    }
+  }
+
+  let curr: HTMLElement | null = actionElement;
+  for (let i = 0; i < 15 && curr && curr !== document.body; i++) {
+    // Check for <time> tag
+    const timeEl = curr.querySelector('time');
+    if (timeEl) {
+      const timeAnchor = (timeEl.closest('a') || timeEl.parentElement?.closest('a')) as HTMLAnchorElement | null;
+      if (timeAnchor?.href) {
+        const m = timeAnchor.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+        if (m && m[2]) {
+          const type = m[1] === 'reels' ? 'reel' : m[1];
+          return `https://www.instagram.com/${type}/${m[2]}/`;
+        }
+      }
+    }
+
+    // Check for any /p/, /reel/, /reels/ anchor
+    const postAnchors = Array.from(
+      curr.querySelectorAll<HTMLAnchorElement>('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]')
+    );
+    for (const a of postAnchors) {
+      const href = a.href || a.getAttribute('href') || '';
+      const m = href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+      if (m && m[2]) {
+        const type = m[1] === 'reels' ? 'reel' : m[1];
+        return `https://www.instagram.com/${type}/${m[2]}/`;
+      }
+    }
+
+    curr = curr.parentElement;
+  }
+
+  if (urlMatch && urlMatch[2]) {
+    const type = urlMatch[1] === 'reels' ? 'reel' : urlMatch[1];
+    return `https://www.instagram.com/${type}/${urlMatch[2]}/`;
+  }
+
+  return null;
+}
+
+/**
  * Extracts the canonical URL of the Instagram Reel or Post
  */
 function extractInstagramPermalink(actionElement: HTMLElement, container: HTMLElement): string {
@@ -303,7 +355,12 @@ function extractCreator(container: HTMLElement): string {
  */
 function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | null {
   const container = findPostOrReelContainer(actionElement);
-  const postUrl = extractInstagramPermalink(actionElement, container);
+  const postUrl = findInstagramPostUrl(actionElement) || extractInstagramPermalink(actionElement, container);
+
+  if (!postUrl) {
+    console.warn('[Elio AI] Could not find Instagram post URL');
+    return null;
+  }
 
   const { cleanUrl, videoId } = cleanVideoUrl(postUrl, 'instagram');
   if (!cleanUrl) return null;

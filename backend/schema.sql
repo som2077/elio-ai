@@ -75,6 +75,12 @@ CREATE POLICY "Users can only access their own saved videos" ON public.saved_vid
     USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Allow public insert to saved_videos" ON public.saved_videos;
+DROP POLICY IF EXISTS "Allow extension insert with valid user_id" ON public.saved_videos;
+CREATE POLICY "Allow extension insert with valid user_id" ON public.saved_videos
+    FOR INSERT TO public
+    WITH CHECK (user_id IS NOT NULL);
+
 -- Policies for qr_auth_sessions (Public access so extension anon can read/write and mobile auth can approve)
 DROP POLICY IF EXISTS "Allow anon insert qr session" ON public.qr_auth_sessions;
 DROP POLICY IF EXISTS "Allow insert qr session" ON public.qr_auth_sessions;

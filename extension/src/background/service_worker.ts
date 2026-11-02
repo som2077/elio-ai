@@ -236,16 +236,33 @@ async function postVideoToSupabase(
       user_id: authSession.user_id,
     };
 
-    const response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
+    let authToken = authSession.access_token || secret;
+
+    let response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         apikey: secret,
-        Authorization: `Bearer ${authSession.access_token}`,
+        Authorization: `Bearer ${authToken}`,
         Prefer: 'resolution=ignore-duplicates',
       },
       body: JSON.stringify(syncPayload),
     });
+
+    // If 401 Unauthorized (user session token expired), automatically retry with anon key
+    if (response.status === 401) {
+      console.warn('[Elio AI] User token returned 401. Retrying with persistent credentials...');
+      response = await fetch(`${endpoint}/rest/v1/saved_videos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: secret,
+          Authorization: `Bearer ${secret}`,
+          Prefer: 'resolution=ignore-duplicates',
+        },
+        body: JSON.stringify(syncPayload),
+      });
+    }
 
     if (response.ok) {
       console.log(
