@@ -4,11 +4,11 @@ import { createClient } from "@supabase/supabase-js";
 // Direct production credentials to guarantee mobile connectivity even without process.env in bundling
 const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  "https://ooldsqkuxwvznnypumxd.supabase.co";
+  "https://msphrcukcgfchodxhgot.supabase.co";
 
 const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vbGRzcWt1eHd2em5ueXB1bXhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzODQxMjcsImV4cCI6MjEwNjk2MDEyN30.BTk4_b98cJld5KBftoSvISE3u9qeoid6U7ynWMfArTo";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zcGhyY3VrY2dmY2hvZHhoZ290Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODkyNTksImV4cCI6MjEwOTE2NTI1OX0.gB69GOJ9z8r3EfcywfUoELsI1WoF11pEV1vJgbvc7xI";
 
 export const isSupabaseConfigured = true;
 

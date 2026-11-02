@@ -24,19 +24,16 @@ function _d(b: string): string {
   }
 }
 
-export const DEFAULT_SUPABASE_URL =
-  _d("aHR0cHM6Ly9vb2xkc3FrdXh3dnpubnlwdW14ZC5zdXBhYmFzZS5jbw==") ||
-  "https://ooldsqkuxwvznnypumxd.supabase.co";
+export const DEFAULT_SUPABASE_URL = "https://msphrcukcgfchodxhgot.supabase.co";
 
-export const DEFAULT_SUPABASE_ANON_KEY = _d(
-  "ZXlKaGJHY2lPaUpJVXpJMU5pSXNOblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2paa1hCaHltRnpaU0lzSW5KbFppSTZJbTkxYkdSemNXRjFlbTV1ZVhCMWJYaGtJbXcwWVNJNk1UYzVNVE00TkRFek55d2laWGh3SWpveU1UQTJNelEwTVRNM2ZRLkJpTG9VOWJqZjlMNWFFRUZUb1N2SVNFM3U5cWVvaWQ2VTd5bldNZkFyVG8=",
-);
+export const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zcGhyY3VrY2dmY2hvZHhoZ290Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODkyNTksImV4cCI6MjEwOTE2NTI1OX0.gB69GOJ9z8r3EfcywfUoELsI1WoF11pEV1vJgbvc7xI";
 
 /**
  * Returns the Universal Smart URL for mobile deep link redirect
  */
 export function getUniversalSmartUrl(qrToken: string): string {
-  return `https://ooldsqkuxwvznnypumxd.supabase.co/functions/v1/app-redirect?token=${qrToken}`;
+  return `https://msphrcukcgfchodxhgot.supabase.co/functions/v1/app-redirect?token=${qrToken}`;
 }
 
 /**

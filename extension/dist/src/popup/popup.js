@@ -1,8 +1,1654 @@
-(function(){"use strict";var Dt=function(){return typeof Promise=="function"&&Promise.prototype&&Promise.prototype.then},ft={},L={};let W;const Ut=[0,26,44,70,100,134,172,196,242,292,346,404,466,532,581,655,733,815,901,991,1085,1156,1258,1364,1474,1588,1706,1828,1921,2051,2185,2323,2465,2611,2761,2876,3034,3196,3362,3532,3706];L.getSymbolSize=function(t){if(!t)throw new Error('"version" cannot be null or undefined');if(t<1||t>40)throw new Error('"version" should be in range from 1 to 40');return t*4+17},L.getSymbolTotalCodewords=function(t){return Ut[t]},L.getBCHDigit=function(e){let t=0;for(;e!==0;)t++,e>>>=1;return t},L.setToSJISFunction=function(t){if(typeof t!="function")throw new Error('"toSJISFunc" is not a valid function.');W=t},L.isKanjiModeEnabled=function(){return typeof W<"u"},L.toSJIS=function(t){return W(t)};var q={};(function(e){e.L={bit:1},e.M={bit:0},e.Q={bit:3},e.H={bit:2};function t(i){if(typeof i!="string")throw new Error("Param is not a string");switch(i.toLowerCase()){case"l":case"low":return e.L;case"m":case"medium":return e.M;case"q":case"quartile":return e.Q;case"h":case"high":return e.H;default:throw new Error("Unknown EC Level: "+i)}}e.isValid=function(r){return r&&typeof r.bit<"u"&&r.bit>=0&&r.bit<4},e.from=function(r,n){if(e.isValid(r))return r;try{return t(r)}catch{return n}}})(q);function gt(){this.buffer=[],this.length=0}gt.prototype={get:function(e){const t=Math.floor(e/8);return(this.buffer[t]>>>7-e%8&1)===1},put:function(e,t){for(let i=0;i<t;i++)this.putBit((e>>>t-i-1&1)===1)},getLengthInBits:function(){return this.length},putBit:function(e){const t=Math.floor(this.length/8);this.buffer.length<=t&&this.buffer.push(0),e&&(this.buffer[t]|=128>>>this.length%8),this.length++}};var Ft=gt;function z(e){if(!e||e<1)throw new Error("BitMatrix size must be defined and greater than 0");this.size=e,this.data=new Uint8Array(e*e),this.reservedBit=new Uint8Array(e*e)}z.prototype.set=function(e,t,i,r){const n=e*this.size+t;this.data[n]=i,r&&(this.reservedBit[n]=!0)},z.prototype.get=function(e,t){return this.data[e*this.size+t]},z.prototype.xor=function(e,t,i){this.data[e*this.size+t]^=i},z.prototype.isReserved=function(e,t){return this.reservedBit[e*this.size+t]};var Vt=z,ht={};(function(e){const t=L.getSymbolSize;e.getRowColCoords=function(r){if(r===1)return[];const n=Math.floor(r/7)+2,o=t(r),s=o===145?26:Math.ceil((o-13)/(2*n-2))*2,c=[o-7];for(let a=1;a<n-1;a++)c[a]=c[a-1]-s;return c.push(6),c.reverse()},e.getPositions=function(r){const n=[],o=e.getRowColCoords(r),s=o.length;for(let c=0;c<s;c++)for(let a=0;a<s;a++)c===0&&a===0||c===0&&a===s-1||c===s-1&&a===0||n.push([o[c],o[a]]);return n}})(ht);var mt={};const zt=L.getSymbolSize,wt=7;mt.getPositions=function(t){const i=zt(t);return[[0,0],[i-wt,0],[0,i-wt]]};var pt={};(function(e){e.Patterns={PATTERN000:0,PATTERN001:1,PATTERN010:2,PATTERN011:3,PATTERN100:4,PATTERN101:5,PATTERN110:6,PATTERN111:7};const t={N1:3,N2:3,N3:40,N4:10};e.isValid=function(n){return n!=null&&n!==""&&!isNaN(n)&&n>=0&&n<=7},e.from=function(n){return e.isValid(n)?parseInt(n,10):void 0},e.getPenaltyN1=function(n){const o=n.size;let s=0,c=0,a=0,l=null,u=null;for(let B=0;B<o;B++){c=a=0,l=u=null;for(let f=0;f<o;f++){let d=n.get(B,f);d===l?c++:(c>=5&&(s+=t.N1+(c-5)),l=d,c=1),d=n.get(f,B),d===u?a++:(a>=5&&(s+=t.N1+(a-5)),u=d,a=1)}c>=5&&(s+=t.N1+(c-5)),a>=5&&(s+=t.N1+(a-5))}return s},e.getPenaltyN2=function(n){const o=n.size;let s=0;for(let c=0;c<o-1;c++)for(let a=0;a<o-1;a++){const l=n.get(c,a)+n.get(c,a+1)+n.get(c+1,a)+n.get(c+1,a+1);(l===4||l===0)&&s++}return s*t.N2},e.getPenaltyN3=function(n){const o=n.size;let s=0,c=0,a=0;for(let l=0;l<o;l++){c=a=0;for(let u=0;u<o;u++)c=c<<1&2047|n.get(l,u),u>=10&&(c===1488||c===93)&&s++,a=a<<1&2047|n.get(u,l),u>=10&&(a===1488||a===93)&&s++}return s*t.N3},e.getPenaltyN4=function(n){let o=0;const s=n.data.length;for(let a=0;a<s;a++)o+=n.data[a];return Math.abs(Math.ceil(o*100/s/5)-10)*t.N4};function i(r,n,o){switch(r){case e.Patterns.PATTERN000:return(n+o)%2===0;case e.Patterns.PATTERN001:return n%2===0;case e.Patterns.PATTERN010:return o%3===0;case e.Patterns.PATTERN011:return(n+o)%3===0;case e.Patterns.PATTERN100:return(Math.floor(n/2)+Math.floor(o/3))%2===0;case e.Patterns.PATTERN101:return n*o%2+n*o%3===0;case e.Patterns.PATTERN110:return(n*o%2+n*o%3)%2===0;case e.Patterns.PATTERN111:return(n*o%3+(n+o)%2)%2===0;default:throw new Error("bad maskPattern:"+r)}}e.applyMask=function(n,o){const s=o.size;for(let c=0;c<s;c++)for(let a=0;a<s;a++)o.isReserved(a,c)||o.xor(a,c,i(n,a,c))},e.getBestMask=function(n,o){const s=Object.keys(e.Patterns).length;let c=0,a=1/0;for(let l=0;l<s;l++){o(l),e.applyMask(l,n);const u=e.getPenaltyN1(n)+e.getPenaltyN2(n)+e.getPenaltyN3(n)+e.getPenaltyN4(n);e.applyMask(l,n),u<a&&(a=u,c=l)}return c}})(pt);var Y={};const P=q,K=[1,1,1,1,1,1,1,1,1,1,2,2,1,2,2,4,1,2,4,4,2,4,4,4,2,4,6,5,2,4,6,6,2,5,8,8,4,5,8,8,4,5,8,11,4,8,10,11,4,9,12,16,4,9,16,16,6,10,12,18,6,10,17,16,6,11,16,19,6,13,18,21,7,14,21,25,8,16,20,25,8,17,23,25,9,17,23,34,9,18,25,30,10,20,27,32,12,21,29,35,12,23,34,37,12,25,34,40,13,26,35,42,14,28,38,45,15,29,40,48,16,31,43,51,17,33,45,54,18,35,48,57,19,37,51,60,19,38,53,63,20,40,56,66,21,43,59,70,22,45,62,74,24,47,65,77,25,49,68,81],$=[7,10,13,17,10,16,22,28,15,26,36,44,20,36,52,64,26,48,72,88,36,64,96,112,40,72,108,130,48,88,132,156,60,110,160,192,72,130,192,224,80,150,224,264,96,176,260,308,104,198,288,352,120,216,320,384,132,240,360,432,144,280,408,480,168,308,448,532,180,338,504,588,196,364,546,650,224,416,600,700,224,442,644,750,252,476,690,816,270,504,750,900,300,560,810,960,312,588,870,1050,336,644,952,1110,360,700,1020,1200,390,728,1050,1260,420,784,1140,1350,450,812,1200,1440,480,868,1290,1530,510,924,1350,1620,540,980,1440,1710,570,1036,1530,1800,570,1064,1590,1890,600,1120,1680,1980,630,1204,1770,2100,660,1260,1860,2220,720,1316,1950,2310,750,1372,2040,2430];Y.getBlocksCount=function(t,i){switch(i){case P.L:return K[(t-1)*4+0];case P.M:return K[(t-1)*4+1];case P.Q:return K[(t-1)*4+2];case P.H:return K[(t-1)*4+3];default:return}},Y.getTotalCodewordsCount=function(t,i){switch(i){case P.L:return $[(t-1)*4+0];case P.M:return $[(t-1)*4+1];case P.Q:return $[(t-1)*4+2];case P.H:return $[(t-1)*4+3];default:return}};var yt={},O={};const J=new Uint8Array(512),j=new Uint8Array(256);(function(){let t=1;for(let i=0;i<255;i++)J[i]=t,j[t]=i,t<<=1,t&256&&(t^=285);for(let i=255;i<512;i++)J[i]=J[i-255]})(),O.log=function(t){if(t<1)throw new Error("log("+t+")");return j[t]},O.exp=function(t){return J[t]},O.mul=function(t,i){return t===0||i===0?0:J[j[t]+j[i]]},function(e){const t=O;e.mul=function(r,n){const o=new Uint8Array(r.length+n.length-1);for(let s=0;s<r.length;s++)for(let c=0;c<n.length;c++)o[s+c]^=t.mul(r[s],n[c]);return o},e.mod=function(r,n){let o=new Uint8Array(r);for(;o.length-n.length>=0;){const s=o[0];for(let a=0;a<n.length;a++)o[a]^=t.mul(n[a],s);let c=0;for(;c<o.length&&o[c]===0;)c++;o=o.slice(c)}return o},e.generateECPolynomial=function(r){let n=new Uint8Array([1]);for(let o=0;o<r;o++)n=e.mul(n,new Uint8Array([1,t.exp(o)]));return n}}(yt);const Et=yt;function Z(e){this.genPoly=void 0,this.degree=e,this.degree&&this.initialize(this.degree)}Z.prototype.initialize=function(t){this.degree=t,this.genPoly=Et.generateECPolynomial(this.degree)},Z.prototype.encode=function(t){if(!this.genPoly)throw new Error("Encoder not initialized");const i=new Uint8Array(t.length+this.degree);i.set(t);const r=Et.mod(i,this.genPoly),n=this.degree-r.length;if(n>0){const o=new Uint8Array(this.degree);return o.set(r,n),o}return r};var Jt=Z,Ct={},_={},X={};X.isValid=function(t){return!isNaN(t)&&t>=1&&t<=40};var M={};const Bt="[0-9]+",Ht="[A-Z $%*+\\-./:]+";let H="(?:[u3000-u303F]|[u3040-u309F]|[u30A0-u30FF]|[uFF00-uFFEF]|[u4E00-u9FAF]|[u2605-u2606]|[u2190-u2195]|u203B|[u2010u2015u2018u2019u2025u2026u201Cu201Du2225u2260]|[u0391-u0451]|[u00A7u00A8u00B1u00B4u00D7u00F7])+";H=H.replace(/u/g,"\\u");const qt="(?:(?![A-Z0-9 $%*+\\-./:]|"+H+`)(?:.|[\r
-]))+`;M.KANJI=new RegExp(H,"g"),M.BYTE_KANJI=new RegExp("[^A-Z0-9 $%*+\\-./:]+","g"),M.BYTE=new RegExp(qt,"g"),M.NUMERIC=new RegExp(Bt,"g"),M.ALPHANUMERIC=new RegExp(Ht,"g");const Yt=new RegExp("^"+H+"$"),Kt=new RegExp("^"+Bt+"$"),$t=new RegExp("^[A-Z0-9 $%*+\\-./:]+$");M.testKanji=function(t){return Yt.test(t)},M.testNumeric=function(t){return Kt.test(t)},M.testAlphanumeric=function(t){return $t.test(t)},function(e){const t=X,i=M;e.NUMERIC={id:"Numeric",bit:1,ccBits:[10,12,14]},e.ALPHANUMERIC={id:"Alphanumeric",bit:2,ccBits:[9,11,13]},e.BYTE={id:"Byte",bit:4,ccBits:[8,16,16]},e.KANJI={id:"Kanji",bit:8,ccBits:[8,10,12]},e.MIXED={bit:-1},e.getCharCountIndicator=function(o,s){if(!o.ccBits)throw new Error("Invalid mode: "+o);if(!t.isValid(s))throw new Error("Invalid version: "+s);return s>=1&&s<10?o.ccBits[0]:s<27?o.ccBits[1]:o.ccBits[2]},e.getBestModeForData=function(o){return i.testNumeric(o)?e.NUMERIC:i.testAlphanumeric(o)?e.ALPHANUMERIC:i.testKanji(o)?e.KANJI:e.BYTE},e.toString=function(o){if(o&&o.id)return o.id;throw new Error("Invalid mode")},e.isValid=function(o){return o&&o.bit&&o.ccBits};function r(n){if(typeof n!="string")throw new Error("Param is not a string");switch(n.toLowerCase()){case"numeric":return e.NUMERIC;case"alphanumeric":return e.ALPHANUMERIC;case"kanji":return e.KANJI;case"byte":return e.BYTE;default:throw new Error("Unknown mode: "+n)}}e.from=function(o,s){if(e.isValid(o))return o;try{return r(o)}catch{return s}}}(_),function(e){const t=L,i=Y,r=q,n=_,o=X,s=7973,c=t.getBCHDigit(s);function a(f,d,p){for(let E=1;E<=40;E++)if(d<=e.getCapacity(E,p,f))return E}function l(f,d){return n.getCharCountIndicator(f,d)+4}function u(f,d){let p=0;return f.forEach(function(E){const I=l(E.mode,d);p+=I+E.getBitsLength()}),p}function B(f,d){for(let p=1;p<=40;p++)if(u(f,p)<=e.getCapacity(p,d,n.MIXED))return p}e.from=function(d,p){return o.isValid(d)?parseInt(d,10):p},e.getCapacity=function(d,p,E){if(!o.isValid(d))throw new Error("Invalid QR Code version");typeof E>"u"&&(E=n.BYTE);const I=t.getSymbolTotalCodewords(d),w=i.getTotalCodewordsCount(d,p),C=(I-w)*8;if(E===n.MIXED)return C;const m=C-l(E,d);switch(E){case n.NUMERIC:return Math.floor(m/10*3);case n.ALPHANUMERIC:return Math.floor(m/11*2);case n.KANJI:return Math.floor(m/13);case n.BYTE:default:return Math.floor(m/8)}},e.getBestVersionForData=function(d,p){let E;const I=r.from(p,r.M);if(Array.isArray(d)){if(d.length>1)return B(d,I);if(d.length===0)return 1;E=d[0]}else E=d;return a(E.mode,E.getLength(),I)},e.getEncodedBits=function(d){if(!o.isValid(d)||d<7)throw new Error("Invalid QR Code version");let p=d<<12;for(;t.getBCHDigit(p)-c>=0;)p^=s<<t.getBCHDigit(p)-c;return d<<12|p}}(Ct);var Tt={};const tt=L,At=1335,Ot=21522,It=tt.getBCHDigit(At);Tt.getEncodedBits=function(t,i){const r=t.bit<<3|i;let n=r<<10;for(;tt.getBCHDigit(n)-It>=0;)n^=At<<tt.getBCHDigit(n)-It;return(r<<10|n)^Ot};var Nt={};const jt=_;function k(e){this.mode=jt.NUMERIC,this.data=e.toString()}k.getBitsLength=function(t){return 10*Math.floor(t/3)+(t%3?t%3*3+1:0)},k.prototype.getLength=function(){return this.data.length},k.prototype.getBitsLength=function(){return k.getBitsLength(this.data.length)},k.prototype.write=function(t){let i,r,n;for(i=0;i+3<=this.data.length;i+=3)r=this.data.substr(i,3),n=parseInt(r,10),t.put(n,10);const o=this.data.length-i;o>0&&(r=this.data.substr(i),n=parseInt(r,10),t.put(n,o*3+1))};var Qt=k;const Gt=_,et=["0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"," ","$","%","*","+","-",".","/",":"];function D(e){this.mode=Gt.ALPHANUMERIC,this.data=e}D.getBitsLength=function(t){return 11*Math.floor(t/2)+6*(t%2)},D.prototype.getLength=function(){return this.data.length},D.prototype.getBitsLength=function(){return D.getBitsLength(this.data.length)},D.prototype.write=function(t){let i;for(i=0;i+2<=this.data.length;i+=2){let r=et.indexOf(this.data[i])*45;r+=et.indexOf(this.data[i+1]),t.put(r,11)}this.data.length%2&&t.put(et.indexOf(this.data[i]),6)};var xt=D;const Wt=_;function U(e){this.mode=Wt.BYTE,typeof e=="string"?this.data=new TextEncoder().encode(e):this.data=new Uint8Array(e)}U.getBitsLength=function(t){return t*8},U.prototype.getLength=function(){return this.data.length},U.prototype.getBitsLength=function(){return U.getBitsLength(this.data.length)},U.prototype.write=function(e){for(let t=0,i=this.data.length;t<i;t++)e.put(this.data[t],8)};var Zt=U;const Xt=_,te=L;function F(e){this.mode=Xt.KANJI,this.data=e}F.getBitsLength=function(t){return t*13},F.prototype.getLength=function(){return this.data.length},F.prototype.getBitsLength=function(){return F.getBitsLength(this.data.length)},F.prototype.write=function(e){let t;for(t=0;t<this.data.length;t++){let i=te.toSJIS(this.data[t]);if(i>=33088&&i<=40956)i-=33088;else if(i>=57408&&i<=60351)i-=49472;else throw new Error("Invalid SJIS character: "+this.data[t]+`
-Make sure your charset is UTF-8`);i=(i>>>8&255)*192+(i&255),e.put(i,13)}};var ee=F,St={exports:{}};(function(e){var t={single_source_shortest_paths:function(i,r,n){var o={},s={};s[r]=0;var c=t.PriorityQueue.make();c.push(r,0);for(var a,l,u,B,f,d,p,E,I;!c.empty();){a=c.pop(),l=a.value,B=a.cost,f=i[l]||{};for(u in f)f.hasOwnProperty(u)&&(d=f[u],p=B+d,E=s[u],I=typeof s[u]>"u",(I||E>p)&&(s[u]=p,c.push(u,p),o[u]=l))}if(typeof n<"u"&&typeof s[n]>"u"){var w=["Could not find a path from ",r," to ",n,"."].join("");throw new Error(w)}return o},extract_shortest_path_from_predecessor_list:function(i,r){for(var n=[],o=r;o;)n.push(o),i[o],o=i[o];return n.reverse(),n},find_path:function(i,r,n){var o=t.single_source_shortest_paths(i,r,n);return t.extract_shortest_path_from_predecessor_list(o,n)},PriorityQueue:{make:function(i){var r=t.PriorityQueue,n={},o;i=i||{};for(o in r)r.hasOwnProperty(o)&&(n[o]=r[o]);return n.queue=[],n.sorter=i.sorter||r.default_sorter,n},default_sorter:function(i,r){return i.cost-r.cost},push:function(i,r){var n={value:i,cost:r};this.queue.push(n),this.queue.sort(this.sorter)},pop:function(){return this.queue.shift()},empty:function(){return this.queue.length===0}}};e.exports=t})(St);var ne=St.exports;(function(e){const t=_,i=Qt,r=xt,n=Zt,o=ee,s=M,c=L,a=ne;function l(w){return unescape(encodeURIComponent(w)).length}function u(w,C,m){const h=[];let g;for(;(g=w.exec(m))!==null;)h.push({data:g[0],index:g.index,mode:C,length:g[0].length});return h}function B(w){const C=u(s.NUMERIC,t.NUMERIC,w),m=u(s.ALPHANUMERIC,t.ALPHANUMERIC,w);let h,g;return c.isKanjiModeEnabled()?(h=u(s.BYTE,t.BYTE,w),g=u(s.KANJI,t.KANJI,w)):(h=u(s.BYTE_KANJI,t.BYTE,w),g=[]),C.concat(m,h,g).sort(function(T,A){return T.index-A.index}).map(function(T){return{data:T.data,mode:T.mode,length:T.length}})}function f(w,C){switch(C){case t.NUMERIC:return i.getBitsLength(w);case t.ALPHANUMERIC:return r.getBitsLength(w);case t.KANJI:return o.getBitsLength(w);case t.BYTE:return n.getBitsLength(w)}}function d(w){return w.reduce(function(C,m){const h=C.length-1>=0?C[C.length-1]:null;return h&&h.mode===m.mode?(C[C.length-1].data+=m.data,C):(C.push(m),C)},[])}function p(w){const C=[];for(let m=0;m<w.length;m++){const h=w[m];switch(h.mode){case t.NUMERIC:C.push([h,{data:h.data,mode:t.ALPHANUMERIC,length:h.length},{data:h.data,mode:t.BYTE,length:h.length}]);break;case t.ALPHANUMERIC:C.push([h,{data:h.data,mode:t.BYTE,length:h.length}]);break;case t.KANJI:C.push([h,{data:h.data,mode:t.BYTE,length:l(h.data)}]);break;case t.BYTE:C.push([{data:h.data,mode:t.BYTE,length:l(h.data)}])}}return C}function E(w,C){const m={},h={start:{}};let g=["start"];for(let y=0;y<w.length;y++){const T=w[y],A=[];for(let N=0;N<T.length;N++){const S=T[N],R=""+y+N;A.push(R),m[R]={node:S,lastCount:0},h[R]={};for(let v=0;v<g.length;v++){const b=g[v];m[b]&&m[b].node.mode===S.mode?(h[b][R]=f(m[b].lastCount+S.length,S.mode)-f(m[b].lastCount,S.mode),m[b].lastCount+=S.length):(m[b]&&(m[b].lastCount=S.length),h[b][R]=f(S.length,S.mode)+4+t.getCharCountIndicator(S.mode,C))}}g=A}for(let y=0;y<g.length;y++)h[g[y]].end=0;return{map:h,table:m}}function I(w,C){let m;const h=t.getBestModeForData(w);if(m=t.from(C,h),m!==t.BYTE&&m.bit<h.bit)throw new Error('"'+w+'" cannot be encoded with mode '+t.toString(m)+`.
- Suggested mode is: `+t.toString(h));switch(m===t.KANJI&&!c.isKanjiModeEnabled()&&(m=t.BYTE),m){case t.NUMERIC:return new i(w);case t.ALPHANUMERIC:return new r(w);case t.KANJI:return new o(w);case t.BYTE:return new n(w)}}e.fromArray=function(C){return C.reduce(function(m,h){return typeof h=="string"?m.push(I(h,null)):h.data&&m.push(I(h.data,h.mode)),m},[])},e.fromString=function(C,m){const h=B(C,c.isKanjiModeEnabled()),g=p(h),y=E(g,m),T=a.find_path(y.map,"start","end"),A=[];for(let N=1;N<T.length-1;N++)A.push(y.table[T[N]].node);return e.fromArray(d(A))},e.rawSplit=function(C){return e.fromArray(B(C,c.isKanjiModeEnabled()))}})(Nt);const Q=L,nt=q,oe=Ft,re=Vt,ie=ht,se=mt,ot=pt,rt=Y,ae=Jt,G=Ct,ce=Tt,le=_,it=Nt;function ue(e,t){const i=e.size,r=se.getPositions(t);for(let n=0;n<r.length;n++){const o=r[n][0],s=r[n][1];for(let c=-1;c<=7;c++)if(!(o+c<=-1||i<=o+c))for(let a=-1;a<=7;a++)s+a<=-1||i<=s+a||(c>=0&&c<=6&&(a===0||a===6)||a>=0&&a<=6&&(c===0||c===6)||c>=2&&c<=4&&a>=2&&a<=4?e.set(o+c,s+a,!0,!0):e.set(o+c,s+a,!1,!0))}}function de(e){const t=e.size;for(let i=8;i<t-8;i++){const r=i%2===0;e.set(i,6,r,!0),e.set(6,i,r,!0)}}function fe(e,t){const i=ie.getPositions(t);for(let r=0;r<i.length;r++){const n=i[r][0],o=i[r][1];for(let s=-2;s<=2;s++)for(let c=-2;c<=2;c++)s===-2||s===2||c===-2||c===2||s===0&&c===0?e.set(n+s,o+c,!0,!0):e.set(n+s,o+c,!1,!0)}}function ge(e,t){const i=e.size,r=G.getEncodedBits(t);let n,o,s;for(let c=0;c<18;c++)n=Math.floor(c/3),o=c%3+i-8-3,s=(r>>c&1)===1,e.set(n,o,s,!0),e.set(o,n,s,!0)}function st(e,t,i){const r=e.size,n=ce.getEncodedBits(t,i);let o,s;for(o=0;o<15;o++)s=(n>>o&1)===1,o<6?e.set(o,8,s,!0):o<8?e.set(o+1,8,s,!0):e.set(r-15+o,8,s,!0),o<8?e.set(8,r-o-1,s,!0):o<9?e.set(8,15-o-1+1,s,!0):e.set(8,15-o-1,s,!0);e.set(r-8,8,1,!0)}function he(e,t){const i=e.size;let r=-1,n=i-1,o=7,s=0;for(let c=i-1;c>0;c-=2)for(c===6&&c--;;){for(let a=0;a<2;a++)if(!e.isReserved(n,c-a)){let l=!1;s<t.length&&(l=(t[s]>>>o&1)===1),e.set(n,c-a,l),o--,o===-1&&(s++,o=7)}if(n+=r,n<0||i<=n){n-=r,r=-r;break}}}function me(e,t,i){const r=new oe;i.forEach(function(a){r.put(a.mode.bit,4),r.put(a.getLength(),le.getCharCountIndicator(a.mode,e)),a.write(r)});const n=Q.getSymbolTotalCodewords(e),o=rt.getTotalCodewordsCount(e,t),s=(n-o)*8;for(r.getLengthInBits()+4<=s&&r.put(0,4);r.getLengthInBits()%8!==0;)r.putBit(0);const c=(s-r.getLengthInBits())/8;for(let a=0;a<c;a++)r.put(a%2?17:236,8);return we(r,e,t)}function we(e,t,i){const r=Q.getSymbolTotalCodewords(t),n=rt.getTotalCodewordsCount(t,i),o=r-n,s=rt.getBlocksCount(t,i),c=r%s,a=s-c,l=Math.floor(r/s),u=Math.floor(o/s),B=u+1,f=l-u,d=new ae(f);let p=0;const E=new Array(s),I=new Array(s);let w=0;const C=new Uint8Array(e.buffer);for(let T=0;T<s;T++){const A=T<a?u:B;E[T]=C.slice(p,p+A),I[T]=d.encode(E[T]),p+=A,w=Math.max(w,A)}const m=new Uint8Array(r);let h=0,g,y;for(g=0;g<w;g++)for(y=0;y<s;y++)g<E[y].length&&(m[h++]=E[y][g]);for(g=0;g<f;g++)for(y=0;y<s;y++)m[h++]=I[y][g];return m}function pe(e,t,i,r){let n;if(Array.isArray(e))n=it.fromArray(e);else if(typeof e=="string"){let l=t;if(!l){const u=it.rawSplit(e);l=G.getBestVersionForData(u,i)}n=it.fromString(e,l||40)}else throw new Error("Invalid data");const o=G.getBestVersionForData(n,i);if(!o)throw new Error("The amount of data is too big to be stored in a QR Code");if(!t)t=o;else if(t<o)throw new Error(`
+(function () {
+  "use strict";
+  var Dt = function () {
+      return (
+        typeof Promise == "function" &&
+        Promise.prototype &&
+        Promise.prototype.then
+      );
+    },
+    ft = {},
+    b = {};
+  let Z;
+  const kt = [
+    0, 26, 44, 70, 100, 134, 172, 196, 242, 292, 346, 404, 466, 532, 581, 655,
+    733, 815, 901, 991, 1085, 1156, 1258, 1364, 1474, 1588, 1706, 1828, 1921,
+    2051, 2185, 2323, 2465, 2611, 2761, 2876, 3034, 3196, 3362, 3532, 3706,
+  ];
+  ((b.getSymbolSize = function (t) {
+    if (!t) throw new Error('"version" cannot be null or undefined');
+    if (t < 1 || t > 40)
+      throw new Error('"version" should be in range from 1 to 40');
+    return t * 4 + 17;
+  }),
+    (b.getSymbolTotalCodewords = function (t) {
+      return kt[t];
+    }),
+    (b.getBCHDigit = function (e) {
+      let t = 0;
+      for (; e !== 0; ) (t++, (e >>>= 1));
+      return t;
+    }),
+    (b.setToSJISFunction = function (t) {
+      if (typeof t != "function")
+        throw new Error('"toSJISFunc" is not a valid function.');
+      Z = t;
+    }),
+    (b.isKanjiModeEnabled = function () {
+      return typeof Z < "u";
+    }),
+    (b.toSJIS = function (t) {
+      return Z(t);
+    }));
+  var H = {};
+  (function (e) {
+    ((e.L = { bit: 1 }),
+      (e.M = { bit: 0 }),
+      (e.Q = { bit: 3 }),
+      (e.H = { bit: 2 }));
+    function t(i) {
+      if (typeof i != "string") throw new Error("Param is not a string");
+      switch (i.toLowerCase()) {
+        case "l":
+        case "low":
+          return e.L;
+        case "m":
+        case "medium":
+          return e.M;
+        case "q":
+        case "quartile":
+          return e.Q;
+        case "h":
+        case "high":
+          return e.H;
+        default:
+          throw new Error("Unknown EC Level: " + i);
+      }
+    }
+    ((e.isValid = function (r) {
+      return r && typeof r.bit < "u" && r.bit >= 0 && r.bit < 4;
+    }),
+      (e.from = function (r, n) {
+        if (e.isValid(r)) return r;
+        try {
+          return t(r);
+        } catch {
+          return n;
+        }
+      }));
+  })(H);
+  function gt() {
+    ((this.buffer = []), (this.length = 0));
+  }
+  gt.prototype = {
+    get: function (e) {
+      const t = Math.floor(e / 8);
+      return ((this.buffer[t] >>> (7 - (e % 8))) & 1) === 1;
+    },
+    put: function (e, t) {
+      for (let i = 0; i < t; i++) this.putBit(((e >>> (t - i - 1)) & 1) === 1);
+    },
+    getLengthInBits: function () {
+      return this.length;
+    },
+    putBit: function (e) {
+      const t = Math.floor(this.length / 8);
+      (this.buffer.length <= t && this.buffer.push(0),
+        e && (this.buffer[t] |= 128 >>> (this.length % 8)),
+        this.length++);
+    },
+  };
+  var Ut = gt;
+  function z(e) {
+    if (!e || e < 1)
+      throw new Error("BitMatrix size must be defined and greater than 0");
+    ((this.size = e),
+      (this.data = new Uint8Array(e * e)),
+      (this.reservedBit = new Uint8Array(e * e)));
+  }
+  ((z.prototype.set = function (e, t, i, r) {
+    const n = e * this.size + t;
+    ((this.data[n] = i), r && (this.reservedBit[n] = !0));
+  }),
+    (z.prototype.get = function (e, t) {
+      return this.data[e * this.size + t];
+    }),
+    (z.prototype.xor = function (e, t, i) {
+      this.data[e * this.size + t] ^= i;
+    }),
+    (z.prototype.isReserved = function (e, t) {
+      return this.reservedBit[e * this.size + t];
+    }));
+  var Ft = z,
+    ht = {};
+  (function (e) {
+    const t = b.getSymbolSize;
+    ((e.getRowColCoords = function (r) {
+      if (r === 1) return [];
+      const n = Math.floor(r / 7) + 2,
+        o = t(r),
+        s = o === 145 ? 26 : Math.ceil((o - 13) / (2 * n - 2)) * 2,
+        c = [o - 7];
+      for (let a = 1; a < n - 1; a++) c[a] = c[a - 1] - s;
+      return (c.push(6), c.reverse());
+    }),
+      (e.getPositions = function (r) {
+        const n = [],
+          o = e.getRowColCoords(r),
+          s = o.length;
+        for (let c = 0; c < s; c++)
+          for (let a = 0; a < s; a++)
+            (c === 0 && a === 0) ||
+              (c === 0 && a === s - 1) ||
+              (c === s - 1 && a === 0) ||
+              n.push([o[c], o[a]]);
+        return n;
+      }));
+  })(ht);
+  var mt = {};
+  const Vt = b.getSymbolSize,
+    wt = 7;
+  mt.getPositions = function (t) {
+    const i = Vt(t);
+    return [
+      [0, 0],
+      [i - wt, 0],
+      [0, i - wt],
+    ];
+  };
+  var pt = {};
+  (function (e) {
+    e.Patterns = {
+      PATTERN000: 0,
+      PATTERN001: 1,
+      PATTERN010: 2,
+      PATTERN011: 3,
+      PATTERN100: 4,
+      PATTERN101: 5,
+      PATTERN110: 6,
+      PATTERN111: 7,
+    };
+    const t = { N1: 3, N2: 3, N3: 40, N4: 10 };
+    ((e.isValid = function (n) {
+      return n != null && n !== "" && !isNaN(n) && n >= 0 && n <= 7;
+    }),
+      (e.from = function (n) {
+        return e.isValid(n) ? parseInt(n, 10) : void 0;
+      }),
+      (e.getPenaltyN1 = function (n) {
+        const o = n.size;
+        let s = 0,
+          c = 0,
+          a = 0,
+          l = null,
+          u = null;
+        for (let B = 0; B < o; B++) {
+          ((c = a = 0), (l = u = null));
+          for (let f = 0; f < o; f++) {
+            let d = n.get(B, f);
+            (d === l
+              ? c++
+              : (c >= 5 && (s += t.N1 + (c - 5)), (l = d), (c = 1)),
+              (d = n.get(f, B)),
+              d === u
+                ? a++
+                : (a >= 5 && (s += t.N1 + (a - 5)), (u = d), (a = 1)));
+          }
+          (c >= 5 && (s += t.N1 + (c - 5)), a >= 5 && (s += t.N1 + (a - 5)));
+        }
+        return s;
+      }),
+      (e.getPenaltyN2 = function (n) {
+        const o = n.size;
+        let s = 0;
+        for (let c = 0; c < o - 1; c++)
+          for (let a = 0; a < o - 1; a++) {
+            const l =
+              n.get(c, a) +
+              n.get(c, a + 1) +
+              n.get(c + 1, a) +
+              n.get(c + 1, a + 1);
+            (l === 4 || l === 0) && s++;
+          }
+        return s * t.N2;
+      }),
+      (e.getPenaltyN3 = function (n) {
+        const o = n.size;
+        let s = 0,
+          c = 0,
+          a = 0;
+        for (let l = 0; l < o; l++) {
+          c = a = 0;
+          for (let u = 0; u < o; u++)
+            ((c = ((c << 1) & 2047) | n.get(l, u)),
+              u >= 10 && (c === 1488 || c === 93) && s++,
+              (a = ((a << 1) & 2047) | n.get(u, l)),
+              u >= 10 && (a === 1488 || a === 93) && s++);
+        }
+        return s * t.N3;
+      }),
+      (e.getPenaltyN4 = function (n) {
+        let o = 0;
+        const s = n.data.length;
+        for (let a = 0; a < s; a++) o += n.data[a];
+        return Math.abs(Math.ceil((o * 100) / s / 5) - 10) * t.N4;
+      }));
+    function i(r, n, o) {
+      switch (r) {
+        case e.Patterns.PATTERN000:
+          return (n + o) % 2 === 0;
+        case e.Patterns.PATTERN001:
+          return n % 2 === 0;
+        case e.Patterns.PATTERN010:
+          return o % 3 === 0;
+        case e.Patterns.PATTERN011:
+          return (n + o) % 3 === 0;
+        case e.Patterns.PATTERN100:
+          return (Math.floor(n / 2) + Math.floor(o / 3)) % 2 === 0;
+        case e.Patterns.PATTERN101:
+          return ((n * o) % 2) + ((n * o) % 3) === 0;
+        case e.Patterns.PATTERN110:
+          return (((n * o) % 2) + ((n * o) % 3)) % 2 === 0;
+        case e.Patterns.PATTERN111:
+          return (((n * o) % 3) + ((n + o) % 2)) % 2 === 0;
+        default:
+          throw new Error("bad maskPattern:" + r);
+      }
+    }
+    ((e.applyMask = function (n, o) {
+      const s = o.size;
+      for (let c = 0; c < s; c++)
+        for (let a = 0; a < s; a++)
+          o.isReserved(a, c) || o.xor(a, c, i(n, a, c));
+    }),
+      (e.getBestMask = function (n, o) {
+        const s = Object.keys(e.Patterns).length;
+        let c = 0,
+          a = 1 / 0;
+        for (let l = 0; l < s; l++) {
+          (o(l), e.applyMask(l, n));
+          const u =
+            e.getPenaltyN1(n) +
+            e.getPenaltyN2(n) +
+            e.getPenaltyN3(n) +
+            e.getPenaltyN4(n);
+          (e.applyMask(l, n), u < a && ((a = u), (c = l)));
+        }
+        return c;
+      }));
+  })(pt);
+  var Y = {};
+  const R = H,
+    $ = [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 4, 1, 2, 4, 4, 2, 4, 4, 4, 2,
+      4, 6, 5, 2, 4, 6, 6, 2, 5, 8, 8, 4, 5, 8, 8, 4, 5, 8, 11, 4, 8, 10, 11, 4,
+      9, 12, 16, 4, 9, 16, 16, 6, 10, 12, 18, 6, 10, 17, 16, 6, 11, 16, 19, 6,
+      13, 18, 21, 7, 14, 21, 25, 8, 16, 20, 25, 8, 17, 23, 25, 9, 17, 23, 34, 9,
+      18, 25, 30, 10, 20, 27, 32, 12, 21, 29, 35, 12, 23, 34, 37, 12, 25, 34,
+      40, 13, 26, 35, 42, 14, 28, 38, 45, 15, 29, 40, 48, 16, 31, 43, 51, 17,
+      33, 45, 54, 18, 35, 48, 57, 19, 37, 51, 60, 19, 38, 53, 63, 20, 40, 56,
+      66, 21, 43, 59, 70, 22, 45, 62, 74, 24, 47, 65, 77, 25, 49, 68, 81,
+    ],
+    q = [
+      7, 10, 13, 17, 10, 16, 22, 28, 15, 26, 36, 44, 20, 36, 52, 64, 26, 48, 72,
+      88, 36, 64, 96, 112, 40, 72, 108, 130, 48, 88, 132, 156, 60, 110, 160,
+      192, 72, 130, 192, 224, 80, 150, 224, 264, 96, 176, 260, 308, 104, 198,
+      288, 352, 120, 216, 320, 384, 132, 240, 360, 432, 144, 280, 408, 480, 168,
+      308, 448, 532, 180, 338, 504, 588, 196, 364, 546, 650, 224, 416, 600, 700,
+      224, 442, 644, 750, 252, 476, 690, 816, 270, 504, 750, 900, 300, 560, 810,
+      960, 312, 588, 870, 1050, 336, 644, 952, 1110, 360, 700, 1020, 1200, 390,
+      728, 1050, 1260, 420, 784, 1140, 1350, 450, 812, 1200, 1440, 480, 868,
+      1290, 1530, 510, 924, 1350, 1620, 540, 980, 1440, 1710, 570, 1036, 1530,
+      1800, 570, 1064, 1590, 1890, 600, 1120, 1680, 1980, 630, 1204, 1770, 2100,
+      660, 1260, 1860, 2220, 720, 1316, 1950, 2310, 750, 1372, 2040, 2430,
+    ];
+  ((Y.getBlocksCount = function (t, i) {
+    switch (i) {
+      case R.L:
+        return $[(t - 1) * 4 + 0];
+      case R.M:
+        return $[(t - 1) * 4 + 1];
+      case R.Q:
+        return $[(t - 1) * 4 + 2];
+      case R.H:
+        return $[(t - 1) * 4 + 3];
+      default:
+        return;
+    }
+  }),
+    (Y.getTotalCodewordsCount = function (t, i) {
+      switch (i) {
+        case R.L:
+          return q[(t - 1) * 4 + 0];
+        case R.M:
+          return q[(t - 1) * 4 + 1];
+        case R.Q:
+          return q[(t - 1) * 4 + 2];
+        case R.H:
+          return q[(t - 1) * 4 + 3];
+        default:
+          return;
+      }
+    }));
+  var yt = {},
+    K = {};
+  const J = new Uint8Array(512),
+    j = new Uint8Array(256);
+  ((function () {
+    let t = 1;
+    for (let i = 0; i < 255; i++)
+      ((J[i] = t), (j[t] = i), (t <<= 1), t & 256 && (t ^= 285));
+    for (let i = 255; i < 512; i++) J[i] = J[i - 255];
+  })(),
+    (K.log = function (t) {
+      if (t < 1) throw new Error("log(" + t + ")");
+      return j[t];
+    }),
+    (K.exp = function (t) {
+      return J[t];
+    }),
+    (K.mul = function (t, i) {
+      return t === 0 || i === 0 ? 0 : J[j[t] + j[i]];
+    }),
+    (function (e) {
+      const t = K;
+      ((e.mul = function (r, n) {
+        const o = new Uint8Array(r.length + n.length - 1);
+        for (let s = 0; s < r.length; s++)
+          for (let c = 0; c < n.length; c++) o[s + c] ^= t.mul(r[s], n[c]);
+        return o;
+      }),
+        (e.mod = function (r, n) {
+          let o = new Uint8Array(r);
+          for (; o.length - n.length >= 0; ) {
+            const s = o[0];
+            for (let a = 0; a < n.length; a++) o[a] ^= t.mul(n[a], s);
+            let c = 0;
+            for (; c < o.length && o[c] === 0; ) c++;
+            o = o.slice(c);
+          }
+          return o;
+        }),
+        (e.generateECPolynomial = function (r) {
+          let n = new Uint8Array([1]);
+          for (let o = 0; o < r; o++)
+            n = e.mul(n, new Uint8Array([1, t.exp(o)]));
+          return n;
+        }));
+    })(yt));
+  const Et = yt;
+  function X(e) {
+    ((this.genPoly = void 0),
+      (this.degree = e),
+      this.degree && this.initialize(this.degree));
+  }
+  ((X.prototype.initialize = function (t) {
+    ((this.degree = t), (this.genPoly = Et.generateECPolynomial(this.degree)));
+  }),
+    (X.prototype.encode = function (t) {
+      if (!this.genPoly) throw new Error("Encoder not initialized");
+      const i = new Uint8Array(t.length + this.degree);
+      i.set(t);
+      const r = Et.mod(i, this.genPoly),
+        n = this.degree - r.length;
+      if (n > 0) {
+        const o = new Uint8Array(this.degree);
+        return (o.set(r, n), o);
+      }
+      return r;
+    }));
+  var zt = X,
+    Ct = {},
+    _ = {},
+    W = {};
+  W.isValid = function (t) {
+    return !isNaN(t) && t >= 1 && t <= 40;
+  };
+  var M = {};
+  const Bt = "[0-9]+",
+    Jt = "[A-Z $%*+\\-./:]+";
+  let O =
+    "(?:[u3000-u303F]|[u3040-u309F]|[u30A0-u30FF]|[uFF00-uFFEF]|[u4E00-u9FAF]|[u2605-u2606]|[u2190-u2195]|u203B|[u2010u2015u2018u2019u2025u2026u201Cu201Du2225u2260]|[u0391-u0451]|[u00A7u00A8u00B1u00B4u00D7u00F7])+";
+  O = O.replace(/u/g, "\\u");
+  const Ot =
+    "(?:(?![A-Z0-9 $%*+\\-./:]|" +
+    O +
+    `)(?:.|[\r
+]))+`;
+  ((M.KANJI = new RegExp(O, "g")),
+    (M.BYTE_KANJI = new RegExp("[^A-Z0-9 $%*+\\-./:]+", "g")),
+    (M.BYTE = new RegExp(Ot, "g")),
+    (M.NUMERIC = new RegExp(Bt, "g")),
+    (M.ALPHANUMERIC = new RegExp(Jt, "g")));
+  const Ht = new RegExp("^" + O + "$"),
+    Yt = new RegExp("^" + Bt + "$"),
+    $t = new RegExp("^[A-Z0-9 $%*+\\-./:]+$");
+  ((M.testKanji = function (t) {
+    return Ht.test(t);
+  }),
+    (M.testNumeric = function (t) {
+      return Yt.test(t);
+    }),
+    (M.testAlphanumeric = function (t) {
+      return $t.test(t);
+    }),
+    (function (e) {
+      const t = W,
+        i = M;
+      ((e.NUMERIC = { id: "Numeric", bit: 1, ccBits: [10, 12, 14] }),
+        (e.ALPHANUMERIC = { id: "Alphanumeric", bit: 2, ccBits: [9, 11, 13] }),
+        (e.BYTE = { id: "Byte", bit: 4, ccBits: [8, 16, 16] }),
+        (e.KANJI = { id: "Kanji", bit: 8, ccBits: [8, 10, 12] }),
+        (e.MIXED = { bit: -1 }),
+        (e.getCharCountIndicator = function (o, s) {
+          if (!o.ccBits) throw new Error("Invalid mode: " + o);
+          if (!t.isValid(s)) throw new Error("Invalid version: " + s);
+          return s >= 1 && s < 10
+            ? o.ccBits[0]
+            : s < 27
+              ? o.ccBits[1]
+              : o.ccBits[2];
+        }),
+        (e.getBestModeForData = function (o) {
+          return i.testNumeric(o)
+            ? e.NUMERIC
+            : i.testAlphanumeric(o)
+              ? e.ALPHANUMERIC
+              : i.testKanji(o)
+                ? e.KANJI
+                : e.BYTE;
+        }),
+        (e.toString = function (o) {
+          if (o && o.id) return o.id;
+          throw new Error("Invalid mode");
+        }),
+        (e.isValid = function (o) {
+          return o && o.bit && o.ccBits;
+        }));
+      function r(n) {
+        if (typeof n != "string") throw new Error("Param is not a string");
+        switch (n.toLowerCase()) {
+          case "numeric":
+            return e.NUMERIC;
+          case "alphanumeric":
+            return e.ALPHANUMERIC;
+          case "kanji":
+            return e.KANJI;
+          case "byte":
+            return e.BYTE;
+          default:
+            throw new Error("Unknown mode: " + n);
+        }
+      }
+      e.from = function (o, s) {
+        if (e.isValid(o)) return o;
+        try {
+          return r(o);
+        } catch {
+          return s;
+        }
+      };
+    })(_),
+    (function (e) {
+      const t = b,
+        i = Y,
+        r = H,
+        n = _,
+        o = W,
+        s = 7973,
+        c = t.getBCHDigit(s);
+      function a(f, d, p) {
+        for (let E = 1; E <= 40; E++) if (d <= e.getCapacity(E, p, f)) return E;
+      }
+      function l(f, d) {
+        return n.getCharCountIndicator(f, d) + 4;
+      }
+      function u(f, d) {
+        let p = 0;
+        return (
+          f.forEach(function (E) {
+            const A = l(E.mode, d);
+            p += A + E.getBitsLength();
+          }),
+          p
+        );
+      }
+      function B(f, d) {
+        for (let p = 1; p <= 40; p++)
+          if (u(f, p) <= e.getCapacity(p, d, n.MIXED)) return p;
+      }
+      ((e.from = function (d, p) {
+        return o.isValid(d) ? parseInt(d, 10) : p;
+      }),
+        (e.getCapacity = function (d, p, E) {
+          if (!o.isValid(d)) throw new Error("Invalid QR Code version");
+          typeof E > "u" && (E = n.BYTE);
+          const A = t.getSymbolTotalCodewords(d),
+            w = i.getTotalCodewordsCount(d, p),
+            C = (A - w) * 8;
+          if (E === n.MIXED) return C;
+          const m = C - l(E, d);
+          switch (E) {
+            case n.NUMERIC:
+              return Math.floor((m / 10) * 3);
+            case n.ALPHANUMERIC:
+              return Math.floor((m / 11) * 2);
+            case n.KANJI:
+              return Math.floor(m / 13);
+            case n.BYTE:
+            default:
+              return Math.floor(m / 8);
+          }
+        }),
+        (e.getBestVersionForData = function (d, p) {
+          let E;
+          const A = r.from(p, r.M);
+          if (Array.isArray(d)) {
+            if (d.length > 1) return B(d, A);
+            if (d.length === 0) return 1;
+            E = d[0];
+          } else E = d;
+          return a(E.mode, E.getLength(), A);
+        }),
+        (e.getEncodedBits = function (d) {
+          if (!o.isValid(d) || d < 7)
+            throw new Error("Invalid QR Code version");
+          let p = d << 12;
+          for (; t.getBCHDigit(p) - c >= 0; ) p ^= s << (t.getBCHDigit(p) - c);
+          return (d << 12) | p;
+        }));
+    })(Ct));
+  var It = {};
+  const tt = b,
+    Tt = 1335,
+    qt = 21522,
+    At = tt.getBCHDigit(Tt);
+  It.getEncodedBits = function (t, i) {
+    const r = (t.bit << 3) | i;
+    let n = r << 10;
+    for (; tt.getBCHDigit(n) - At >= 0; ) n ^= Tt << (tt.getBCHDigit(n) - At);
+    return ((r << 10) | n) ^ qt;
+  };
+  var St = {};
+  const Kt = _;
+  function D(e) {
+    ((this.mode = Kt.NUMERIC), (this.data = e.toString()));
+  }
+  ((D.getBitsLength = function (t) {
+    return 10 * Math.floor(t / 3) + (t % 3 ? (t % 3) * 3 + 1 : 0);
+  }),
+    (D.prototype.getLength = function () {
+      return this.data.length;
+    }),
+    (D.prototype.getBitsLength = function () {
+      return D.getBitsLength(this.data.length);
+    }),
+    (D.prototype.write = function (t) {
+      let i, r, n;
+      for (i = 0; i + 3 <= this.data.length; i += 3)
+        ((r = this.data.substr(i, 3)), (n = parseInt(r, 10)), t.put(n, 10));
+      const o = this.data.length - i;
+      o > 0 &&
+        ((r = this.data.substr(i)), (n = parseInt(r, 10)), t.put(n, o * 3 + 1));
+    }));
+  var jt = D;
+  const Qt = _,
+    et = [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O",
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "U",
+      "V",
+      "W",
+      "X",
+      "Y",
+      "Z",
+      " ",
+      "$",
+      "%",
+      "*",
+      "+",
+      "-",
+      ".",
+      "/",
+      ":",
+    ];
+  function k(e) {
+    ((this.mode = Qt.ALPHANUMERIC), (this.data = e));
+  }
+  ((k.getBitsLength = function (t) {
+    return 11 * Math.floor(t / 2) + 6 * (t % 2);
+  }),
+    (k.prototype.getLength = function () {
+      return this.data.length;
+    }),
+    (k.prototype.getBitsLength = function () {
+      return k.getBitsLength(this.data.length);
+    }),
+    (k.prototype.write = function (t) {
+      let i;
+      for (i = 0; i + 2 <= this.data.length; i += 2) {
+        let r = et.indexOf(this.data[i]) * 45;
+        ((r += et.indexOf(this.data[i + 1])), t.put(r, 11));
+      }
+      this.data.length % 2 && t.put(et.indexOf(this.data[i]), 6);
+    }));
+  var Gt = k;
+  const xt = _;
+  function U(e) {
+    ((this.mode = xt.BYTE),
+      typeof e == "string"
+        ? (this.data = new TextEncoder().encode(e))
+        : (this.data = new Uint8Array(e)));
+  }
+  ((U.getBitsLength = function (t) {
+    return t * 8;
+  }),
+    (U.prototype.getLength = function () {
+      return this.data.length;
+    }),
+    (U.prototype.getBitsLength = function () {
+      return U.getBitsLength(this.data.length);
+    }),
+    (U.prototype.write = function (e) {
+      for (let t = 0, i = this.data.length; t < i; t++) e.put(this.data[t], 8);
+    }));
+  var Zt = U;
+  const Xt = _,
+    Wt = b;
+  function F(e) {
+    ((this.mode = Xt.KANJI), (this.data = e));
+  }
+  ((F.getBitsLength = function (t) {
+    return t * 13;
+  }),
+    (F.prototype.getLength = function () {
+      return this.data.length;
+    }),
+    (F.prototype.getBitsLength = function () {
+      return F.getBitsLength(this.data.length);
+    }),
+    (F.prototype.write = function (e) {
+      let t;
+      for (t = 0; t < this.data.length; t++) {
+        let i = Wt.toSJIS(this.data[t]);
+        if (i >= 33088 && i <= 40956) i -= 33088;
+        else if (i >= 57408 && i <= 60351) i -= 49472;
+        else
+          throw new Error(
+            "Invalid SJIS character: " +
+              this.data[t] +
+              `
+Make sure your charset is UTF-8`,
+          );
+        ((i = ((i >>> 8) & 255) * 192 + (i & 255)), e.put(i, 13));
+      }
+    }));
+  var te = F,
+    Nt = { exports: {} };
+  (function (e) {
+    var t = {
+      single_source_shortest_paths: function (i, r, n) {
+        var o = {},
+          s = {};
+        s[r] = 0;
+        var c = t.PriorityQueue.make();
+        c.push(r, 0);
+        for (var a, l, u, B, f, d, p, E, A; !c.empty(); ) {
+          ((a = c.pop()), (l = a.value), (B = a.cost), (f = i[l] || {}));
+          for (u in f)
+            f.hasOwnProperty(u) &&
+              ((d = f[u]),
+              (p = B + d),
+              (E = s[u]),
+              (A = typeof s[u] > "u"),
+              (A || E > p) && ((s[u] = p), c.push(u, p), (o[u] = l)));
+        }
+        if (typeof n < "u" && typeof s[n] > "u") {
+          var w = ["Could not find a path from ", r, " to ", n, "."].join("");
+          throw new Error(w);
+        }
+        return o;
+      },
+      extract_shortest_path_from_predecessor_list: function (i, r) {
+        for (var n = [], o = r; o; ) (n.push(o), i[o], (o = i[o]));
+        return (n.reverse(), n);
+      },
+      find_path: function (i, r, n) {
+        var o = t.single_source_shortest_paths(i, r, n);
+        return t.extract_shortest_path_from_predecessor_list(o, n);
+      },
+      PriorityQueue: {
+        make: function (i) {
+          var r = t.PriorityQueue,
+            n = {},
+            o;
+          i = i || {};
+          for (o in r) r.hasOwnProperty(o) && (n[o] = r[o]);
+          return ((n.queue = []), (n.sorter = i.sorter || r.default_sorter), n);
+        },
+        default_sorter: function (i, r) {
+          return i.cost - r.cost;
+        },
+        push: function (i, r) {
+          var n = { value: i, cost: r };
+          (this.queue.push(n), this.queue.sort(this.sorter));
+        },
+        pop: function () {
+          return this.queue.shift();
+        },
+        empty: function () {
+          return this.queue.length === 0;
+        },
+      },
+    };
+    e.exports = t;
+  })(Nt);
+  var ee = Nt.exports;
+  (function (e) {
+    const t = _,
+      i = jt,
+      r = Gt,
+      n = Zt,
+      o = te,
+      s = M,
+      c = b,
+      a = ee;
+    function l(w) {
+      return unescape(encodeURIComponent(w)).length;
+    }
+    function u(w, C, m) {
+      const h = [];
+      let g;
+      for (; (g = w.exec(m)) !== null; )
+        h.push({ data: g[0], index: g.index, mode: C, length: g[0].length });
+      return h;
+    }
+    function B(w) {
+      const C = u(s.NUMERIC, t.NUMERIC, w),
+        m = u(s.ALPHANUMERIC, t.ALPHANUMERIC, w);
+      let h, g;
+      return (
+        c.isKanjiModeEnabled()
+          ? ((h = u(s.BYTE, t.BYTE, w)), (g = u(s.KANJI, t.KANJI, w)))
+          : ((h = u(s.BYTE_KANJI, t.BYTE, w)), (g = [])),
+        C.concat(m, h, g)
+          .sort(function (I, T) {
+            return I.index - T.index;
+          })
+          .map(function (I) {
+            return { data: I.data, mode: I.mode, length: I.length };
+          })
+      );
+    }
+    function f(w, C) {
+      switch (C) {
+        case t.NUMERIC:
+          return i.getBitsLength(w);
+        case t.ALPHANUMERIC:
+          return r.getBitsLength(w);
+        case t.KANJI:
+          return o.getBitsLength(w);
+        case t.BYTE:
+          return n.getBitsLength(w);
+      }
+    }
+    function d(w) {
+      return w.reduce(function (C, m) {
+        const h = C.length - 1 >= 0 ? C[C.length - 1] : null;
+        return h && h.mode === m.mode
+          ? ((C[C.length - 1].data += m.data), C)
+          : (C.push(m), C);
+      }, []);
+    }
+    function p(w) {
+      const C = [];
+      for (let m = 0; m < w.length; m++) {
+        const h = w[m];
+        switch (h.mode) {
+          case t.NUMERIC:
+            C.push([
+              h,
+              { data: h.data, mode: t.ALPHANUMERIC, length: h.length },
+              { data: h.data, mode: t.BYTE, length: h.length },
+            ]);
+            break;
+          case t.ALPHANUMERIC:
+            C.push([h, { data: h.data, mode: t.BYTE, length: h.length }]);
+            break;
+          case t.KANJI:
+            C.push([h, { data: h.data, mode: t.BYTE, length: l(h.data) }]);
+            break;
+          case t.BYTE:
+            C.push([{ data: h.data, mode: t.BYTE, length: l(h.data) }]);
+        }
+      }
+      return C;
+    }
+    function E(w, C) {
+      const m = {},
+        h = { start: {} };
+      let g = ["start"];
+      for (let y = 0; y < w.length; y++) {
+        const I = w[y],
+          T = [];
+        for (let S = 0; S < I.length; S++) {
+          const N = I[S],
+            P = "" + y + S;
+          (T.push(P), (m[P] = { node: N, lastCount: 0 }), (h[P] = {}));
+          for (let v = 0; v < g.length; v++) {
+            const L = g[v];
+            m[L] && m[L].node.mode === N.mode
+              ? ((h[L][P] =
+                  f(m[L].lastCount + N.length, N.mode) -
+                  f(m[L].lastCount, N.mode)),
+                (m[L].lastCount += N.length))
+              : (m[L] && (m[L].lastCount = N.length),
+                (h[L][P] =
+                  f(N.length, N.mode) +
+                  4 +
+                  t.getCharCountIndicator(N.mode, C)));
+          }
+        }
+        g = T;
+      }
+      for (let y = 0; y < g.length; y++) h[g[y]].end = 0;
+      return { map: h, table: m };
+    }
+    function A(w, C) {
+      let m;
+      const h = t.getBestModeForData(w);
+      if (((m = t.from(C, h)), m !== t.BYTE && m.bit < h.bit))
+        throw new Error(
+          '"' +
+            w +
+            '" cannot be encoded with mode ' +
+            t.toString(m) +
+            `.
+ Suggested mode is: ` +
+            t.toString(h),
+        );
+      switch ((m === t.KANJI && !c.isKanjiModeEnabled() && (m = t.BYTE), m)) {
+        case t.NUMERIC:
+          return new i(w);
+        case t.ALPHANUMERIC:
+          return new r(w);
+        case t.KANJI:
+          return new o(w);
+        case t.BYTE:
+          return new n(w);
+      }
+    }
+    ((e.fromArray = function (C) {
+      return C.reduce(function (m, h) {
+        return (
+          typeof h == "string"
+            ? m.push(A(h, null))
+            : h.data && m.push(A(h.data, h.mode)),
+          m
+        );
+      }, []);
+    }),
+      (e.fromString = function (C, m) {
+        const h = B(C, c.isKanjiModeEnabled()),
+          g = p(h),
+          y = E(g, m),
+          I = a.find_path(y.map, "start", "end"),
+          T = [];
+        for (let S = 1; S < I.length - 1; S++) T.push(y.table[I[S]].node);
+        return e.fromArray(d(T));
+      }),
+      (e.rawSplit = function (C) {
+        return e.fromArray(B(C, c.isKanjiModeEnabled()));
+      }));
+  })(St);
+  const Q = b,
+    nt = H,
+    ne = Ut,
+    oe = Ft,
+    re = ht,
+    ie = mt,
+    ot = pt,
+    rt = Y,
+    se = zt,
+    G = Ct,
+    ae = It,
+    ce = _,
+    it = St;
+  function le(e, t) {
+    const i = e.size,
+      r = ie.getPositions(t);
+    for (let n = 0; n < r.length; n++) {
+      const o = r[n][0],
+        s = r[n][1];
+      for (let c = -1; c <= 7; c++)
+        if (!(o + c <= -1 || i <= o + c))
+          for (let a = -1; a <= 7; a++)
+            s + a <= -1 ||
+              i <= s + a ||
+              ((c >= 0 && c <= 6 && (a === 0 || a === 6)) ||
+              (a >= 0 && a <= 6 && (c === 0 || c === 6)) ||
+              (c >= 2 && c <= 4 && a >= 2 && a <= 4)
+                ? e.set(o + c, s + a, !0, !0)
+                : e.set(o + c, s + a, !1, !0));
+    }
+  }
+  function ue(e) {
+    const t = e.size;
+    for (let i = 8; i < t - 8; i++) {
+      const r = i % 2 === 0;
+      (e.set(i, 6, r, !0), e.set(6, i, r, !0));
+    }
+  }
+  function de(e, t) {
+    const i = re.getPositions(t);
+    for (let r = 0; r < i.length; r++) {
+      const n = i[r][0],
+        o = i[r][1];
+      for (let s = -2; s <= 2; s++)
+        for (let c = -2; c <= 2; c++)
+          s === -2 || s === 2 || c === -2 || c === 2 || (s === 0 && c === 0)
+            ? e.set(n + s, o + c, !0, !0)
+            : e.set(n + s, o + c, !1, !0);
+    }
+  }
+  function fe(e, t) {
+    const i = e.size,
+      r = G.getEncodedBits(t);
+    let n, o, s;
+    for (let c = 0; c < 18; c++)
+      ((n = Math.floor(c / 3)),
+        (o = (c % 3) + i - 8 - 3),
+        (s = ((r >> c) & 1) === 1),
+        e.set(n, o, s, !0),
+        e.set(o, n, s, !0));
+  }
+  function st(e, t, i) {
+    const r = e.size,
+      n = ae.getEncodedBits(t, i);
+    let o, s;
+    for (o = 0; o < 15; o++)
+      ((s = ((n >> o) & 1) === 1),
+        o < 6
+          ? e.set(o, 8, s, !0)
+          : o < 8
+            ? e.set(o + 1, 8, s, !0)
+            : e.set(r - 15 + o, 8, s, !0),
+        o < 8
+          ? e.set(8, r - o - 1, s, !0)
+          : o < 9
+            ? e.set(8, 15 - o - 1 + 1, s, !0)
+            : e.set(8, 15 - o - 1, s, !0));
+    e.set(r - 8, 8, 1, !0);
+  }
+  function ge(e, t) {
+    const i = e.size;
+    let r = -1,
+      n = i - 1,
+      o = 7,
+      s = 0;
+    for (let c = i - 1; c > 0; c -= 2)
+      for (c === 6 && c--; ; ) {
+        for (let a = 0; a < 2; a++)
+          if (!e.isReserved(n, c - a)) {
+            let l = !1;
+            (s < t.length && (l = ((t[s] >>> o) & 1) === 1),
+              e.set(n, c - a, l),
+              o--,
+              o === -1 && (s++, (o = 7)));
+          }
+        if (((n += r), n < 0 || i <= n)) {
+          ((n -= r), (r = -r));
+          break;
+        }
+      }
+  }
+  function he(e, t, i) {
+    const r = new ne();
+    i.forEach(function (a) {
+      (r.put(a.mode.bit, 4),
+        r.put(a.getLength(), ce.getCharCountIndicator(a.mode, e)),
+        a.write(r));
+    });
+    const n = Q.getSymbolTotalCodewords(e),
+      o = rt.getTotalCodewordsCount(e, t),
+      s = (n - o) * 8;
+    for (
+      r.getLengthInBits() + 4 <= s && r.put(0, 4);
+      r.getLengthInBits() % 8 !== 0;
+    )
+      r.putBit(0);
+    const c = (s - r.getLengthInBits()) / 8;
+    for (let a = 0; a < c; a++) r.put(a % 2 ? 17 : 236, 8);
+    return me(r, e, t);
+  }
+  function me(e, t, i) {
+    const r = Q.getSymbolTotalCodewords(t),
+      n = rt.getTotalCodewordsCount(t, i),
+      o = r - n,
+      s = rt.getBlocksCount(t, i),
+      c = r % s,
+      a = s - c,
+      l = Math.floor(r / s),
+      u = Math.floor(o / s),
+      B = u + 1,
+      f = l - u,
+      d = new se(f);
+    let p = 0;
+    const E = new Array(s),
+      A = new Array(s);
+    let w = 0;
+    const C = new Uint8Array(e.buffer);
+    for (let I = 0; I < s; I++) {
+      const T = I < a ? u : B;
+      ((E[I] = C.slice(p, p + T)),
+        (A[I] = d.encode(E[I])),
+        (p += T),
+        (w = Math.max(w, T)));
+    }
+    const m = new Uint8Array(r);
+    let h = 0,
+      g,
+      y;
+    for (g = 0; g < w; g++)
+      for (y = 0; y < s; y++) g < E[y].length && (m[h++] = E[y][g]);
+    for (g = 0; g < f; g++) for (y = 0; y < s; y++) m[h++] = A[y][g];
+    return m;
+  }
+  function we(e, t, i, r) {
+    let n;
+    if (Array.isArray(e)) n = it.fromArray(e);
+    else if (typeof e == "string") {
+      let l = t;
+      if (!l) {
+        const u = it.rawSplit(e);
+        l = G.getBestVersionForData(u, i);
+      }
+      n = it.fromString(e, l || 40);
+    } else throw new Error("Invalid data");
+    const o = G.getBestVersionForData(n, i);
+    if (!o)
+      throw new Error(
+        "The amount of data is too big to be stored in a QR Code",
+      );
+    if (!t) t = o;
+    else if (t < o)
+      throw new Error(
+        `
 The chosen QR Code version cannot contain this amount of data.
-Minimum version required to store current data is: `+o+`.
-`);const s=me(t,i,n),c=Q.getSymbolSize(t),a=new re(c);return ue(a,t),de(a),fe(a,t),st(a,i,0),t>=7&&ge(a,t),he(a,s),isNaN(r)&&(r=ot.getBestMask(a,st.bind(null,a,i))),ot.applyMask(r,a),st(a,i,r),{modules:a,version:t,errorCorrectionLevel:i,maskPattern:r,segments:n}}ft.create=function(t,i){if(typeof t>"u"||t==="")throw new Error("No input text");let r=nt.M,n,o;return typeof i<"u"&&(r=nt.from(i.errorCorrectionLevel,nt.M),n=G.from(i.version),o=ot.from(i.maskPattern),i.toSJISFunc&&Q.setToSJISFunction(i.toSJISFunc)),pe(t,n,r,o)};var bt={},at={};(function(e){function t(i){if(typeof i=="number"&&(i=i.toString()),typeof i!="string")throw new Error("Color should be defined as hex string");let r=i.slice().replace("#","").split("");if(r.length<3||r.length===5||r.length>8)throw new Error("Invalid hex color: "+i);(r.length===3||r.length===4)&&(r=Array.prototype.concat.apply([],r.map(function(o){return[o,o]}))),r.length===6&&r.push("F","F");const n=parseInt(r.join(""),16);return{r:n>>24&255,g:n>>16&255,b:n>>8&255,a:n&255,hex:"#"+r.slice(0,6).join("")}}e.getOptions=function(r){r||(r={}),r.color||(r.color={});const n=typeof r.margin>"u"||r.margin===null||r.margin<0?4:r.margin,o=r.width&&r.width>=21?r.width:void 0,s=r.scale||4;return{width:o,scale:o?4:s,margin:n,color:{dark:t(r.color.dark||"#000000ff"),light:t(r.color.light||"#ffffffff")},type:r.type,rendererOpts:r.rendererOpts||{}}},e.getScale=function(r,n){return n.width&&n.width>=r+n.margin*2?n.width/(r+n.margin*2):n.scale},e.getImageWidth=function(r,n){const o=e.getScale(r,n);return Math.floor((r+n.margin*2)*o)},e.qrToImageData=function(r,n,o){const s=n.modules.size,c=n.modules.data,a=e.getScale(s,o),l=Math.floor((s+o.margin*2)*a),u=o.margin*a,B=[o.color.light,o.color.dark];for(let f=0;f<l;f++)for(let d=0;d<l;d++){let p=(f*l+d)*4,E=o.color.light;if(f>=u&&d>=u&&f<l-u&&d<l-u){const I=Math.floor((f-u)/a),w=Math.floor((d-u)/a);E=B[c[I*s+w]?1:0]}r[p++]=E.r,r[p++]=E.g,r[p++]=E.b,r[p]=E.a}}})(at),function(e){const t=at;function i(n,o,s){n.clearRect(0,0,o.width,o.height),o.style||(o.style={}),o.height=s,o.width=s,o.style.height=s+"px",o.style.width=s+"px"}function r(){try{return document.createElement("canvas")}catch{throw new Error("You need to specify a canvas element")}}e.render=function(o,s,c){let a=c,l=s;typeof a>"u"&&(!s||!s.getContext)&&(a=s,s=void 0),s||(l=r()),a=t.getOptions(a);const u=t.getImageWidth(o.modules.size,a),B=l.getContext("2d"),f=B.createImageData(u,u);return t.qrToImageData(f.data,o,a),i(B,l,u),B.putImageData(f,0,0),l},e.renderToDataURL=function(o,s,c){let a=c;typeof a>"u"&&(!s||!s.getContext)&&(a=s,s=void 0),a||(a={});const l=e.render(o,s,a),u=a.type||"image/png",B=a.rendererOpts||{};return l.toDataURL(u,B.quality)}}(bt);var Lt={};const ye=at;function Mt(e,t){const i=e.a/255,r=t+'="'+e.hex+'"';return i<1?r+" "+t+'-opacity="'+i.toFixed(2).slice(1)+'"':r}function ct(e,t,i){let r=e+t;return typeof i<"u"&&(r+=" "+i),r}function Ee(e,t,i){let r="",n=0,o=!1,s=0;for(let c=0;c<e.length;c++){const a=Math.floor(c%t),l=Math.floor(c/t);!a&&!o&&(o=!0),e[c]?(s++,c>0&&a>0&&e[c-1]||(r+=o?ct("M",a+i,.5+l+i):ct("m",n,0),n=0,o=!1),a+1<t&&e[c+1]||(r+=ct("h",s),s=0)):n++}return r}Lt.render=function(t,i,r){const n=ye.getOptions(i),o=t.modules.size,s=t.modules.data,c=o+n.margin*2,a=n.color.light.a?"<path "+Mt(n.color.light,"fill")+' d="M0 0h'+c+"v"+c+'H0z"/>':"",l="<path "+Mt(n.color.dark,"stroke")+' d="'+Ee(s,o,n.margin)+'"/>',u='viewBox="0 0 '+c+" "+c+'"',f='<svg xmlns="http://www.w3.org/2000/svg" '+(n.width?'width="'+n.width+'" height="'+n.width+'" ':"")+u+' shape-rendering="crispEdges">'+a+l+`</svg>
-`;return typeof r=="function"&&r(null,f),f};const Ce=Dt,lt=ft,Rt=bt,Be=Lt;function ut(e,t,i,r,n){const o=[].slice.call(arguments,1),s=o.length,c=typeof o[s-1]=="function";if(!c&&!Ce())throw new Error("Callback required as last argument");if(c){if(s<2)throw new Error("Too few arguments provided");s===2?(n=i,i=t,t=r=void 0):s===3&&(t.getContext&&typeof n>"u"?(n=r,r=void 0):(n=r,r=i,i=t,t=void 0))}else{if(s<1)throw new Error("Too few arguments provided");return s===1?(i=t,t=r=void 0):s===2&&!t.getContext&&(r=i,i=t,t=void 0),new Promise(function(a,l){try{const u=lt.create(i,r);a(e(u,t,r))}catch(u){l(u)}})}try{const a=lt.create(i,r);n(null,e(a,t,r))}catch(a){n(a)}}lt.create;var Te=ut.bind(null,Rt.render);ut.bind(null,Rt.renderToDataURL),ut.bind(null,function(e,t,i){return Be.render(e,i)});function Pt(e){try{return atob(e)}catch{return""}}const _t=Pt("aHR0cHM6Ly9vb2xkc3FrdXh3dnpubnlwdW14ZC5zdXBhYmFzZS5jbw==")||"https://ooldsqkuxwvznnypumxd.supabase.co",vt=Pt("ZXlKaGJHY2lPaUpJVXpJMU5pSXNOblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2paa1hCaHltRnpaU0lzSW5KbFppSTZJbTkxYkdSemNXRjFlbTV1ZVhCMWJYaGtJbXcwWVNJNk1UYzVNVE00TkRFek55d2laWGh3SWpveU1UQTJNelEwTVRNM2ZRLkJpTG9VOWJqZjlMNWFFRUZUb1N2SVNFM3U5cWVvaWQ2VTd5bldNZkFyVG8=");function kt(e){return`https://ooldsqkuxwvznnypumxd.supabase.co/functions/v1/app-redirect?token=${e}`}async function Ae(e=_t,t=vt){const i=crypto.randomUUID(),r=new Date(Date.now()+5*60*1e3).toISOString(),n=kt(i),o=await fetch(`${e}/rest/v1/qr_auth_sessions`,{method:"POST",headers:{"Content-Type":"application/json",apikey:t,Authorization:`Bearer ${t}`,Prefer:"return=representation"},body:JSON.stringify({qr_token:i,status:"pending",expires_at:r})});if(!o.ok){const s=await o.text();throw new Error(`Failed to create QR session: ${o.status} - ${s}`)}return{qr_token:i,expires_at:r,universal_url:n}}async function Ie(e,t){const i=t.startsWith("http")?t:kt(t);await Te(e,i,{errorCorrectionLevel:"M",margin:1,width:170,color:{dark:"#000000",light:"#ffffff"}})}function Ne(e=_t,t=vt,i,r,n){let o=!1,s=null;const c=async()=>{if(!o){try{const l=`${e}/rest/v1/qr_auth_sessions?qr_token=eq.${encodeURIComponent(i)}&select=*`,u=await fetch(l,{method:"GET",headers:{apikey:t,Authorization:`Bearer ${t}`,Accept:"application/json"}});if(!u.ok)console.warn("[Elio AI Auth] Poll returned status:",u.status);else{const B=await u.json();if(Array.isArray(B)&&B.length>0){const f=B[0];if(f.status==="approved"){const p=f.auth_payload||{},E={user_id:p.user_id||f.user_id||"",email:p.email||"",access_token:p.access_token||"",refresh_token:p.refresh_token||""};await chrome.storage.local.set({authSession:E}),a(),r(E);return}const d=f.expires_at&&new Date(f.expires_at).getTime()<Date.now();if(f.status==="expired"||d){a(),n==null||n();return}}}}catch(l){o||console.error("[Elio AI Auth] Error checking approval status:",l)}o||(s=setTimeout(c,2e3))}};s=setTimeout(c,1500);const a=()=>{o=!0,s&&(clearTimeout(s),s=null)};return a}async function Se(){try{return(await chrome.storage.local.get("authSession")).authSession||null}catch(e){return console.error("[Elio AI Auth] Failed to read auth session:",e),null}}async function be(){await chrome.storage.local.remove("authSession")}let x=null,V=null;document.addEventListener("DOMContentLoaded",async()=>{const e=document.getElementById("liveDot"),t=document.getElementById("liveStatusText"),i=document.getElementById("unauthView"),r=document.getElementById("authView"),n=document.getElementById("qrCanvas"),o=document.getElementById("qrLoading"),s=document.getElementById("qrLoadingText"),c=document.getElementById("qrTimer"),a=document.getElementById("qrTimerText"),l=document.getElementById("refreshQrBtn"),u=document.getElementById("userEmail"),B=document.getElementById("logoutBtn"),f=document.getElementById("syncToggle"),d=document.getElementById("recentList");async function p(){E();const g=await Se();g&&g.user_id?I(g):C()}function E(){x&&(x(),x=null),V&&(clearInterval(V),V=null)}async function I(g){i.classList.add("hidden"),r.classList.remove("hidden"),e.classList.remove("dot-pending"),t.textContent="SYNC ACTIVE",u.textContent=g.email||"Linked Mobile Device";const y=await chrome.storage.local.get(["syncEnabled","recentSaves"]);y.syncEnabled!==void 0&&(f.checked=!!y.syncEnabled),w(y.recentSaves||[])}function w(g){for(;d.firstChild;)d.removeChild(d.firstChild);if(!Array.isArray(g)||g.length===0){const y=document.createElement("div");y.className="empty-state",y.innerHTML="No clips captured yet.<br />Like any video on YouTube, X, Instagram, TikTok, FB, or Reddit.",d.appendChild(y);return}g.forEach(y=>{const T=document.createElement("a");T.className="video-item",T.href=y.clean_url||"#",T.target="_blank",T.rel="noopener noreferrer";let A="VIDEO";const N=(y.platform||"").toLowerCase();N==="youtube"?A="YT":N==="instagram"?A="IG":N==="twitter"?A="𝕏":N==="facebook"?A="FB":N==="tiktok"?A="TT":N==="reddit"?A="RD":N==="linkedin"?A="IN":N==="pinterest"&&(A="PIN");const S=document.createElement("img");S.className="thumbnail",S.src=y.thumbnail_url||"https://via.placeholder.com/50x36?text=Clip",S.alt="",S.onerror=()=>{S.src="https://via.placeholder.com/50x36?text=Clip"};const R=document.createElement("div");R.className="video-info";const v=document.createElement("div");v.className="video-title",v.textContent=y.title||"Liked Social Video";const b=document.createElement("div");b.className="video-meta";const dt=document.createElement("span");dt.className="badge",dt.textContent=A,b.appendChild(dt),y.creator_name&&b.appendChild(document.createTextNode(` ${y.creator_name}`)),R.appendChild(v),R.appendChild(b),T.appendChild(S),T.appendChild(R),d.appendChild(T)})}async function C(){r.classList.add("hidden"),i.classList.remove("hidden"),e.classList.add("dot-pending"),t.textContent="SCAN QR",o.classList.remove("hidden"),s.textContent="Generating QR Code...",l.classList.add("hidden"),c.className="qr-timer-pill",a.textContent="Expires in 05:00";try{const g=await Ae();await Ie(n,g.qr_token),o.classList.add("hidden"),m(new Date(g.expires_at).getTime()),x=Ne(void 0,void 0,g.qr_token,async y=>{E(),I(y)},()=>{h()})}catch(g){console.error("[Elio AI] Failed to generate QR session:",g),s.textContent="Connection Error",l.classList.remove("hidden")}}function m(g){V&&clearInterval(V);const y=()=>{const T=g-Date.now();if(T<=0){h();return}const A=Math.floor(T/1e3),N=Math.floor(A/60),S=A%60;a.textContent=`Expires in ${String(N).padStart(2,"0")}:${String(S).padStart(2,"0")}`,A<60?c.className="qr-timer-pill expiring-soon":c.className="qr-timer-pill"};y(),V=setInterval(y,1e3)}function h(){E(),a.textContent="Session Expired",c.className="qr-timer-pill expired",l.classList.remove("hidden")}l.addEventListener("click",()=>{C()}),B.addEventListener("click",async()=>{B.textContent="Logging out...",await be(),B.textContent="Logout",C()}),f.addEventListener("change",()=>{chrome.storage.local.set({syncEnabled:f.checked})}),chrome.storage.onChanged.addListener((g,y)=>{y==="local"&&(g.recentSaves&&!r.classList.contains("hidden")&&w(g.recentSaves.newValue||[]),g.authSession&&(g.authSession.newValue?i.classList.contains("hidden")===!1&&I(g.authSession.newValue):C()))}),await p()})})();
+Minimum version required to store current data is: ` +
+          o +
+          `.
+`,
+      );
+    const s = he(t, i, n),
+      c = Q.getSymbolSize(t),
+      a = new oe(c);
+    return (
+      le(a, t),
+      ue(a),
+      de(a, t),
+      st(a, i, 0),
+      t >= 7 && fe(a, t),
+      ge(a, s),
+      isNaN(r) && (r = ot.getBestMask(a, st.bind(null, a, i))),
+      ot.applyMask(r, a),
+      st(a, i, r),
+      {
+        modules: a,
+        version: t,
+        errorCorrectionLevel: i,
+        maskPattern: r,
+        segments: n,
+      }
+    );
+  }
+  ft.create = function (t, i) {
+    if (typeof t > "u" || t === "") throw new Error("No input text");
+    let r = nt.M,
+      n,
+      o;
+    return (
+      typeof i < "u" &&
+        ((r = nt.from(i.errorCorrectionLevel, nt.M)),
+        (n = G.from(i.version)),
+        (o = ot.from(i.maskPattern)),
+        i.toSJISFunc && Q.setToSJISFunction(i.toSJISFunc)),
+      we(t, n, r, o)
+    );
+  };
+  var Lt = {},
+    at = {};
+  ((function (e) {
+    function t(i) {
+      if ((typeof i == "number" && (i = i.toString()), typeof i != "string"))
+        throw new Error("Color should be defined as hex string");
+      let r = i.slice().replace("#", "").split("");
+      if (r.length < 3 || r.length === 5 || r.length > 8)
+        throw new Error("Invalid hex color: " + i);
+      ((r.length === 3 || r.length === 4) &&
+        (r = Array.prototype.concat.apply(
+          [],
+          r.map(function (o) {
+            return [o, o];
+          }),
+        )),
+        r.length === 6 && r.push("F", "F"));
+      const n = parseInt(r.join(""), 16);
+      return {
+        r: (n >> 24) & 255,
+        g: (n >> 16) & 255,
+        b: (n >> 8) & 255,
+        a: n & 255,
+        hex: "#" + r.slice(0, 6).join(""),
+      };
+    }
+    ((e.getOptions = function (r) {
+      (r || (r = {}), r.color || (r.color = {}));
+      const n =
+          typeof r.margin > "u" || r.margin === null || r.margin < 0
+            ? 4
+            : r.margin,
+        o = r.width && r.width >= 21 ? r.width : void 0,
+        s = r.scale || 4;
+      return {
+        width: o,
+        scale: o ? 4 : s,
+        margin: n,
+        color: {
+          dark: t(r.color.dark || "#000000ff"),
+          light: t(r.color.light || "#ffffffff"),
+        },
+        type: r.type,
+        rendererOpts: r.rendererOpts || {},
+      };
+    }),
+      (e.getScale = function (r, n) {
+        return n.width && n.width >= r + n.margin * 2
+          ? n.width / (r + n.margin * 2)
+          : n.scale;
+      }),
+      (e.getImageWidth = function (r, n) {
+        const o = e.getScale(r, n);
+        return Math.floor((r + n.margin * 2) * o);
+      }),
+      (e.qrToImageData = function (r, n, o) {
+        const s = n.modules.size,
+          c = n.modules.data,
+          a = e.getScale(s, o),
+          l = Math.floor((s + o.margin * 2) * a),
+          u = o.margin * a,
+          B = [o.color.light, o.color.dark];
+        for (let f = 0; f < l; f++)
+          for (let d = 0; d < l; d++) {
+            let p = (f * l + d) * 4,
+              E = o.color.light;
+            if (f >= u && d >= u && f < l - u && d < l - u) {
+              const A = Math.floor((f - u) / a),
+                w = Math.floor((d - u) / a);
+              E = B[c[A * s + w] ? 1 : 0];
+            }
+            ((r[p++] = E.r), (r[p++] = E.g), (r[p++] = E.b), (r[p] = E.a));
+          }
+      }));
+  })(at),
+    (function (e) {
+      const t = at;
+      function i(n, o, s) {
+        (n.clearRect(0, 0, o.width, o.height),
+          o.style || (o.style = {}),
+          (o.height = s),
+          (o.width = s),
+          (o.style.height = s + "px"),
+          (o.style.width = s + "px"));
+      }
+      function r() {
+        try {
+          return document.createElement("canvas");
+        } catch {
+          throw new Error("You need to specify a canvas element");
+        }
+      }
+      ((e.render = function (o, s, c) {
+        let a = c,
+          l = s;
+        (typeof a > "u" && (!s || !s.getContext) && ((a = s), (s = void 0)),
+          s || (l = r()),
+          (a = t.getOptions(a)));
+        const u = t.getImageWidth(o.modules.size, a),
+          B = l.getContext("2d"),
+          f = B.createImageData(u, u);
+        return (
+          t.qrToImageData(f.data, o, a),
+          i(B, l, u),
+          B.putImageData(f, 0, 0),
+          l
+        );
+      }),
+        (e.renderToDataURL = function (o, s, c) {
+          let a = c;
+          (typeof a > "u" && (!s || !s.getContext) && ((a = s), (s = void 0)),
+            a || (a = {}));
+          const l = e.render(o, s, a),
+            u = a.type || "image/png",
+            B = a.rendererOpts || {};
+          return l.toDataURL(u, B.quality);
+        }));
+    })(Lt));
+  var bt = {};
+  const pe = at;
+  function Mt(e, t) {
+    const i = e.a / 255,
+      r = t + '="' + e.hex + '"';
+    return i < 1 ? r + " " + t + '-opacity="' + i.toFixed(2).slice(1) + '"' : r;
+  }
+  function ct(e, t, i) {
+    let r = e + t;
+    return (typeof i < "u" && (r += " " + i), r);
+  }
+  function ye(e, t, i) {
+    let r = "",
+      n = 0,
+      o = !1,
+      s = 0;
+    for (let c = 0; c < e.length; c++) {
+      const a = Math.floor(c % t),
+        l = Math.floor(c / t);
+      (!a && !o && (o = !0),
+        e[c]
+          ? (s++,
+            (c > 0 && a > 0 && e[c - 1]) ||
+              ((r += o ? ct("M", a + i, 0.5 + l + i) : ct("m", n, 0)),
+              (n = 0),
+              (o = !1)),
+            (a + 1 < t && e[c + 1]) || ((r += ct("h", s)), (s = 0)))
+          : n++);
+    }
+    return r;
+  }
+  bt.render = function (t, i, r) {
+    const n = pe.getOptions(i),
+      o = t.modules.size,
+      s = t.modules.data,
+      c = o + n.margin * 2,
+      a = n.color.light.a
+        ? "<path " +
+          Mt(n.color.light, "fill") +
+          ' d="M0 0h' +
+          c +
+          "v" +
+          c +
+          'H0z"/>'
+        : "",
+      l =
+        "<path " +
+        Mt(n.color.dark, "stroke") +
+        ' d="' +
+        ye(s, o, n.margin) +
+        '"/>',
+      u = 'viewBox="0 0 ' + c + " " + c + '"',
+      f =
+        '<svg xmlns="http://www.w3.org/2000/svg" ' +
+        (n.width ? 'width="' + n.width + '" height="' + n.width + '" ' : "") +
+        u +
+        ' shape-rendering="crispEdges">' +
+        a +
+        l +
+        `</svg>
+`;
+    return (typeof r == "function" && r(null, f), f);
+  };
+  const Ee = Dt,
+    lt = ft,
+    Pt = Lt,
+    Ce = bt;
+  function ut(e, t, i, r, n) {
+    const o = [].slice.call(arguments, 1),
+      s = o.length,
+      c = typeof o[s - 1] == "function";
+    if (!c && !Ee()) throw new Error("Callback required as last argument");
+    if (c) {
+      if (s < 2) throw new Error("Too few arguments provided");
+      s === 2
+        ? ((n = i), (i = t), (t = r = void 0))
+        : s === 3 &&
+          (t.getContext && typeof n > "u"
+            ? ((n = r), (r = void 0))
+            : ((n = r), (r = i), (i = t), (t = void 0)));
+    } else {
+      if (s < 1) throw new Error("Too few arguments provided");
+      return (
+        s === 1
+          ? ((i = t), (t = r = void 0))
+          : s === 2 && !t.getContext && ((r = i), (i = t), (t = void 0)),
+        new Promise(function (a, l) {
+          try {
+            const u = lt.create(i, r);
+            a(e(u, t, r));
+          } catch (u) {
+            l(u);
+          }
+        })
+      );
+    }
+    try {
+      const a = lt.create(i, r);
+      n(null, e(a, t, r));
+    } catch (a) {
+      n(a);
+    }
+  }
+  lt.create;
+  var Be = ut.bind(null, Pt.render);
+  (ut.bind(null, Pt.renderToDataURL),
+    ut.bind(null, function (e, t, i) {
+      return Ce.render(e, i);
+    }));
+  const Rt = "https://msphrcukcgfchodxhgot.supabase.co",
+    _t =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zcGhyY3VrY2dmY2hvZHhoZ290Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1ODkyNTksImV4cCI6MjEwOTE2NTI1OX0.gB69GOJ9z8r3EfcywfUoELsI1WoF11pEV1vJgbvc7xI";
+  function vt(e) {
+    return `https://msphrcukcgfchodxhgot.supabase.co/functions/v1/app-redirect?token=${e}`;
+  }
+  async function Ie(e = Rt, t = _t) {
+    const i = crypto.randomUUID(),
+      r = new Date(Date.now() + 5 * 60 * 1e3).toISOString(),
+      n = vt(i),
+      o = await fetch(`${e}/rest/v1/qr_auth_sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: t,
+          Authorization: `Bearer ${t}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ qr_token: i, status: "pending", expires_at: r }),
+      });
+    if (!o.ok) {
+      const s = await o.text();
+      throw new Error(`Failed to create QR session: ${o.status} - ${s}`);
+    }
+    return { qr_token: i, expires_at: r, universal_url: n };
+  }
+  async function Te(e, t) {
+    const i = t.startsWith("http") ? t : vt(t);
+    await Be(e, i, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 170,
+      color: { dark: "#000000", light: "#ffffff" },
+    });
+  }
+  function Ae(e = Rt, t = _t, i, r, n) {
+    let o = !1,
+      s = null;
+    const c = async () => {
+      if (!o) {
+        try {
+          const l = `${e}/rest/v1/qr_auth_sessions?qr_token=eq.${encodeURIComponent(i)}&select=*`,
+            u = await fetch(l, {
+              method: "GET",
+              headers: {
+                apikey: t,
+                Authorization: `Bearer ${t}`,
+                Accept: "application/json",
+              },
+            });
+          if (!u.ok)
+            console.warn("[Elio AI Auth] Poll returned status:", u.status);
+          else {
+            const B = await u.json();
+            if (Array.isArray(B) && B.length > 0) {
+              const f = B[0];
+              if (f.status === "approved") {
+                const p = f.auth_payload || {},
+                  E = {
+                    user_id: p.user_id || f.user_id || "",
+                    email: p.email || "",
+                    access_token: p.access_token || "",
+                    refresh_token: p.refresh_token || "",
+                  };
+                (await chrome.storage.local.set({ authSession: E }), a(), r(E));
+                return;
+              }
+              const d =
+                f.expires_at && new Date(f.expires_at).getTime() < Date.now();
+              if (f.status === "expired" || d) {
+                (a(), n == null || n());
+                return;
+              }
+            }
+          }
+        } catch (l) {
+          o ||
+            console.error("[Elio AI Auth] Error checking approval status:", l);
+        }
+        o || (s = setTimeout(c, 2e3));
+      }
+    };
+    s = setTimeout(c, 1500);
+    const a = () => {
+      ((o = !0), s && (clearTimeout(s), (s = null)));
+    };
+    return a;
+  }
+  async function Se() {
+    try {
+      return (
+        (await chrome.storage.local.get("authSession")).authSession || null
+      );
+    } catch (e) {
+      return (
+        console.error("[Elio AI Auth] Failed to read auth session:", e),
+        null
+      );
+    }
+  }
+  async function Ne() {
+    await chrome.storage.local.remove("authSession");
+  }
+  let x = null,
+    V = null;
+  document.addEventListener("DOMContentLoaded", async () => {
+    const e = document.getElementById("liveDot"),
+      t = document.getElementById("liveStatusText"),
+      i = document.getElementById("unauthView"),
+      r = document.getElementById("authView"),
+      n = document.getElementById("qrCanvas"),
+      o = document.getElementById("qrLoading"),
+      s = document.getElementById("qrLoadingText"),
+      c = document.getElementById("qrTimer"),
+      a = document.getElementById("qrTimerText"),
+      l = document.getElementById("refreshQrBtn"),
+      u = document.getElementById("userEmail"),
+      B = document.getElementById("logoutBtn"),
+      f = document.getElementById("syncToggle"),
+      d = document.getElementById("recentList");
+    async function p() {
+      E();
+      const g = await Se();
+      g && g.user_id ? A(g) : C();
+    }
+    function E() {
+      (x && (x(), (x = null)), V && (clearInterval(V), (V = null)));
+    }
+    async function A(g) {
+      (i.classList.add("hidden"),
+        r.classList.remove("hidden"),
+        e.classList.remove("dot-pending"),
+        (t.textContent = "SYNC ACTIVE"),
+        (u.textContent = g.email || "Linked Mobile Device"));
+      const y = await chrome.storage.local.get(["syncEnabled", "recentSaves"]);
+      (y.syncEnabled !== void 0 && (f.checked = !!y.syncEnabled),
+        w(y.recentSaves || []));
+    }
+    function w(g) {
+      for (; d.firstChild; ) d.removeChild(d.firstChild);
+      if (!Array.isArray(g) || g.length === 0) {
+        const y = document.createElement("div");
+        ((y.className = "empty-state"),
+          (y.innerHTML =
+            "No clips captured yet.<br />Like any video on YouTube, X, Instagram, TikTok, FB, or Reddit."),
+          d.appendChild(y));
+        return;
+      }
+      g.forEach((y) => {
+        const I = document.createElement("a");
+        ((I.className = "video-item"),
+          (I.href = y.clean_url || "#"),
+          (I.target = "_blank"),
+          (I.rel = "noopener noreferrer"));
+        let T = "VIDEO";
+        const S = (y.platform || "").toLowerCase();
+        S === "youtube"
+          ? (T = "YT")
+          : S === "instagram"
+            ? (T = "IG")
+            : S === "twitter"
+              ? (T = "𝕏")
+              : S === "facebook"
+                ? (T = "FB")
+                : S === "tiktok"
+                  ? (T = "TT")
+                  : S === "reddit"
+                    ? (T = "RD")
+                    : S === "linkedin"
+                      ? (T = "IN")
+                      : S === "pinterest" && (T = "PIN");
+        const N = document.createElement("img");
+        ((N.className = "thumbnail"),
+          (N.src =
+            y.thumbnail_url || "https://via.placeholder.com/50x36?text=Clip"),
+          (N.alt = ""),
+          (N.onerror = () => {
+            N.src = "https://via.placeholder.com/50x36?text=Clip";
+          }));
+        const P = document.createElement("div");
+        P.className = "video-info";
+        const v = document.createElement("div");
+        ((v.className = "video-title"),
+          (v.textContent = y.title || "Liked Social Video"));
+        const L = document.createElement("div");
+        L.className = "video-meta";
+        const dt = document.createElement("span");
+        ((dt.className = "badge"),
+          (dt.textContent = T),
+          L.appendChild(dt),
+          y.creator_name &&
+            L.appendChild(document.createTextNode(` ${y.creator_name}`)),
+          P.appendChild(v),
+          P.appendChild(L),
+          I.appendChild(N),
+          I.appendChild(P),
+          d.appendChild(I));
+      });
+    }
+    async function C() {
+      (r.classList.add("hidden"),
+        i.classList.remove("hidden"),
+        e.classList.add("dot-pending"),
+        (t.textContent = "SCAN QR"),
+        o.classList.remove("hidden"),
+        (s.textContent = "Generating QR Code..."),
+        l.classList.add("hidden"),
+        (c.className = "qr-timer-pill"),
+        (a.textContent = "Expires in 05:00"));
+      try {
+        const g = await Ie();
+        (await Te(n, g.qr_token),
+          o.classList.add("hidden"),
+          m(new Date(g.expires_at).getTime()),
+          (x = Ae(
+            void 0,
+            void 0,
+            g.qr_token,
+            async (y) => {
+              (E(), A(y));
+            },
+            () => {
+              h();
+            },
+          )));
+      } catch (g) {
+        (console.error("[Elio AI] Failed to generate QR session:", g),
+          (s.textContent = "Connection Error"),
+          l.classList.remove("hidden"));
+      }
+    }
+    function m(g) {
+      V && clearInterval(V);
+      const y = () => {
+        const I = g - Date.now();
+        if (I <= 0) {
+          h();
+          return;
+        }
+        const T = Math.floor(I / 1e3),
+          S = Math.floor(T / 60),
+          N = T % 60;
+        ((a.textContent = `Expires in ${String(S).padStart(2, "0")}:${String(N).padStart(2, "0")}`),
+          T < 60
+            ? (c.className = "qr-timer-pill expiring-soon")
+            : (c.className = "qr-timer-pill"));
+      };
+      (y(), (V = setInterval(y, 1e3)));
+    }
+    function h() {
+      (E(),
+        (a.textContent = "Session Expired"),
+        (c.className = "qr-timer-pill expired"),
+        l.classList.remove("hidden"));
+    }
+    (l.addEventListener("click", () => {
+      C();
+    }),
+      B.addEventListener("click", async () => {
+        ((B.textContent = "Logging out..."),
+          await Ne(),
+          (B.textContent = "Logout"),
+          C());
+      }),
+      f.addEventListener("change", () => {
+        chrome.storage.local.set({ syncEnabled: f.checked });
+      }),
+      chrome.storage.onChanged.addListener((g, y) => {
+        y === "local" &&
+          (g.recentSaves &&
+            !r.classList.contains("hidden") &&
+            w(g.recentSaves.newValue || []),
+          g.authSession &&
+            (g.authSession.newValue
+              ? i.classList.contains("hidden") === !1 &&
+                A(g.authSession.newValue)
+              : C()));
+      }),
+      await p());
+  });
+})();
