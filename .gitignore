@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Expo & React Native
+.expo/
+*/.expo/
+.expo-shared/
+web-build/
+
+# Android build outputs & local config
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+*.dex
+*.class
+*.apk
+*.aab
+
+# iOS build outputs & Pods
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/DerivedData/
+
+# Extension artifacts
+extension/web-ext-artifacts/
+
+# System & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

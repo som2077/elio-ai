@@ -1,0 +1,86 @@
+{
+  "manifest_version": 3,
+  "name": "Elio AI - Universal Social Video Saver",
+  "version": "1.2.0",
+  "description": "Automatically sync liked videos from YouTube, Instagram, X/Twitter, Facebook, Reddit, LinkedIn, Pinterest, and TikTok with Elio AI.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "elio-ai-sync@som2077.com",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "permissions": ["storage", "activeTab", "alarms"],
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://*.instagram.com/*",
+    "*://*.twitter.com/*",
+    "*://*.x.com/*",
+    "*://*.facebook.com/*",
+    "*://*.reddit.com/*",
+    "*://*.linkedin.com/*",
+    "*://*.pinterest.com/*",
+    "*://*.tiktok.com/*"
+  ],
+  "background": {
+    "scripts": ["dist/background/service_worker.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": ["dist/content/youtube.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.instagram.com/*"],
+      "js": ["dist/content/instagram.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.twitter.com/*", "*://*.x.com/*"],
+      "js": ["dist/content/twitter.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.facebook.com/*"],
+      "js": ["dist/content/facebook.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.reddit.com/*"],
+      "js": ["dist/content/reddit.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.linkedin.com/*"],
+      "js": ["dist/content/linkedin.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.pinterest.com/*"],
+      "js": ["dist/content/pinterest.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.tiktok.com/*"],
+      "js": ["dist/content/tiktok.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Elio AI Sync Status",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  }
+}

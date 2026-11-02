@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Clipper</title>
+    <style>
+      :root {
+        --bg-pitch-black: #000000;
+        --card-pitch-black: #000000;
+        --card-border: rgba(255, 255, 255, 0.12);
+        --card-hover: rgba(255, 255, 255, 0.08);
+        --text-primary: #ffffff;
+        --text-secondary: #88888e;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+          Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Seamless full bleed background so Chrome never shows white rectangular corners */
+      html,
+      body {
+        width: 320px;
+        min-height: 410px;
+        background-color: #0a0a0c;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* Full bleed wrapper with clean internal padding */
+      .glass-wrapper {
+        width: 100%;
+        min-height: 410px;
+        background: #0a0a0c;
+        padding: 16px;
+        color: var(--text-primary);
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Header */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 14px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .brand-icon {
+        width: 28px;
+        height: 28px;
+        background: #ffffff;
+        color: #000000;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 900;
+        box-shadow: 0 2px 10px rgba(255, 255, 255, 0.3);
+      }
+
+      .brand-title {
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -0.4px;
+        color: #ffffff;
+      }
+
+      .live-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        color: #ffffff;
+      }
+
+      .live-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 0 8px #ffffff;
+      }
+
+      /* Sync Toggle Card */
+      .toggle-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--card-pitch-black);
+        border: 1px solid var(--card-border);
+        padding: 11px 14px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+        margin-bottom: 14px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      }
+
+      .toggle-label {
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* Minimalist Switch */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 36px;
+        height: 20px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #222226;
+        transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 2px;
+        bottom: 2px;
+        background-color: #777777;
+        transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 50%;
+      }
+      input:checked + .slider {
+        background-color: #ffffff;
+      }
+      input:checked + .slider:before {
+        transform: translateX(16px);
+        background-color: #000000;
+      }
+
+      /* Section Bar */
+      .section-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 0 2px;
+      }
+
+      .section-title {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--text-secondary);
+        font-weight: 800;
+      }
+
+      /* Recent Saves Scrollable List */
+      .recent-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 225px;
+        overflow-y: auto;
+        padding-right: 2px;
+      }
+
+      .recent-list::-webkit-scrollbar {
+        width: 4px;
+      }
+      .recent-list::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+      }
+
+      /* Pitch-Black Video Card */
+      .video-item {
+        display: flex;
+        gap: 10px;
+        background: var(--card-pitch-black);
+        border: 1px solid var(--card-border);
+        padding: 8px 10px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        align-items: center;
+      }
+
+      .video-item:hover {
+        background: var(--card-hover);
+        border-color: rgba(255, 255, 255, 0.35);
+        transform: translateY(-1px);
+      }
+
+      .thumbnail {
+        width: 52px;
+        height: 38px;
+        border-radius: 8px;
+        object-fit: cover;
+        background: #000000;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        flex-shrink: 0;
+      }
+
+      .video-info {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .video-title {
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #ffffff;
+        letter-spacing: -0.2px;
+      }
+
+      .video-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10px;
+        color: var(--text-secondary);
+      }
+
+      /* Solid High-Contrast Monochrome Badges */
+      .badge {
+        display: inline-block;
+        font-size: 9px;
+        padding: 2px 6px;
+        border-radius: 5px;
+        font-weight: 900;
+        letter-spacing: 0.4px;
+        background: #000000;
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+
+      /* Empty state */
+      .empty-state {
+        font-size: 11px;
+        color: var(--text-secondary);
+        text-align: center;
+        padding: 30px 14px;
+        line-height: 19px;
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.4);
+      }
+
+      /* Pitch Black Footer */
+      .footer {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 10px;
+        color: var(--text-secondary);
+        font-weight: 600;
+      }
+
+      .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #ffffff;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glass-wrapper">
+      <!-- Header -->
+      <div class="header">
+        <div class="brand">
+          <div class="brand-icon">✂</div>
+          <div class="brand-title">Clipper</div>
+        </div>
+        <div class="live-pill">
+          <div class="live-dot"></div>
+          <span>SYNC ACTIVE</span>
+        </div>
+      </div>
+
+      <!-- Toggle Card -->
+      <div class="toggle-card">
+        <span class="toggle-label">Auto-Sync Likes</span>
+        <label class="switch">
+          <input type="checkbox" id="syncToggle" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Section Bar -->
+      <div class="section-bar">
+        <div class="section-title">Recent Captures</div>
+      </div>
+
+      <!-- Recent Captures List -->
+      <div class="recent-list" id="recentList">
+        <div class="empty-state">
+          No clips captured yet.<br />Like any video on YouTube, X, Instagram,
+          or FB.
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <span>Realtime Stream</span>
+        <div class="status-badge">
+          <span>● Cloud Synced</span>
+        </div>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

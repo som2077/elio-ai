@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Elio AI",
+    "slug": "elio-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "elio-ai",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "backgroundColor": "#0A0F1D"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.elioai.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0F1D"
+      },
+      "package": "com.elioai.android"
+    },
+    "plugins": [
+      "expo-router"
+    ]
+  }
+}
