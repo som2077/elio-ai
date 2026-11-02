@@ -265,7 +265,7 @@ export default function HomeScreen() {
         style={[styles.safeContainer, styles.centerContainer]}
         edges={["top", "left", "right"]}
       >
-        <StatusBar style="light" backgroundColor={appleColors.canvas} translucent={true} />
+        <StatusBar style="light" backgroundColor="#000000" translucent={true} />
         <ActivityIndicator size="large" color={appleColors.accent} />
         <Text style={styles.loadingText}>Syncing Elio AI...</Text>
       </SafeAreaView>
@@ -278,7 +278,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={["top", "left", "right"]}>
-      <StatusBar style="light" backgroundColor={appleColors.canvas} translucent={true} />
+      <StatusBar style="light" backgroundColor="#000000" translucent={true} />
 
       {/* VIEW: WATCHLIST FEED */}
       {activeTab === "feed" && (
@@ -580,7 +580,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: appleColors.canvas,
+    backgroundColor: "#000000",
   },
   centerContainer: {
     justifyContent: "center",
@@ -610,8 +610,8 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
   listContent: {
-    paddingHorizontal: 14,
-    paddingTop: 6,
+    paddingHorizontal: 0,
+    paddingTop: 0,
     paddingBottom: 110,
   },
   emptySearchBox: {
