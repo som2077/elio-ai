@@ -1,15 +1,12 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from "react-native";
 import { supabase } from "../services/supabase";
 import { motionTokens } from "../utils/motion";
@@ -31,10 +28,6 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
-  const [email, setEmail] = useState("");
-  const [otpToken, setOtpToken] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [message, setMessage] = useState<{
     text: string;
@@ -43,7 +36,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
   // Micro-interaction animated scale
   const googleBtnScale = useRef(new Animated.Value(1)).current;
-  const emailBtnScale = useRef(new Animated.Value(1)).current;
+
+  // Auto-listen to auth state changes (e.g. When Google deep link redirects back)
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        onAuthSuccess?.();
+      }
+    });
+
+    // Check if session already exists on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        onAuthSuccess?.();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [onAuthSuccess]);
 
   const animatePressIn = (scaleAnim: Animated.Value) => {
     Animated.spring(scaleAnim, {
@@ -71,7 +85,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       const redirectUrl = getRedirectUri();
 
       if (!WebBrowser) {
-        throw new Error("WebBrowser module not available in this APK build. Please use Email / OTP login below or rebuild the app.");
+        throw new Error(
+          "WebBrowser module not available in this APK build. Please rebuild the app."
+        );
       }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -87,12 +103,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl,
+          redirectUrl
         );
+
         if (result.type === "success" && result.url) {
-          // Parse access token or session if returned in url params
           const urlParams = new URLSearchParams(
-            result.url.split("#")[1] || result.url.split("?")[1],
+            result.url.split("#")[1] || result.url.split("?")[1]
           );
           const accessToken = urlParams.get("access_token");
           const refreshToken = urlParams.get("refresh_token");
@@ -103,7 +119,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               refresh_token: refreshToken,
             });
             onAuthSuccess?.();
+            return;
           }
+        }
+
+        // Check if session was set via callback route
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session) {
+          onAuthSuccess?.();
         }
       }
     } catch (err: any) {
@@ -116,90 +141,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
   };
 
-  // Passwordless Email Magic Link / OTP
-  const handleSendMagicLink = async () => {
-    if (!email || !email.includes("@")) {
-      setMessage({
-        text: "Please enter a valid email address.",
-        type: "error",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setMessage(null);
-      const redirectUrl = getRedirectUri();
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: redirectUrl,
-        },
-      });
-
-      if (error) throw error;
-
-      setOtpSent(true);
-      setMessage({
-        text: "✦ Magic link & 6-digit code sent to your email! Tap the link or enter the code below.",
-        type: "success",
-      });
-    } catch (err: any) {
-      setMessage({
-        text: err.message || "Failed to send magic link.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Verify 6-digit OTP code directly in app
-  const handleVerifyOtp = async () => {
-    if (!otpToken || otpToken.length < 6) {
-      setMessage({
-        text: "Please enter the 6-digit verification code from your email.",
-        type: "error",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setMessage(null);
-
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: email.trim().toLowerCase(),
-        token: otpToken.trim(),
-        type: "email",
-      });
-
-      if (error) throw error;
-
-      if (data.session) {
-        setMessage({ text: "Welcome to Elio AI!", type: "success" });
-        onAuthSuccess?.();
-      }
-    } catch (err: any) {
-      setMessage({
-        text: err.message || "Invalid or expired code. Please try again.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+    <View style={styles.container}>
+      <View style={styles.content}>
         {/* Brand Header */}
         <View style={styles.header}>
           <View style={styles.logoBadge}>
@@ -226,9 +170,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
         {/* Card Container */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sign in to your account</Text>
+          <Text style={styles.cardTitle}>Welcome to Elio AI</Text>
           <Text style={styles.cardSubtitle}>
-            Passwordless & instant. New users are registered automatically.
+            1-Tap instant access. Your saved social clips and AI summaries sync
+            seamlessly across devices.
           </Text>
 
           {/* 1-Tap Hero Google Button */}
@@ -242,294 +187,179 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               disabled={googleLoading}
             >
               {googleLoading ? (
-                <ActivityIndicator color="#0F172A" />
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator color="#0F172A" />
+                  <Text style={styles.loadingText}>Opening Google...</Text>
+                </View>
               ) : (
-                <>
-                  <Text style={styles.googleIcon}>🌐</Text>
+                <View style={styles.googleBtnContent}>
+                  <View style={styles.googleIconBadge}>
+                    <Text style={styles.googleIcon}>G</Text>
+                  </View>
                   <Text style={styles.googleBtnText}>Continue with Google</Text>
-                </>
+                </View>
               )}
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Clean Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR WITH EMAIL</Text>
-            <View style={styles.dividerLine} />
+          {/* Security footnote */}
+          <View style={styles.footerNote}>
+            <Text style={styles.footerNoteText}>
+              🔒 Protected with Supabase Row-Level Security
+            </Text>
           </View>
-
-          {/* Email Input */}
-          <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>Email Address</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="name@example.com"
-              placeholderTextColor="#475569"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
-          </View>
-
-          {/* If OTP Sent, show 6-digit Code input */}
-          {otpSent && (
-            <View style={[styles.inputWrapper, { marginTop: 12 }]}>
-              <Text style={styles.inputLabel}>6-Digit Verification Code</Text>
-              <TextInput
-                style={[styles.input, styles.otpInput]}
-                placeholder="123456"
-                placeholderTextColor="#475569"
-                value={otpToken}
-                onChangeText={setOtpToken}
-                keyboardType="number-pad"
-                maxLength={6}
-                editable={!loading}
-              />
-            </View>
-          )}
-
-          {/* Submit Action Button */}
-          <Animated.View
-            style={{ transform: [{ scale: emailBtnScale }], marginTop: 16 }}
-          >
-            <TouchableOpacity
-              activeOpacity={0.88}
-              style={styles.submitBtn}
-              onPress={otpSent ? handleVerifyOtp : handleSendMagicLink}
-              onPressIn={() => animatePressIn(emailBtnScale)}
-              onPressOut={() => animatePressOut(emailBtnScale)}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.submitBtnText}>
-                  {otpSent
-                    ? "Verify Code & Enter ↗"
-                    : "✉️ Send Magic Link / Code"}
-                </Text>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-
-          {otpSent && (
-            <TouchableOpacity
-              style={styles.resendBtn}
-              onPress={() => {
-                setOtpSent(false);
-                setOtpToken("");
-              }}
-            >
-              <Text style={styles.resendBtnText}>← Try a different email</Text>
-            </TouchableOpacity>
-          )}
         </View>
-
-        {/* Footer Note */}
-        <View style={styles.footerNote}>
-          <Text style={styles.footerText}>
-            🔒 Protected by Supabase Row-Level Security & AES encryption.
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0F1D",
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
+    backgroundColor: "#080C14",
     justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  content: {
+    width: "100%",
+    maxWidth: 420,
+    alignSelf: "center",
   },
   header: {
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 32,
   },
   logoBadge: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    backgroundColor: "#1E293B",
-    borderWidth: 1.5,
-    borderColor: "#334155",
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: "#6366F1",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 16,
     shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    elevation: 10,
   },
   logoIcon: {
     fontSize: 28,
-    color: "#818CF8",
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
   appName: {
-    fontSize: 30,
-    fontWeight: "900",
+    fontSize: 32,
+    fontWeight: "800",
     color: "#F8FAFC",
     letterSpacing: -0.5,
   },
   tagline: {
-    fontSize: 13,
+    fontSize: 14,
     color: "#94A3B8",
     marginTop: 6,
-    fontWeight: "500",
-  },
-  card: {
-    backgroundColor: "#131B2E",
-    borderRadius: 20,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "#1E293B",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#F1F5F9",
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    color: "#64748B",
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  googleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 10,
-    shadowColor: "#FFF",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  googleIcon: {
-    fontSize: 18,
-  },
-  googleBtnText: {
-    color: "#0F172A",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 20,
-    gap: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#1E293B",
-  },
-  dividerText: {
-    color: "#64748B",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-  },
-  inputWrapper: {
-    gap: 6,
-  },
-  inputLabel: {
-    color: "#94A3B8",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  input: {
-    backgroundColor: "#0A0F1D",
-    borderWidth: 1,
-    borderColor: "#243048",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: "#F1F5F9",
-    fontSize: 14,
-  },
-  otpInput: {
-    letterSpacing: 8,
     textAlign: "center",
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#818CF8",
-    borderColor: "#6366F1",
-  },
-  submitBtn: {
-    backgroundColor: "#6366F1",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitBtnText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  resendBtn: {
-    marginTop: 12,
-    alignItems: "center",
-  },
-  resendBtnText: {
-    color: "#818CF8",
-    fontSize: 12,
-    fontWeight: "600",
   },
   alertBanner: {
-    borderRadius: 10,
     padding: 12,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 18,
     borderWidth: 1,
   },
   alertError: {
     backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderColor: "#DC2626",
+    borderColor: "rgba(239, 68, 68, 0.35)",
   },
   alertSuccess: {
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    borderColor: "#059669",
+    backgroundColor: "rgba(34, 197, 94, 0.12)",
+    borderColor: "rgba(34, 197, 94, 0.35)",
   },
   alertText: {
-    color: "#F1F5F9",
-    fontSize: 12,
-    lineHeight: 18,
+    color: "#F8FAFC",
+    fontSize: 13,
     textAlign: "center",
+    lineHeight: 18,
+  },
+  card: {
+    backgroundColor: "#0F172A",
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#F8FAFC",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: "#94A3B8",
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 24,
+  },
+  googleBtn: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  googleBtnContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleIconBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#4285F4",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  googleIcon: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
+  googleBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0F172A",
+    letterSpacing: -0.2,
+  },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0F172A",
   },
   footerNote: {
-    marginTop: 24,
+    marginTop: 20,
     alignItems: "center",
   },
-  footerText: {
-    color: "#475569",
-    fontSize: 11,
-    textAlign: "center",
+  footerNoteText: {
+    fontSize: 12,
+    color: "#64748B",
   },
 });
