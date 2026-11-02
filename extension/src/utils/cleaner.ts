@@ -51,10 +51,20 @@ export function cleanVideoUrl(rawUrl: string, platform: SocialPlatform): { clean
 
     if (platform === 'instagram') {
       const match = url.pathname.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-      if (match && match[2]) {
-        const type = match[1] === 'reels' ? 'reel' : match[1];
+      const invalidShortcodes = new Set([
+        'audio',
+        'videos',
+        'tagged',
+        'saved',
+        'explore',
+        'feed',
+        'stories',
+        'channel',
+        'direct',
+      ]);
+      if (match && match[2] && !invalidShortcodes.has(match[2].toLowerCase()) && match[2].length >= 5) {
         return {
-          cleanUrl: `https://www.instagram.com/${type}/${match[2]}/`,
+          cleanUrl: `https://www.instagram.com/reel/${match[2]}/`,
           videoId: match[2],
         };
       }

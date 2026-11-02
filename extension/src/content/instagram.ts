@@ -5,6 +5,45 @@ console.log('[Elio AI] Instagram Content Script initialized.');
 let lastSavedUrl: string | null = null;
 let lastSavedTime: number = 0;
 
+const INVALID_SHORTCODES = new Set([
+  'audio',
+  'videos',
+  'tagged',
+  'saved',
+  'explore',
+  'feed',
+  'stories',
+  'channel',
+  'direct',
+  'reels',
+  'reel',
+  'p',
+]);
+
+const SYSTEM_ROUTES = new Set([
+  'explore',
+  'reels',
+  'reel',
+  'p',
+  'direct',
+  'stories',
+  'audio',
+  'accounts',
+  'emails',
+  'developer',
+  'about',
+  'legal',
+  'privacy',
+  'terms',
+  'directory',
+  'settings',
+  'your_activity',
+  'saved',
+  'home',
+  'notifications',
+  'create',
+]);
+
 /**
  * Modern floating HUD toast on Instagram to visually confirm video/post saved
  */
@@ -61,145 +100,442 @@ function showElioToast(title: string, message: string, isSuccess: boolean = true
 }
 
 /**
- * Universal container locator for modern Instagram Web (Reels, Posts, Carousels, Modals)
+ * Universal container locator strictly scoped to a single Instagram Reel or Post
+ * Guarantees that the container does NOT bleed into the global feed or other reels.
  */
 function findPostOrReelContainer(actionElement: HTMLElement): HTMLElement {
-  // 1. If in a modal dialog
+  // 1. If in a modal dialog (desktop pop-up view)
   const dialog = actionElement.closest('div[role="dialog"]');
   if (dialog) return dialog as HTMLElement;
 
-  // 2. If inside a traditional article or section
-  const article = actionElement.closest('article, section');
+  // 2. If inside a traditional article (standard feed post)
+  const article = actionElement.closest('article');
   if (article) return article as HTMLElement;
 
-  // 3. Walk up parents to find the nearest element holding this post's media and permalink
+  // 3. Reels container locator:
+  // Walk up from actionElement until we find the enclosing container holding THIS reel.
+  // In Instagram Reels, each reel card contains exactly 1 <video> element.
+  // The parent scrolling feed contains 2 or more videos.
   let current: HTMLElement | null = actionElement;
-  let candidateContainer: HTMLElement | null = null;
+  let singleVideoContainer: HTMLElement | null = null;
 
   while (current && current !== document.body && current !== document.documentElement) {
-    const hasMedia = current.querySelector('video, img');
-    const hasPostLink = current.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"], time');
-
-    if (hasMedia && hasPostLink) {
-      candidateContainer = current;
-      if (
-        current.tagName === 'ARTICLE' ||
-        current.tagName === 'SECTION' ||
-        current.getAttribute('role') === 'presentation' ||
-        (current.offsetHeight > 300 && current.offsetWidth > 300)
-      ) {
-        return current;
-      }
+    const videos = current.querySelectorAll('video');
+    if (videos.length === 1 && current.offsetHeight > 300) {
+      singleVideoContainer = current;
+    } else if (videos.length > 1) {
+      // Reached multi-reel feed container; stop immediately!
+      break;
     }
     current = current.parentElement;
   }
 
-  if (candidateContainer) return candidateContainer;
+  if (singleVideoContainer) return singleVideoContainer;
 
-  // 4. Fallback: find active video on screen if currently watching Reels
-  const videos = Array.from(document.querySelectorAll('video'));
-  const activeVideo = videos.find((v) => !v.paused && v.offsetHeight > 200);
+  // 4. Fallback: Find the currently active or playing video on screen
+  const allVideos = Array.from(document.querySelectorAll('video'));
+  const activeVideo =
+    allVideos.find((v) => {
+      const rect = v.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      return midY >= 0 && midY <= window.innerHeight && !v.paused;
+    }) ||
+    allVideos.find((v) => !v.paused && v.offsetHeight > 250) ||
+    allVideos[0];
+
   if (activeVideo) {
-    const parent =
-      activeVideo.closest('section') ||
-      activeVideo.closest('article') ||
-      activeVideo.parentElement?.parentElement;
-    if (parent) return parent as HTMLElement;
+    let curr: HTMLElement | null = activeVideo;
+    let card: HTMLElement | null = null;
+    while (curr && curr !== document.body && curr !== document.documentElement) {
+      const vids = curr.querySelectorAll('video');
+      if (vids.length === 1 && curr.offsetHeight > 300) {
+        card = curr;
+      } else if (vids.length > 1) {
+        break;
+      }
+      curr = curr.parentElement;
+    }
+    if (card) return card;
+    return activeVideo.parentElement || actionElement;
   }
 
-  return document.body;
+  return actionElement.parentElement || actionElement;
 }
 
 /**
- * Exhaustive post URL finder: searches upward through parents for <time> anchor or permalinks
+ * Validates Instagram username
  */
-function findInstagramPostUrl(actionElement: HTMLElement): string | null {
-  const currentUrl = window.location.href;
-  const urlMatch = currentUrl.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-  if (urlMatch && urlMatch[2]) {
-    if (!currentUrl.endsWith('/reels/') && !currentUrl.endsWith('/reels')) {
-      const type = urlMatch[1] === 'reels' ? 'reel' : urlMatch[1];
-      return `https://www.instagram.com/${type}/${urlMatch[2]}/`;
+function isValidUsername(str: string): boolean {
+  if (!str) return false;
+  const clean = str.replace(/^@/, '').trim().toLowerCase();
+  if (clean.length < 2 || clean.length > 32) return false;
+  if (SYSTEM_ROUTES.has(clean)) return false;
+  if (INVALID_SHORTCODES.has(clean)) return false;
+  if (clean.includes('/') || clean.includes('?') || clean.includes('&') || clean.includes(' ')) return false;
+  return /^[a-zA-Z0-9._]+$/.test(clean);
+}
+
+/**
+ * Normalizes username string
+ */
+function normalizeUsername(raw: string): string {
+  const clean = raw.replace(/^@/, '').trim();
+  return `@${clean}`;
+}
+
+/**
+ * Extracts creator username strictly from the current reel container
+ */
+function extractCreator(container: HTMLElement): string {
+  // 1. High-accuracy check: Creator's profile picture alt attribute
+  // Instagram renders profile picture alt as:
+  // "yournishaant's profile picture" / "yournishaant’s photo" / "yournishaant की प्रोफ़ाइल फ़ोटो"
+  const profileImgs = Array.from(container.querySelectorAll<HTMLImageElement>('img[alt]'));
+  for (const img of profileImgs) {
+    const alt = (img.getAttribute('alt') || '').trim();
+    if (!alt) continue;
+
+    const mEn = alt.match(/^([a-zA-Z0-9._]+)(?:'s|’s)\s+(?:profile picture|photo)/i);
+    if (mEn && mEn[1] && isValidUsername(mEn[1])) {
+      return normalizeUsername(mEn[1]);
+    }
+
+    const mHi = alt.match(/^([a-zA-Z0-9._]+)\s+की\s+प्रोफ़ाइल/i);
+    if (mHi && mHi[1] && isValidUsername(mHi[1])) {
+      return normalizeUsername(mHi[1]);
+    }
+
+    const mGen = alt.match(/(?:profile picture of|foto del perfil de|profilbild von)\s+([a-zA-Z0-9._]+)/i);
+    if (mGen && mGen[1] && isValidUsername(mGen[1])) {
+      return normalizeUsername(mGen[1]);
     }
   }
 
-  let curr: HTMLElement | null = actionElement;
-  for (let i = 0; i < 15 && curr && curr !== document.body; i++) {
-    // Check for <time> tag
-    const timeEl = curr.querySelector('time');
-    if (timeEl) {
-      const timeAnchor = (timeEl.closest('a') || timeEl.parentElement?.closest('a')) as HTMLAnchorElement | null;
-      if (timeAnchor?.href) {
-        const m = timeAnchor.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-        if (m && m[2]) {
-          const type = m[1] === 'reels' ? 'reel' : m[1];
-          return `https://www.instagram.com/${type}/${m[2]}/`;
+  // 2. High-accuracy check: Anchor adjacent to the "Follow" / "Following" button
+  // Instagram reels always place the author's username link right next to the Follow button
+  const buttons = Array.from(container.querySelectorAll('button, div[role="button"]'));
+  const followBtn = buttons.find((b) => {
+    const txt = (b.textContent || '').trim().toLowerCase();
+    return (
+      txt === 'follow' ||
+      txt === 'following' ||
+      txt === 'फॉलो करें' ||
+      txt === 'फॉलो कर रहे हैं'
+    );
+  });
+
+  if (followBtn) {
+    const row = followBtn.closest('div, header') || followBtn.parentElement;
+    if (row) {
+      const rowAnchors = Array.from(row.querySelectorAll<HTMLAnchorElement>('a[href^="/"]'));
+      for (const a of rowAnchors) {
+        const href = a.getAttribute('href') || '';
+        const m = href.match(/^\/([a-zA-Z0-9._]+)\/?$/);
+        if (m && m[1] && isValidUsername(m[1])) {
+          return normalizeUsername(m[1]);
         }
       }
     }
+  }
 
-    // Check for any /p/, /reel/, /reels/ anchor
-    const postAnchors = Array.from(
-      curr.querySelectorAll<HTMLAnchorElement>('a[href*="/p/"], a[href*="/reel/"], a[href*="/reels/"]')
-    );
-    for (const a of postAnchors) {
-      const href = a.href || a.getAttribute('href') || '';
-      const m = href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-      if (m && m[2]) {
-        const type = m[1] === 'reels' ? 'reel' : m[1];
-        return `https://www.instagram.com/${type}/${m[2]}/`;
+  // 3. Search for header or author anchors inside container
+  const authorSelectors = [
+    'header a[role="link"]',
+    'header a[href^="/"]',
+    'div[class*="author"] a[href^="/"]',
+    'a.notranslate[href^="/"]',
+    'a[role="link"][href^="/"]',
+    'a[href^="/"]',
+  ];
+
+  for (const sel of authorSelectors) {
+    const anchors = Array.from(container.querySelectorAll<HTMLAnchorElement>(sel));
+    for (const a of anchors) {
+      const href = a.getAttribute('href') || '';
+      const m = href.match(/^\/([a-zA-Z0-9._]+)\/?$/);
+      if (m && m[1] && isValidUsername(m[1])) {
+        // Exclude audio link or button text
+        const text = (a.textContent || '').trim().toLowerCase();
+        if (
+          !text.includes('audio') &&
+          !text.includes('sound') &&
+          !text.includes('संगीत') &&
+          !text.includes('follow') &&
+          !text.includes('explore')
+        ) {
+          return normalizeUsername(m[1]);
+        }
       }
     }
-
-    curr = curr.parentElement;
   }
 
-  if (urlMatch && urlMatch[2]) {
-    const type = urlMatch[1] === 'reels' ? 'reel' : urlMatch[1];
-    return `https://www.instagram.com/${type}/${urlMatch[2]}/`;
-  }
-
-  return null;
+  return '@instagram_creator';
 }
 
 /**
- * Extracts the canonical URL of the Instagram Reel or Post
+ * Searches for high-quality thumbnail image for the post or reel
+ * Ensures small avatars and audio cover art are never chosen.
  */
-function extractInstagramPermalink(actionElement: HTMLElement, container: HTMLElement): string {
-  const currentUrl = window.location.href;
+function findInstagramMediaThumbnail(container: HTMLElement): string {
+  // 1. Try video element poster attribute (high-res official Instagram CDN cover)
+  const video = container.querySelector('video') as HTMLVideoElement | null;
+  if (video?.poster && !video.poster.startsWith('blob:') && video.poster.length > 20) {
+    return video.poster;
+  }
 
-  const directMatch = currentUrl.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-  if (directMatch && directMatch[2]) {
-    if (!currentUrl.endsWith('/reels/') && !currentUrl.endsWith('/reels')) {
-      const type = directMatch[1] === 'reels' ? 'reel' : directMatch[1];
-      return `https://www.instagram.com/${type}/${directMatch[2]}/`;
+  // 2. High-res reel cover image in the container
+  // A reel cover image is displayed large (> 120px wide and > 140px tall).
+  // Audio icons and avatars have small rendered dimensions (< 60px) and will be skipped.
+  const imgs = Array.from(container.querySelectorAll<HTMLImageElement>('img'));
+  for (const img of imgs) {
+    const rect = img.getBoundingClientRect();
+    if (rect.width < 120 || rect.height < 140) continue;
+
+    const alt = (img.alt || '').toLowerCase();
+    if (alt.includes('profile') || alt.includes('avatar') || alt.includes('audio')) continue;
+
+    const src = img.src || img.getAttribute('src') || '';
+    if (src && !src.startsWith('blob:') && !src.startsWith('data:image/svg')) {
+      if (src.includes('cdninstagram') || src.includes('fbcdn.net') || rect.width > 200) {
+        return src;
+      }
     }
   }
 
+  // 3. Canvas snapshot fallback from HTML5 video element
+  if (video) {
+    const frame = captureVideoFrame(video);
+    if (frame) return frame;
+  }
+
+  // 4. Meta tag fallback (when viewing a direct single post or reel page)
+  const ogImg = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
+  if (ogImg && !ogImg.includes('static.cdninstagram.com/rsrc.php')) {
+    return ogImg;
+  }
+
+  // 5. Creator avatar fallback so the card always has a clean visual image
+  for (const img of imgs) {
+    const alt = (img.alt || '').toLowerCase();
+    if (alt.includes('profile') || alt.includes('photo')) {
+      const src = img.src || img.getAttribute('src');
+      if (src && !src.startsWith('blob:') && !src.startsWith('data:image/svg')) {
+        return src;
+      }
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Captures live frame from HTML5 video element using canvas
+ */
+function captureVideoFrame(video: HTMLVideoElement): string {
+  try {
+    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+      const canvas = document.createElement('canvas');
+      const maxDim = 480;
+      const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        if (dataUrl && dataUrl.length > 800) {
+          return dataUrl;
+        }
+      }
+    }
+  } catch {
+    // Cross-origin tainted canvas fallback
+  }
+  return '';
+}
+
+/**
+ * Filters out UI junk words from Instagram titles/captions
+ */
+function isGarbageTitle(str: string): boolean {
+  if (!str) return true;
+  const s = str.trim().toLowerCase();
+  if (s.length < 3) return true;
+
+  const garbageList = [
+    'messages',
+    'explore',
+    'reels',
+    'reel',
+    'post',
+    'audio',
+    'original audio',
+    'home',
+    'search',
+    'notifications',
+    'create',
+    'profile',
+    'more',
+    'follow',
+    'following',
+    'verified',
+    'audio image',
+    'profile picture',
+    'profile photo',
+    'profile icon',
+    'avatar',
+    'view more on instagram',
+    'log in to instagram',
+  ];
+
+  if (garbageList.includes(s)) return true;
+  if (s.includes('photo by') && (s.includes('on') || s.includes('in'))) return true;
+  if (s.includes('may be an image of') || s.includes('image may contain')) return true;
+  if (/^\d+(\.\d+)?[kmb]?\s*(likes?|comments?|shares?)?$/i.test(s)) return true;
+
+  return false;
+}
+
+/**
+ * Strips trailing "... more" or button clutter from captions
+ */
+function cleanCaption(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\s*(?:\.\.\.|…)?\s*(?:more|less|अधिक|और देखें)$/i, '')
+    .replace(/^["“]|["”]$/g, '')
+    .trim();
+}
+
+/**
+ * Extracts clean video title / caption similar to YouTube video titles
+ */
+function extractInstagramTitle(container: HTMLElement, creator: string, isReel: boolean): string {
+  // 1. Direct page title if on direct reel/post page
+  if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
+    const titleMatch = document.title.match(/on Instagram:\s*["“](.*?)["”]/s);
+    if (titleMatch && titleMatch[1]?.trim() && !isGarbageTitle(titleMatch[1])) {
+      const cleaned = cleanCaption(titleMatch[1]);
+      if (cleaned.length > 2) return cleaned.slice(0, 150);
+    }
+  }
+
+  // 2. Meta tags
+  const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
+  if (ogTitle) {
+    const m = ogTitle.match(/on Instagram:\s*["“](.*?)["”]/s);
+    if (m && m[1]?.trim() && !isGarbageTitle(m[1])) {
+      const cleaned = cleanCaption(m[1]);
+      if (cleaned.length > 2) return cleaned.slice(0, 150);
+    }
+  }
+
+  // 3. Primary caption inside container (h1 or caption classes)
+  const captionEl = container.querySelector(
+    'h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx'
+  );
+  const captionText = captionEl?.textContent?.trim();
+  if (captionText && captionText.length > 3 && captionText !== creator && !isGarbageTitle(captionText)) {
+    const cleaned = cleanCaption(captionText);
+    if (cleaned.length > 2) return cleaned.slice(0, 150);
+  }
+
+  // 4. dir="auto" elements inside container (user captions on Instagram)
+  const dirSpans = Array.from(container.querySelectorAll<HTMLElement>('span[dir="auto"], div[dir="auto"]'));
+  for (const el of dirSpans) {
+    const text = el.textContent?.trim() || '';
+    if (
+      text.length > 3 &&
+      text !== creator &&
+      !text.startsWith('@') &&
+      !text.toLowerCase().includes('verified') &&
+      !text.toLowerCase().includes('follow') &&
+      !text.toLowerCase().includes('original audio') &&
+      !isGarbageTitle(text)
+    ) {
+      const cleaned = cleanCaption(text);
+      if (cleaned.length > 2) return cleaned.slice(0, 150);
+    }
+  }
+
+  return isReel ? `Instagram Reel by ${creator}` : `Instagram Post by ${creator}`;
+}
+
+/**
+ * Finds the exact Reel or Post URL
+ * Rejects reserved paths like /reels/audio/ and searches script tags when needed
+ */
+function findInstagramPostUrl(
+  actionElement: HTMLElement,
+  container: HTMLElement,
+  creator: string
+): string | null {
+  // 1. Direct shortcode in window.location.pathname
+  const locMatch = window.location.pathname.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+  if (locMatch && locMatch[1]) {
+    const code = locMatch[1];
+    if (code.length >= 7 && !INVALID_SHORTCODES.has(code.toLowerCase())) {
+      return `https://www.instagram.com/reel/${code}/`;
+    }
+  }
+
+  // 2. Check for <time> anchor inside the scoped container
   const timeEl = container.querySelector('time');
   const timeAnchor = timeEl?.closest('a') as HTMLAnchorElement | null;
-  if (timeAnchor && timeAnchor.href) {
-    const match = timeAnchor.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-    if (match && match[2]) {
-      const type = match[1] === 'reels' ? 'reel' : match[1];
-      return `https://www.instagram.com/${type}/${match[2]}/`;
+  if (timeAnchor?.href) {
+    const m = timeAnchor.href.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+    if (m && m[1] && m[1].length >= 7 && !INVALID_SHORTCODES.has(m[1].toLowerCase())) {
+      return `https://www.instagram.com/reel/${m[1]}/`;
     }
   }
 
-  const permalinks = Array.from(
-    container.querySelectorAll<HTMLAnchorElement>(
-      'a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"]'
-    )
+  // 3. Search inside the scoped container for valid post/reel anchors
+  const containerAnchors = Array.from(
+    container.querySelectorAll<HTMLAnchorElement>('a[href*="/reel/"], a[href*="/reels/"], a[href*="/p/"]')
   );
-  for (const a of permalinks) {
-    const match = a.href.match(/\/(reel|reels|p)\/([a-zA-Z0-9_-]+)/);
-    if (match && match[2]) {
-      const type = match[1] === 'reels' ? 'reel' : match[1];
-      return `https://www.instagram.com/${type}/${match[2]}/`;
+  for (const a of containerAnchors) {
+    const href = a.href || a.getAttribute('href') || '';
+    const m = href.match(/\/(?:reel|reels|p)\/([a-zA-Z0-9_-]+)/);
+    if (m && m[1] && m[1].length >= 7 && !INVALID_SHORTCODES.has(m[1].toLowerCase())) {
+      return `https://www.instagram.com/reel/${m[1]}/`;
     }
   }
 
-  return currentUrl;
+  // 4. Search inline JSON script tags for the creator's reel shortcode
+  if (creator && creator !== '@instagram_creator') {
+    const rawUsername = creator.replace(/^@/, '');
+    const scripts = Array.from(
+      document.querySelectorAll('script[type="application/json"], script:not([src])')
+    );
+    for (const s of scripts) {
+      const text = s.textContent || '';
+      if (text.includes(rawUsername)) {
+        const matchNear =
+          text.match(
+            new RegExp(
+              `"(?:shortcode|code)":"([a-zA-Z0-9_-]{8,})"[^}]{0,300}?"username":"${rawUsername}"`,
+              'i'
+            )
+          ) ||
+          text.match(
+            new RegExp(
+              `"username":"${rawUsername}"[^}]{0,300}?"(?:shortcode|code)":"([a-zA-Z0-9_-]{8,})"`,
+              'i'
+            )
+          );
+        if (matchNear && matchNear[1] && !INVALID_SHORTCODES.has(matchNear[1].toLowerCase())) {
+          return `https://www.instagram.com/reel/${matchNear[1]}/`;
+        }
+      }
+    }
+  }
+
+  // 5. Fallback if on /reels/ and creator is known
+  if (window.location.href.includes('/reels') && creator && creator !== '@instagram_creator') {
+    return `https://www.instagram.com/${creator.replace('@', '')}/reels/`;
+  }
+
+  return window.location.href;
 }
 
 /**
@@ -218,7 +554,12 @@ function getInstagramActionType(target: HTMLElement): 'like' | 'save' | null {
   }
 
   const targetLabel = (target.getAttribute('aria-label') || target.getAttribute('title') || '').toLowerCase();
-  if (targetLabel.includes('like') || targetLabel.includes('unlike') || targetLabel.includes('पसंद') || targetLabel.includes('लाइक')) {
+  if (
+    targetLabel.includes('like') ||
+    targetLabel.includes('unlike') ||
+    targetLabel.includes('पसंद') ||
+    targetLabel.includes('लाइक')
+  ) {
     return 'like';
   }
   if (targetLabel.includes('save') || targetLabel.includes('bookmark') || targetLabel.includes('सहेजें')) {
@@ -281,214 +622,29 @@ function getInstagramActionType(target: HTMLElement): 'like' | 'save' | null {
 }
 
 /**
- * Extracts creator username
+ * Checks whether the post/reel heart button is in the LIKED state (Red heart or aria-label="Unlike")
  */
-function extractCreator(container: HTMLElement): string {
-  const usernameSelectors = [
-    'header a[role="link"]',
-    'a.notranslate',
-    'header a',
-    'a[role="link"] span',
-    'span._aacl._aaco._aacw',
-  ];
+function isPostLikedState(container: HTMLElement): boolean {
+  const svgs = Array.from(container.querySelectorAll('svg'));
+  for (const svg of svgs) {
+    const aria = (svg.getAttribute('aria-label') || svg.querySelector('title')?.textContent || '').toLowerCase();
+    const color = (svg.getAttribute('color') || svg.getAttribute('fill') || '').toLowerCase();
 
-  for (const sel of usernameSelectors) {
-    const el = container.querySelector(sel);
-    const text = el?.textContent?.trim();
-    if (text && !text.includes(' ') && text.length > 1 && text.length < 35) {
-      return text.startsWith('@') ? text : `@${text}`;
+    const isRed =
+      color.includes('255, 48, 64') ||
+      color.includes('#ff3040') ||
+      color.includes('237, 73, 86');
+
+    const isUnlike =
+      aria.includes('unlike') ||
+      aria.includes('पसंद हटाएं') ||
+      aria.includes('gefällt mir nicht');
+
+    if (isRed || isUnlike) {
+      return true;
     }
   }
-
-  const anchors = Array.from(
-    container.querySelectorAll<HTMLAnchorElement>('a[role="link"], a[href^="/"]')
-  );
-  for (const a of anchors) {
-    const href = a.getAttribute('href') || '';
-    const text = a.textContent?.trim() || '';
-    if (
-      href.startsWith('/') &&
-      !href.includes('/reel') &&
-      !href.includes('/reels') &&
-      !href.includes('/p/') &&
-      !href.includes('/explore') &&
-      !href.includes('/direct') &&
-      text &&
-      !text.includes(' ') &&
-      text.length > 1 &&
-      text.length < 35
-    ) {
-      return text.startsWith('@') ? text : `@${text}`;
-    }
-  }
-
-  return '@instagram_creator';
-}
-
-/**
- * Captures live frame from HTML5 video element using canvas
- */
-function captureVideoFrame(video: HTMLVideoElement): string {
-  try {
-    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-      const canvas = document.createElement('canvas');
-      const maxDim = 480;
-      const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
-      canvas.width = Math.round(video.videoWidth * scale);
-      canvas.height = Math.round(video.videoHeight * scale);
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        if (dataUrl && dataUrl.length > 800) {
-          return dataUrl;
-        }
-      }
-    }
-  } catch {
-    // Cross-origin tainted canvas fallback
-  }
-  return '';
-}
-
-/**
- * Validates whether an extracted string is a real caption or just UI noise
- */
-function isGarbageTitle(str: string): boolean {
-  if (!str) return true;
-  const s = str.trim().toLowerCase();
-  if (s.length < 3) return true;
-  if (
-    s.includes("audio image") ||
-    s.includes("profile picture") ||
-    s.includes("profile photo") ||
-    s.includes("profile icon") ||
-    s.includes("avatar")
-  ) {
-    return true;
-  }
-  if (s.includes("photo by") && (s.includes("on") || s.includes("in"))) return true;
-  if (s.includes("may be an image of") || s.includes("image may contain")) return true;
-  if (s === "reels" || s === "reel" || s === "post" || s === "original audio" || s === "audio") return true;
-  if (s.includes("likes") && s.includes("comments")) return true;
-  if (s.includes("view more on instagram") || s.includes("log in to instagram")) return true;
   return false;
-}
-
-/**
- * Searches for high-quality thumbnail image for the post or reel
- */
-function findInstagramMediaThumbnail(container: HTMLElement): string {
-  // 1. Try video frame snapshot for reels
-  const video = container.querySelector('video') as HTMLVideoElement | null;
-  if (video) {
-    const frame = captureVideoFrame(video);
-    if (frame) return frame;
-    if (video.poster && !video.poster.startsWith('blob:')) {
-      return video.poster;
-    }
-  }
-
-  // 2. Search for media images (exclude small avatars / profile pictures / audio images)
-  const imgs = Array.from(container.querySelectorAll<HTMLImageElement>('img'));
-  for (const img of imgs) {
-    const src = img.src || img.getAttribute('src') || '';
-    const alt = (img.alt || '').toLowerCase();
-    const w = img.naturalWidth || img.width || 0;
-    const h = img.naturalHeight || img.height || 0;
-
-    if (
-      alt.includes('profile') ||
-      alt.includes('avatar') ||
-      alt.includes('audio image') ||
-      alt.includes('audio') ||
-      alt.includes('प्रोफ़ाइल')
-    ) {
-      continue;
-    }
-
-    if (w > 0 && w < 140 && h > 0 && h < 140) continue;
-
-    if (src.includes('cdninstagram') || src.includes('fbcdn.net') || w >= 150 || h >= 150) {
-      if (!src.startsWith('blob:') && !src.startsWith('data:image/svg')) {
-        return src;
-      }
-    }
-  }
-
-  // 3. Check page meta tag (for direct reel or post view)
-  const ogImg = document.querySelector('meta[property="og:image"]')?.getAttribute('content');
-  if (ogImg && !ogImg.includes('static.cdninstagram.com/rsrc.php')) {
-    return ogImg;
-  }
-
-  return '';
-}
-
-/**
- * Extracts rich, real post caption / title just like YouTube video titles
- */
-function extractInstagramTitle(container: HTMLElement, creator: string, isReel: boolean): string {
-  // 1. Check document.title quotes if on a direct post/reel page
-  if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
-    const titleMatch = document.title.match(/on Instagram:\s*["“](.*?)["”]/s);
-    if (titleMatch && titleMatch[1]?.trim() && !isGarbageTitle(titleMatch[1])) {
-      return titleMatch[1].trim().slice(0, 150);
-    }
-  }
-
-  // 2. Check meta tags
-  const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
-  if (ogTitle) {
-    const m = ogTitle.match(/on Instagram:\s*["“](.*?)["”]/s);
-    if (m && m[1]?.trim() && !isGarbageTitle(m[1])) {
-      return m[1].trim().slice(0, 150);
-    }
-  }
-
-  const ogDesc = document.querySelector('meta[property="og:description"]')?.getAttribute('content');
-  if (ogDesc) {
-    const m = ogDesc.match(/["“](.*?)["”]/s);
-    if (m && m[1]?.trim() && !isGarbageTitle(m[1])) {
-      return m[1].trim().slice(0, 150);
-    }
-  }
-
-  // 3. Check container h1 or caption classes (primary caption on post page or feed item)
-  const captionEl = container.querySelector('h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx');
-  const captionText = captionEl?.textContent?.trim();
-  if (captionText && captionText.length > 5 && captionText !== creator && !isGarbageTitle(captionText)) {
-    return captionText.slice(0, 150);
-  }
-
-  // 4. Check dir="auto" elements (Instagram standard for user captions)
-  const dirSpans = Array.from(container.querySelectorAll<HTMLElement>('span[dir="auto"], div[dir="auto"]'));
-  for (const el of dirSpans) {
-    const text = el.textContent?.trim() || '';
-    if (
-      text.length > 5 &&
-      text !== creator &&
-      !text.startsWith('@') &&
-      !text.toLowerCase().includes('verified') &&
-      !text.toLowerCase().includes('follow') &&
-      !text.toLowerCase().includes('original audio') &&
-      !isGarbageTitle(text)
-    ) {
-      return text.slice(0, 150);
-    }
-  }
-
-  // 5. Check img[alt]
-  const imgAlt = container.querySelector('img[alt]:not([alt=""]):not([alt*="profile"]):not([alt*="Audio"])')?.getAttribute('alt');
-  if (imgAlt && imgAlt.length > 10 && !isGarbageTitle(imgAlt)) {
-    const quoteMatch = imgAlt.match(/["“](.*?)["”]/);
-    if (quoteMatch && quoteMatch[1] && !isGarbageTitle(quoteMatch[1])) {
-      return quoteMatch[1].slice(0, 150);
-    }
-    return imgAlt.slice(0, 150);
-  }
-
-  return isReel ? `Instagram Reel by ${creator}` : `Instagram Post by ${creator}`;
 }
 
 /**
@@ -496,19 +652,19 @@ function extractInstagramTitle(container: HTMLElement, creator: string, isReel: 
  */
 function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | null {
   const container = findPostOrReelContainer(actionElement);
-  const postUrl = findInstagramPostUrl(actionElement) || extractInstagramPermalink(actionElement, container);
+  const creator = extractCreator(container);
+  const rawPostUrl = findInstagramPostUrl(actionElement, container, creator);
 
-  if (!postUrl) {
+  if (!rawPostUrl) {
     console.warn('[Elio AI] Could not find Instagram post URL');
     return null;
   }
 
-  const { cleanUrl, videoId } = cleanVideoUrl(postUrl, 'instagram');
-  if (!cleanUrl) return null;
+  const { cleanUrl, videoId } = cleanVideoUrl(rawPostUrl, 'instagram');
+  const finalCleanUrl = cleanUrl || rawPostUrl;
 
-  const creator = extractCreator(container);
   const videoEl = container.querySelector('video') as HTMLVideoElement | null;
-  const isReel = postUrl.includes('/reel') || Boolean(videoEl);
+  const isReel = finalCleanUrl.includes('/reel') || Boolean(videoEl);
 
   // Extract rich real title & real thumbnail
   const title = extractInstagramTitle(container, creator, isReel);
@@ -517,9 +673,9 @@ function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | nu
   return {
     platform: 'instagram',
     category: isReel ? 'reel' : 'post',
-    original_url: postUrl,
-    clean_url: cleanUrl,
-    platform_video_id: videoId,
+    original_url: rawPostUrl,
+    clean_url: finalCleanUrl,
+    platform_video_id: videoId || undefined,
     title: title,
     creator_name: creator,
     thumbnail_url: thumbnail,
@@ -532,7 +688,7 @@ function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | nu
  */
 function sendInstagramSync(payload: SavedVideoPayload) {
   const now = Date.now();
-  if (payload.clean_url === lastSavedUrl && now - lastSavedTime < 3000) return;
+  if (payload.clean_url === lastSavedUrl && now - lastSavedTime < 4000) return;
   lastSavedUrl = payload.clean_url;
   lastSavedTime = now;
 
@@ -551,7 +707,11 @@ function sendInstagramSync(payload: SavedVideoPayload) {
       }
 
       if (response && response.synced) {
-        showElioToast('Synced to Elio AI', `"${(payload.title || 'Instagram post').slice(0, 30)}..." synced to mobile`, true);
+        showElioToast(
+          'Synced to Elio AI',
+          `"${(payload.title || 'Instagram post').slice(0, 30)}..." synced to mobile`,
+          true
+        );
       } else if (response && response.reason === 'unauthenticated') {
         showElioToast('Saved Locally', 'Open extension to link with phone', false);
       } else {
@@ -571,14 +731,19 @@ document.addEventListener(
     if (!target) return;
 
     const action = getInstagramActionType(target);
-    if (action) {
+    if (action === 'like' || action === 'save') {
       console.log(`[Elio AI] Detected Instagram ${action} click!`);
+      // Wait for Instagram's UI to update heart fill / state
       setTimeout(() => {
-        const payload = scrapeInstagramPost(target);
-        if (payload) {
-          sendInstagramSync(payload);
+        const container = findPostOrReelContainer(target);
+        // Only sync if the item is in liked/saved state
+        if (action === 'save' || isPostLikedState(container)) {
+          const payload = scrapeInstagramPost(target);
+          if (payload) {
+            sendInstagramSync(payload);
+          }
         }
-      }, 250);
+      }, 300);
     }
   },
   true
@@ -625,9 +790,10 @@ document.addEventListener(
 
       console.log("[Elio AI] Detected Instagram 'L' key like shortcut!");
       setTimeout(() => {
-        const activeMedia = (document.querySelector('video') || document.querySelector('article img')) as HTMLElement | null;
-        if (activeMedia) {
-          const payload = scrapeInstagramPost(activeMedia);
+        const allVideos = Array.from(document.querySelectorAll('video'));
+        const activeVideo = allVideos.find((v) => !v.paused && v.offsetHeight > 250) || allVideos[0];
+        if (activeVideo) {
+          const payload = scrapeInstagramPost(activeVideo);
           if (payload) {
             sendInstagramSync(payload);
           }
@@ -637,45 +803,3 @@ document.addEventListener(
   },
   true
 );
-
-// 4. MutationObserver: Watches for red heart state changes
-const observer = new MutationObserver((mutations) => {
-  for (const mutation of mutations) {
-    if (mutation.type === 'attributes') {
-      const el = mutation.target as HTMLElement;
-      if (!el) continue;
-
-      const isSvg = el.tagName.toLowerCase() === 'svg';
-      const svg = isSvg ? el : el.querySelector('svg');
-
-      if (svg) {
-        const ariaLabel = (svg.getAttribute('aria-label') || '').toLowerCase();
-        const titleText = (svg.querySelector('title')?.textContent || '').toLowerCase();
-        const color = (svg.getAttribute('color') || svg.getAttribute('fill') || '').toLowerCase();
-
-        const isRedHeart =
-          color.includes('255, 48, 64') ||
-          color.includes('#ff3040') ||
-          color.includes('237, 73, 86');
-
-        const isUnlikeState =
-          ariaLabel.includes('unlike') ||
-          titleText.includes('unlike') ||
-          ariaLabel.includes('पसंद हटाएं');
-
-        if (isRedHeart || isUnlikeState) {
-          const payload = scrapeInstagramPost(svg as HTMLElement);
-          if (payload) {
-            sendInstagramSync(payload);
-          }
-        }
-      }
-    }
-  }
-});
-
-observer.observe(document.body, {
-  attributes: true,
-  subtree: true,
-  attributeFilter: ['aria-label', 'color', 'fill', 'class'],
-});
