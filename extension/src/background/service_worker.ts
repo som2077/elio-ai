@@ -67,25 +67,35 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 });
 
 /**
- * Injects content scripts into active YouTube and social tabs so users don't have to manually refresh
+ * Injects content scripts into active YouTube, Instagram, and social tabs so users don't have to manually refresh
  */
 async function injectScriptsIntoExistingTabs() {
-  try {
-    const tabs = await chrome.tabs.query({ url: ['*://*.youtube.com/*'] });
-    for (const tab of tabs) {
-      if (tab.id && !tab.url?.includes('chrome-extension://')) {
-        chrome.scripting
-          .executeScript({
-            target: { tabId: tab.id },
-            files: ['dist/content/youtube.js'],
-          })
-          .catch(() => {
-            // Tab might be in restricted state or navigating
-          });
+  const targets = [
+    { urls: ['*://*.youtube.com/*'], file: 'dist/content/youtube.js' },
+    { urls: ['*://*.instagram.com/*'], file: 'dist/content/instagram.js' },
+    { urls: ['*://*.twitter.com/*', '*://*.x.com/*'], file: 'dist/content/twitter.js' },
+    { urls: ['*://*.reddit.com/*'], file: 'dist/content/reddit.js' },
+    { urls: ['*://*.tiktok.com/*'], file: 'dist/content/tiktok.js' },
+  ];
+
+  for (const target of targets) {
+    try {
+      const tabs = await chrome.tabs.query({ url: target.urls });
+      for (const tab of tabs) {
+        if (tab.id && !tab.url?.includes('chrome-extension://')) {
+          chrome.scripting
+            .executeScript({
+              target: { tabId: tab.id },
+              files: [target.file],
+            })
+            .catch(() => {
+              // Tab might be in restricted state or navigating
+            });
+        }
       }
+    } catch (err) {
+      console.warn('[Elio AI] Tab injection notice for', target.file, err);
     }
-  } catch (err) {
-    console.warn('[Elio AI] Tab injection notice:', err);
   }
 }
 
