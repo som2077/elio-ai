@@ -399,63 +399,98 @@ function isGarbageTitle(str: string): boolean {
 /**
  * Strips trailing "... more" or button clutter from captions
  */
-function cleanCaption(text: string): string {
+function cleanCaption(text: string, creator: string = ''): string {
   if (!text) return '';
-  return text
-    .replace(/\s*(?:\.\.\.|…)?\s*(?:more|less|अधिक|और देखें)$/i, '')
-    .replace(/^["“]|["”]$/g, '')
-    .trim();
+  let t = text.trim();
+  // Strip leading creator username and time like "itsjustkumkum 13w" or "itsjustkumkum\u00a013w"
+  const raw = creator.replace(/^@/, '').trim();
+  if (raw) {
+    const prefixRegex = new RegExp(`^${raw}[\\s\\u00a0]*(?:\\d+[wdhmsy]?|•)?[\\s\\u00a0]*`, 'i');
+    t = t.replace(prefixRegex, '');
+  }
+  t = t.replace(/\s*(?:\.\.\.|…)?\s*(?:more|less|अधिक|और देखें)$/i, '');
+  t = t.replace(/^["“]|["”]$/g, '');
+  return t.trim();
 }
 
 /**
- * Extracts clean video title / caption similar to YouTube video titles
+ * Extracts clean video title / caption strictly from the current reel container
+ * Never uses static document.title or global og:title to prevent cross-reel title leakage!
  */
 function extractInstagramTitle(container: HTMLElement, creator: string, isReel: boolean): string {
-  // 1. Direct page title if on direct reel/post page
-  if (window.location.pathname.includes('/p/') || window.location.pathname.includes('/reel/')) {
-    const titleMatch = document.title.match(/on Instagram:\s*["“](.*?)["”]/s);
-    if (titleMatch && titleMatch[1]?.trim() && !isGarbageTitle(titleMatch[1])) {
-      const cleaned = cleanCaption(titleMatch[1]);
-      if (cleaned.length > 2) return cleaned.slice(0, 150);
-    }
-  }
+  const rawCreator = creator.replace(/^@/, '').toLowerCase().trim();
 
-  // 2. Meta tags
-  const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
-  if (ogTitle) {
-    const m = ogTitle.match(/on Instagram:\s*["“](.*?)["”]/s);
-    if (m && m[1]?.trim() && !isGarbageTitle(m[1])) {
-      const cleaned = cleanCaption(m[1]);
-      if (cleaned.length > 2) return cleaned.slice(0, 150);
-    }
-  }
-
-  // 3. Primary caption inside container (h1 or caption classes)
-  const captionEl = container.querySelector(
-    'h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx'
+  // 1. Primary check: Look for caption block inside the scoped container
+  const dirSpans = Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx, span[dir="auto"], div[dir="auto"]'
+    )
   );
-  const captionText = captionEl?.textContent?.trim();
-  if (captionText && captionText.length > 3 && captionText !== creator && !isGarbageTitle(captionText)) {
-    const cleaned = cleanCaption(captionText);
-    if (cleaned.length > 2) return cleaned.slice(0, 150);
+
+  // First pass: Match caption starting with creator username + timestamp (classic Instagram reel caption layout)
+  for (const el of dirSpans) {
+    if (el.closest('a[href*="/audio/"], a[href*="/reels/audio/"], div[role="marquee"], button, [role="button"]')) {
+      continue;
+    }
+
+    const raw = (el.textContent || '').trim();
+    const rawNoNbsp = raw.replace(/\u00a0/g, ' ');
+
+    if (rawCreator && rawNoNbsp.toLowerCase().startsWith(rawCreator) && rawNoNbsp.length > rawCreator.length + 3) {
+      const cleaned = cleanCaption(raw, creator);
+      if (cleaned.length > 2 && !isGarbageTitle(cleaned)) {
+        return cleaned.slice(0, 150);
+      }
+    }
   }
 
-  // 4. dir="auto" elements inside container (user captions on Instagram)
-  const dirSpans = Array.from(container.querySelectorAll<HTMLElement>('span[dir="auto"], div[dir="auto"]'));
+  // Second pass: Any visible caption text in container that is not creator or audio
   for (const el of dirSpans) {
-    const text = el.textContent?.trim() || '';
-    if (
-      text.length > 3 &&
-      text !== creator &&
-      !text.startsWith('@') &&
-      !text.toLowerCase().includes('verified') &&
-      !text.toLowerCase().includes('follow') &&
-      !text.toLowerCase().includes('original audio') &&
-      !isGarbageTitle(text)
-    ) {
-      const cleaned = cleanCaption(text);
-      if (cleaned.length > 2) return cleaned.slice(0, 150);
+    if (el.closest('a[href*="/audio/"], a[href*="/reels/audio/"], div[role="marquee"], button, [role="button"]')) {
+      continue;
     }
+
+    const raw = (el.textContent || '').trim();
+    const cleaned = cleanCaption(raw, creator);
+    if (
+      cleaned.length > 2 &&
+      cleaned.toLowerCase() !== rawCreator &&
+      !cleaned.startsWith('@') &&
+      !cleaned.toLowerCase().includes('verified') &&
+      !cleaned.toLowerCase().includes('follow') &&
+      !cleaned.toLowerCase().includes('original audio') &&
+      !cleaned.toLowerCase().startsWith('never miss') &&
+      !cleaned.toLowerCase().startsWith('sign up') &&
+      !isGarbageTitle(cleaned)
+    ) {
+      return cleaned.slice(0, 150);
+    }
+  }
+
+  // 2. Search script tags for THIS creator's reel caption
+  try {
+    const scripts = Array.from(
+      document.querySelectorAll('script[type="application/json"], script:not([src])')
+    );
+    for (const s of scripts) {
+      const text = s.textContent || '';
+      if (rawCreator && text.includes(rawCreator)) {
+        const m =
+          text.match(new RegExp(`"${rawCreator}"[^}]{0,400}?"text":"([^"]{4,200})"`, 'i')) ||
+          text.match(new RegExp(`"text":"([^"]{4,200})"[^}]{0,400}?"${rawCreator}"`, 'i'));
+        if (m && m[1]) {
+          const unescaped = m[1].replace(/\\u[\dA-F]{4}/gi, (match) =>
+            String.fromCharCode(parseInt(match.replace(/\\u/g, ''), 16))
+          );
+          const cleaned = cleanCaption(unescaped, creator);
+          if (cleaned.length > 2 && !isGarbageTitle(cleaned)) {
+            return cleaned.slice(0, 150);
+          }
+        }
+      }
+    }
+  } catch {
+    // Non-blocking
   }
 
   return isReel ? `Instagram Reel by ${creator}` : `Instagram Post by ${creator}`;
