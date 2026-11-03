@@ -1,5 +1,11 @@
 import React, { useRef } from "react";
-import { View, TouchableOpacity, StyleSheet, Animated, Image } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Image,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
@@ -8,8 +14,6 @@ interface AppleHeaderProps {
   userEmail?: string;
   totalCount: number;
   unreadCount: number;
-  layoutMode: "grid" | "list";
-  onToggleLayout: () => void;
   onOpenScanner: () => void;
   onOpenSearch?: () => void;
   onOpenFeedsDrawer?: () => void;
@@ -19,14 +23,11 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   userEmail: _userEmail,
   totalCount: _totalCount,
   unreadCount: _unreadCount,
-  layoutMode,
-  onToggleLayout,
   onOpenScanner,
   onOpenSearch,
   onOpenFeedsDrawer,
 }) => {
   const qrScale = useRef(new Animated.Value(1)).current;
-  const layoutScale = useRef(new Animated.Value(1)).current;
   const searchScale = useRef(new Animated.Value(1)).current;
 
   const animatePressIn = (val: Animated.Value) => {
@@ -72,27 +73,8 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           />
         </View>
 
-        {/* Right Actions: Grid/List Switcher, QR Scanner & Search Button */}
+        {/* Right Actions: QR Scanner & Search Button */}
         <View style={styles.actionsRight}>
-          <Animated.View style={{ transform: [{ scale: layoutScale }] }}>
-            <TouchableOpacity
-              activeOpacity={0.75}
-              style={styles.iconBtn}
-              onPressIn={() => animatePressIn(layoutScale)}
-              onPressOut={() => animatePressOut(layoutScale)}
-              onPress={() => {
-                haptics.selection();
-                onToggleLayout();
-              }}
-            >
-              <Ionicons
-                name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
-                size={21}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-          </Animated.View>
-
           <Animated.View style={{ transform: [{ scale: qrScale }] }}>
             <TouchableOpacity
               activeOpacity={0.75}

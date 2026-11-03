@@ -50,9 +50,8 @@ export default function HomeScreen() {
   const [showQuickClipModal, setShowQuickClipModal] = useState(false);
   const [feedDrawerFilter, setFeedDrawerFilter] = useState<FeedFilterType>("for_you");
 
-  // Tab & Layout states (Pinterest brick cards as primary)
+  // Tab states
   const [activeTab, setActiveTab] = useState<TabKey>("feed");
-  const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -268,38 +267,6 @@ export default function HomeScreen() {
     });
   }, [videos, searchQuery, searchPlatform]);
 
-  // Split feed videos into two balanced columns for Pinterest-style staggered masonry
-  const { feedMasonryCol1, feedMasonryCol2 } = useMemo(() => {
-    const col1: SavedVideo[] = [];
-    const col2: SavedVideo[] = [];
-    let h1 = 0;
-    let h2 = 0;
-
-    feedVideos.forEach((v) => {
-      const p = (v.platform || "").toLowerCase();
-      const cat = (v.category || "").toLowerCase();
-      const title = (v.title || "").toLowerCase();
-      const isTall =
-        cat === "reel" ||
-        cat === "short" ||
-        p === "tiktok" ||
-        p === "instagram" ||
-        title.includes("short") ||
-        title.includes("reel");
-      const estHeight = isTall ? 240 : p === "youtube" && !title.includes("short") ? 165 : 190;
-
-      if (h1 <= h2) {
-        col1.push(v);
-        h1 += estHeight + 60;
-      } else {
-        col2.push(v);
-        h2 += estHeight + 60;
-      }
-    });
-
-    return { feedMasonryCol1: col1, feedMasonryCol2: col2 };
-  }, [feedVideos]);
-
   // Split search videos into two balanced columns for Pinterest-style staggered masonry
   const { searchMasonryCol1, searchMasonryCol2 } = useMemo(() => {
     const col1: SavedVideo[] = [];
@@ -361,11 +328,6 @@ export default function HomeScreen() {
             userEmail={session?.user?.email}
             totalCount={videos.length}
             unreadCount={unreadCount}
-            layoutMode={layoutMode}
-            onToggleLayout={() => {
-              triggerLayoutMotion();
-              setLayoutMode((prev) => (prev === "grid" ? "list" : "grid"));
-            }}
             onOpenScanner={() => setShowScanner(true)}
             onOpenSearch={() => {
               triggerLayoutMotion();
@@ -375,83 +337,13 @@ export default function HomeScreen() {
           />
 
           {loading ? (
-            <ScrollView contentContainerStyle={styles.masonryScrollContent} showsVerticalScrollIndicator={false}>
-              <View style={styles.masonryRow}>
-                <View style={styles.masonryColumn}>
-                  <GridSkeletonCard height={220} />
-                  <GridSkeletonCard height={165} />
-                  <GridSkeletonCard height={240} />
-                </View>
-                <View style={styles.masonryColumn}>
-                  <GridSkeletonCard height={170} />
-                  <GridSkeletonCard height={235} />
-                  <GridSkeletonCard height={180} />
-                </View>
-              </View>
-            </ScrollView>
-          ) : layoutMode === "grid" ? (
-            /* 2-COLUMN PINTEREST BRICK MASONRY */
-            <ScrollView
-              contentContainerStyle={styles.masonryScrollContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={() => {
-                    haptics.light();
-                    setRefreshing(true);
-                    fetchVideos();
-                  }}
-                  tintColor={appleColors.accent}
-                  colors={[appleColors.accent]}
-                />
-              }
-            >
-              {feedVideos.length === 0 ? (
-                <EmptyState onLinkPress={() => setShowScanner(true)} />
-              ) : (
-                <View style={styles.masonryRow}>
-                  <View style={styles.masonryColumn}>
-                    {feedMasonryCol1.map((item, idx) => (
-                      <VideoGridCard
-                        key={item.id}
-                        video={item}
-                        index={idx * 2}
-                        onPress={() => {
-                          setDetailVideo(item);
-                          setShowDetailSheet(true);
-                        }}
-                        onLongPress={() => {
-                          setDetailVideo(item);
-                          setShowDetailSheet(true);
-                        }}
-                        onToggleStatus={() => toggleStatus(item)}
-                      />
-                    ))}
-                  </View>
-                  <View style={styles.masonryColumn}>
-                    {feedMasonryCol2.map((item, idx) => (
-                      <VideoGridCard
-                        key={item.id}
-                        video={item}
-                        index={idx * 2 + 1}
-                        onPress={() => {
-                          setDetailVideo(item);
-                          setShowDetailSheet(true);
-                        }}
-                        onLongPress={() => {
-                          setDetailVideo(item);
-                          setShowDetailSheet(true);
-                        }}
-                        onToggleStatus={() => toggleStatus(item)}
-                      />
-                    ))}
-                  </View>
-                </View>
-              )}
+            <ScrollView contentContainerStyle={styles.listContent}>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
             </ScrollView>
           ) : (
-            /* 1-COLUMN WIDE PINTEREST BRICK LIST */
+            /* 1-COLUMN FEED LIST (CLASSIC POST VIEW) */
             <FlatList
               key="list-view-1-col"
               data={feedVideos}
