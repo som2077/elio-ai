@@ -76,27 +76,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* 2. Search / Explore */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.tabItem}
-          onPress={() => {
-            if (activeTab !== "search") {
-              haptics.selection();
-              onTabSelect("search");
-            }
-          }}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons
-              name={activeTab === "search" ? "search" : "search-outline"}
-              size={23}
-              color={activeTab === "search" ? "#FFFFFF" : "#71767B"}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {/* 3. Fast Clip (+) Button */}
+        {/* 2. Fast Clip (+) Button */}
         <TouchableOpacity
           activeOpacity={0.75}
           style={styles.tabItem}
@@ -116,7 +96,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* 4. Insights & Analytics */}
+        {/* 3. Insights & Analytics */}
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.tabItem}
@@ -139,7 +119,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* 5. Profile / Linked Devices */}
+        {/* 4. Profile / Linked Devices */}
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.tabItem}
