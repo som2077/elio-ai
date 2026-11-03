@@ -10,11 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { threadsTokens, appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { supabase } from "../services/supabase";
+import { cleanShareUrl, analyzeSharedUrl, processSharedContent } from "../services/shareHandler";
 
 interface QuickClipModalProps {
   visible: boolean;
@@ -35,17 +37,8 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
 
   const username = userEmail ? userEmail.split("@")[0] : "clipper";
 
-  const detectPlatform = (text: string) => {
-    const l = text.toLowerCase();
-    if (l.includes("youtu")) return "youtube";
-    if (l.includes("instagram.com")) return "instagram";
-    if (l.includes("twitter.com") || l.includes("x.com")) return "twitter";
-    if (l.includes("tiktok.com")) return "tiktok";
-    if (l.includes("reddit.com")) return "reddit";
-    return "other";
-  };
-
-  const detected = detectPlatform(url);
+  const detectedAnalysis = url.trim() ? analyzeSharedUrl(cleanShareUrl(url.trim())) : null;
+  const detected = detectedAnalysis ? detectedAnalysis.platform : "other";
 
   const handleSave = async () => {
     if (!url.trim()) return;
@@ -57,33 +50,24 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
         data: { user },
       } = await supabase.auth.getUser();
 
-      const platformVal = detectPlatform(url);
-      const cleanUrl = url.trim();
-      const generatedTitle = title.trim() || `Saved ${platformVal.toUpperCase()} Clip`;
+      const result = await processSharedContent(url.trim(), user?.id);
 
-      const { error } = await supabase.from("saved_videos").insert([
-        {
-          user_id: user?.id,
-          clean_url: cleanUrl,
-          raw_url: cleanUrl,
-          title: generatedTitle,
-          platform: platformVal === "other" ? "youtube" : platformVal,
-          status: "unread",
-          thumbnail_url:
-            platformVal === "youtube"
-              ? "https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=600&auto=format&fit=crop&q=80"
-              : "https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80",
-        },
-      ]);
-
-      if (error) {
-        console.warn("Save clip error:", error.message);
-      } else {
+      if (result.success) {
+        // If user entered a custom title, update it
+        if (title.trim() && result.video?.id) {
+          await supabase
+            .from("saved_videos")
+            .update({ title: title.trim() })
+            .eq("id", result.video.id);
+        }
         haptics.success();
         setUrl("");
         setTitle("");
         onClipSaved();
         onClose();
+      } else {
+        console.warn("Save clip error:", result.error);
+        Alert.alert("Unable to Save", result.error || "Please check the URL.");
       }
     } catch (err: any) {
       console.warn("Failed to insert clip:", err.message);

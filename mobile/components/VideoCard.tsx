@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SavedVideo } from "../types/video";
@@ -25,7 +24,7 @@ interface VideoCardProps {
 /**
  * Authentic Threads / X Inspired Single-Column Feed Post Card
  * Left column: Creator / Platform Avatar
- * Right column: Header (Name, Verified, Handle, Time, Menu), Title, 16:9 Media, Action Row
+ * Right column: Header (Name, Verified, Handle, Time, Menu), Title, 16:9 Media
  */
 export const VideoCard: React.FC<VideoCardProps> = ({
   video,
@@ -41,7 +40,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
   const [imageError, setImageError] = useState(false);
   const cardScale = useRef(new Animated.Value(1)).current;
-  const retweetScale = useRef(new Animated.Value(1)).current;
 
   const handleCardPressIn = () => {
     Animated.spring(cardScale, {
@@ -67,38 +65,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     } else {
       haptics.light();
     }
-
-    Animated.sequence([
-      Animated.timing(retweetScale, {
-        toValue: 0.75,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.spring(retweetScale, {
-        toValue: 1.3,
-        speed: 40,
-        bounciness: 10,
-        useNativeDriver: true,
-      }),
-      Animated.spring(retweetScale, {
-        toValue: 1,
-        speed: 30,
-        bounciness: 4,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
     onToggleStatus();
-  };
-
-  const handleShare = async () => {
-    try {
-      haptics.light();
-      await Share.share({
-        message: `${video.title || "Check this out"}: ${video.clean_url}`,
-        url: video.clean_url,
-      });
-    } catch {}
   };
 
   const getPlatformIcon = (p: string): keyof typeof Ionicons.glyphMap => {
@@ -311,95 +278,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               <Ionicons name="play" size={20} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
-
-          {/* Action Engagement Bar */}
-          <View style={styles.actionBar}>
-            {/* 1. Comment Action */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={() => {
-                haptics.light();
-                if (onLongPress) onLongPress();
-              }}
-            >
-              <Ionicons
-                name="chatbubble-outline"
-                size={16}
-                color={appleColors.twitterMuted}
-              />
-              <Text style={styles.actionCount}>
-                {video.user_notes ? "1" : "0"}
-              </Text>
-            </TouchableOpacity>
-
-            {/* 2. Retweet / Status Toggle Button */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={handleToggle}
-            >
-              <Animated.View style={{ transform: [{ scale: retweetScale }] }}>
-                <Ionicons
-                  name="repeat-outline"
-                  size={18}
-                  color={
-                    isWatched ? appleColors.twitterGreen : appleColors.twitterMuted
-                  }
-                />
-              </Animated.View>
-              <Text
-                style={[
-                  styles.actionCount,
-                  isWatched && { color: appleColors.twitterGreen },
-                ]}
-              >
-                {isWatched ? "Done" : "Queue"}
-              </Text>
-            </TouchableOpacity>
-
-            {/* 3. Bookmark Pill */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={() => {
-                haptics.light();
-                if (onLongPress) onLongPress();
-              }}
-            >
-              <Ionicons
-                name="bookmark-outline"
-                size={16}
-                color={appleColors.twitterMuted}
-              />
-            </TouchableOpacity>
-
-            {/* 4. Native OS Share */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={handleShare}
-            >
-              <Ionicons
-                name="share-outline"
-                size={16}
-                color={appleColors.twitterMuted}
-              />
-            </TouchableOpacity>
-
-            {/* 5. Direct Open Link */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={onPress}
-            >
-              <Ionicons
-                name="open-outline"
-                size={16}
-                color={appleColors.twitterBlue}
-              />
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </Animated.View>
@@ -411,7 +289,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 14,
     paddingTop: 12,
-    paddingBottom: 4,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#1A1A1A",
     backgroundColor: "#000000",
@@ -493,7 +371,7 @@ const styles = StyleSheet.create({
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    marginBottom: 2,
   },
   mediaThumbnail: {
     ...StyleSheet.absoluteFillObject,
@@ -555,24 +433,5 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.35)",
     alignItems: "center",
     justifyContent: "center",
-  },
-  actionBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 6,
-    paddingRight: 10,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-  },
-  actionCount: {
-    color: appleColors.twitterMuted,
-    fontSize: 11,
-    fontWeight: "500",
   },
 });

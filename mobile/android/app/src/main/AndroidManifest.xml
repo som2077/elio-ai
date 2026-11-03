@@ -27,6 +27,12 @@
         <data android:scheme="elio-ai"/>
         <data android:scheme="com.elioai.android"/>
       </intent-filter>
+      <!-- Universal Mobile Share Target: Allows users to share videos from YouTube, Instagram, X, TikTok, Reddit, etc. -->
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="text/plain"/>
+      </intent-filter>
     </activity>
     <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" android:exported="false"/>
   </application>

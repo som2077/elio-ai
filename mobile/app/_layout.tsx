@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { StyleSheet } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { appleColors } from "../theme/appleTokens";
@@ -8,6 +8,8 @@ import { StartupVideoSplash } from "../components/StartupVideoSplash";
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
+  const pathname = usePathname();
+  const isShareScreen = pathname === "/share";
 
   return (
     <SafeAreaProvider style={styles.container}>
@@ -26,8 +28,17 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="share"
+          options={{
+            headerShown: false,
+            animation: "none",
+            presentation: "transparentModal",
+            contentStyle: { backgroundColor: "transparent" },
+          }}
+        />
       </Stack>
-      {showSplash && (
+      {showSplash && !isShareScreen && (
         <StartupVideoSplash onFinish={() => setShowSplash(false)} />
       )}
     </SafeAreaProvider>
