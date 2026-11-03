@@ -6,6 +6,7 @@ import {
   Animated,
   Image,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { haptics } from "../utils/haptics";
@@ -28,6 +29,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   onOpenSearch,
   onOpenFeedsDrawer,
 }) => {
+  const insets = useSafeAreaInsets();
   const qrScale = useRef(new Animated.Value(1)).current;
   const searchScale = useRef(new Animated.Value(1)).current;
 
@@ -50,7 +52,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   };
 
   return (
-    <View style={styles.headerContainer}>
+    <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
       {/* Twitter Frosted Glass Backdrop Blur */}
       <BlurView
         intensity={70}
@@ -122,6 +124,11 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(255, 255, 255, 0.08)",
     overflow: "hidden",

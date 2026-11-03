@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
   StyleSheet,
   Alert,
 } from "react-native";
+import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "../services/supabase";
 import { SavedVideo } from "../types/video";
@@ -37,8 +38,11 @@ import { QuickClipModal } from "../components/QuickClipModal";
 import { triggerLayoutMotion } from "../utils/motion";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
+import { processSharedContent, flushPendingShares } from "../services/shareHandler";
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const headerHeight = insets.top + 48;
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
@@ -68,6 +72,89 @@ export default function HomeScreen() {
   const [detailVideo, setDetailVideo] = useState<SavedVideo | null>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
 
+  // Deep Link & Native Share Target deduplication
+  const lastProcessedUrl = useRef<string>("");
+
+  const handleIncomingDeepLink = async (incomingUrl: string | null) => {
+    if (!incomingUrl) return;
+
+    // Prevent duplicate triggers if URL was processed in last 2.5 seconds
+    if (lastProcessedUrl.current === incomingUrl) return;
+    lastProcessedUrl.current = incomingUrl;
+    setTimeout(() => {
+      lastProcessedUrl.current = "";
+    }, 2500);
+
+    try {
+      const parsed = Linking.parse(incomingUrl);
+      let sharedText = "";
+
+      if (parsed.scheme === "elio-ai" && parsed.hostname === "share") {
+        sharedText = (parsed.queryParams?.text as string) || "";
+      } else if (incomingUrl.includes("elio-ai://share?text=")) {
+        const rawQuery = incomingUrl.split("text=")[1];
+        sharedText = rawQuery ? decodeURIComponent(rawQuery) : "";
+      }
+
+      if (!sharedText) return;
+
+      haptics.selection();
+
+      const result = await processSharedContent(sharedText, session?.user?.id);
+
+      if (result.success) {
+        if (result.isDuplicate) {
+          haptics.warning();
+          setToast({
+            message: "Already in your Watchlist! 📌",
+            type: "info",
+          });
+        } else {
+          haptics.success();
+          triggerLayoutMotion();
+          const platformLabel = result.platform
+            ? result.platform.toUpperCase()
+            : "CLIP";
+
+          setToast({
+            message: `Saved from ${platformLabel}! ⚡`,
+            type: "success",
+          });
+
+          // Refresh video watchlist
+          if (session?.user?.id) {
+            fetchVideos(session.user.id);
+          }
+        }
+      } else if (result.error) {
+        console.warn("[Share Handler] Notice:", result.error);
+      }
+    } catch (err: any) {
+      console.warn("[Share Handler] Error processing link:", err.message);
+    }
+  };
+
+  // Listen for native Android/iOS share target intents and deep links
+  useEffect(() => {
+    // 1. Cold start check (App launched via Share Sheet)
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) {
+        handleIncomingDeepLink(initialUrl);
+      }
+    });
+
+    // 2. Warm start listener (App was already open in background)
+    const subscription = Linking.addEventListener("url", (event) => {
+      if (event.url) {
+        handleIncomingDeepLink(event.url);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [session?.user?.id]);
+
   // Auth session listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
@@ -75,6 +162,16 @@ export default function HomeScreen() {
       setAuthLoading(false);
       if (currentSession) {
         fetchVideos(currentSession.user.id);
+        // Sync any pending clips shared while unauthenticated
+        flushPendingShares(currentSession.user.id).then((synced) => {
+          if (synced > 0) {
+            fetchVideos(currentSession.user.id);
+            setToast({
+              message: `Synced ${synced} shared clip${synced > 1 ? "s" : ""}! ⚡`,
+              type: "success",
+            });
+          }
+        });
       }
     });
 
@@ -84,6 +181,7 @@ export default function HomeScreen() {
       setSession(newSession);
       if (newSession) {
         fetchVideos(newSession.user.id);
+        flushPendingShares(newSession.user.id);
       } else {
         setVideos([]);
       }
@@ -317,27 +415,22 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeContainer} edges={["top", "left", "right"]}>
-      <StatusBar style="light" backgroundColor="#000000" translucent={true} />
+    <SafeAreaView style={styles.safeContainer} edges={[]}>
+      <StatusBar style="light" backgroundColor="transparent" translucent={true} />
 
       {/* VIEW: WATCHLIST FEED */}
       {activeTab === "feed" && (
         <View style={styles.tabContentContainer}>
-          {/* Top Apple / Threads Header */}
-          <AppleHeader
-            userEmail={session?.user?.email}
-            totalCount={videos.length}
-            unreadCount={unreadCount}
-            onOpenScanner={() => setShowScanner(true)}
-            onOpenSearch={() => {
-              triggerLayoutMotion();
-              setActiveTab("search");
-            }}
-            onOpenFeedsDrawer={() => setShowFeedsDrawer(true)}
-          />
-
           {loading ? (
-            <ScrollView contentContainerStyle={styles.listContent}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.listContent,
+                {
+                  paddingTop: headerHeight,
+                  paddingBottom: Math.max(insets.bottom, 12) + 60,
+                },
+              ]}
+            >
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
@@ -363,7 +456,13 @@ export default function HomeScreen() {
                   onToggleStatus={() => toggleStatus(item)}
                 />
               )}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={[
+                styles.listContent,
+                {
+                  paddingTop: headerHeight,
+                  paddingBottom: Math.max(insets.bottom, 12) + 60,
+                },
+              ]}
               ListEmptyComponent={
                 <EmptyState onLinkPress={() => setShowScanner(true)} />
               }
@@ -377,16 +476,30 @@ export default function HomeScreen() {
                   }}
                   tintColor={appleColors.accent}
                   colors={[appleColors.accent]}
+                  progressViewOffset={headerHeight}
                 />
               }
             />
           )}
+
+          {/* Top Apple / Threads Header (Floating Translucent Frosted Glass) */}
+          <AppleHeader
+            userEmail={session?.user?.email}
+            totalCount={videos.length}
+            unreadCount={unreadCount}
+            onOpenScanner={() => setShowScanner(true)}
+            onOpenSearch={() => {
+              triggerLayoutMotion();
+              setActiveTab("search");
+            }}
+            onOpenFeedsDrawer={() => setShowFeedsDrawer(true)}
+          />
         </View>
       )}
 
       {/* VIEW: SEARCH & DISCOVER */}
       {activeTab === "search" && (
-        <View style={styles.tabContentContainer}>
+        <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
           <SearchBar
             query={searchQuery}
             selectedPlatform={searchPlatform}
@@ -482,28 +595,32 @@ export default function HomeScreen() {
 
       {/* VIEW: ACTIVITY & INSIGHTS (ALL DATA TELEMETRY) */}
       {activeTab === "insights" && (
-        <InsightsView
-          videos={videos}
-          selectedDate={selectedDate}
-          onSelectDate={(date) => setSelectedDate(date)}
-          onVideoPress={(video) => {
-            setDetailVideo(video);
-            setShowDetailSheet(true);
-          }}
-          onBack={() => {
-            triggerLayoutMotion();
-            setActiveTab("feed");
-          }}
-        />
+        <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
+          <InsightsView
+            videos={videos}
+            selectedDate={selectedDate}
+            onSelectDate={(date) => setSelectedDate(date)}
+            onVideoPress={(video) => {
+              setDetailVideo(video);
+              setShowDetailSheet(true);
+            }}
+            onBack={() => {
+              triggerLayoutMotion();
+              setActiveTab("feed");
+            }}
+          />
+        </View>
       )}
 
       {/* VIEW: DEVICES & PC SYNC */}
       {activeTab === "devices" && (
-        <DevicesView
-          userEmail={session?.user?.email}
-          onOpenScanner={() => setShowScanner(true)}
-          onLogout={handleLogout}
-        />
+        <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
+          <DevicesView
+            userEmail={session?.user?.email}
+            onOpenScanner={() => setShowScanner(true)}
+            onLogout={handleLogout}
+          />
+        </View>
       )}
 
       {/* THREADS 5-TAB BOTTOM NAVIGATION DOCK */}
