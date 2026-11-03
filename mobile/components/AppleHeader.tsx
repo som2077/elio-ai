@@ -7,6 +7,7 @@ import {
   Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
@@ -50,6 +51,22 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
   return (
     <View style={styles.headerContainer}>
+      {/* Twitter Frosted Glass Backdrop Blur */}
+      <BlurView
+        intensity={85}
+        tint="dark"
+        experimentalBlurMethod="dimezisBlurView"
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Translucent Dark Scrim */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "rgba(0, 0, 0, 0.75)" },
+        ]}
+        pointerEvents="none"
+      />
+
       {/* Top Bar: Hamburger Menu, Center Threads Logo, Right Actions */}
       <View style={styles.topBar}>
         {/* Left Hamburger Drawer Trigger */}
@@ -112,9 +129,9 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    backgroundColor: "#000000",
-    borderBottomWidth: 1,
-    borderBottomColor: "#1A1A1A",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255, 255, 255, 0.12)",
+    overflow: "hidden",
   },
   topBar: {
     height: 48,

@@ -1,13 +1,13 @@
 import React from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
@@ -21,12 +21,13 @@ interface FloatingTabBarProps {
 }
 
 /**
- * Essential Functional Bottom Navigation Dock
+ * Twitter / X Inspired Frosted Glass Translucent Navigation Bar
  * Features:
- * 1. Home (Watchlist & Saved Clips Feed)
- * 2. Compose / '+' (1-Tap Video URL Clipper)
- * 3. Insights (Activity & All Data Telemetry)
- * 4. Profile / Devices (Paired Desktop Extension Sync & Account)
+ * - Native BlurView backdrop with 85 intensity
+ * - Translucent obsidian glass tint (rgba(0, 0, 0, 0.75))
+ * - Hairline top divider (rgba(255, 255, 255, 0.12))
+ * - Pure flat glyphs with active white & inactive muted state
+ * - Twitter blue notification badge dot
  */
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   activeTab,
@@ -41,10 +42,26 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       style={[
         styles.barContainer,
         {
-          paddingBottom: Math.max(insets.bottom, 12),
+          paddingBottom: Math.max(insets.bottom, 10),
         },
       ]}
     >
+      {/* Twitter Frosted Glass Backdrop Blur */}
+      <BlurView
+        intensity={85}
+        tint="dark"
+        experimentalBlurMethod="dimezisBlurView"
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Translucent Dark Scrim for pure contrast */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "rgba(0, 0, 0, 0.75)" },
+        ]}
+        pointerEvents="none"
+      />
+
       <View style={styles.tabRow}>
         {/* 1. Home / Watchlist Feed */}
         <TouchableOpacity
@@ -57,22 +74,39 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             }
           }}
         >
-          <View style={{ position: "relative" }}>
+          <View style={styles.iconWrapper}>
             <Ionicons
               name={activeTab === "feed" ? "home" : "home-outline"}
-              size={24}
-              color={activeTab === "feed" ? "#FFFFFF" : threadsTokens.colors.textSecondary}
+              size={23}
+              color={activeTab === "feed" ? "#FFFFFF" : "#71767B"}
             />
-            {Boolean(unreadCount && unreadCount > 0) && (
-              <View style={styles.redDot} />
-            )}
           </View>
         </TouchableOpacity>
 
-        {/* 2. Fast Clip (+) Button */}
+        {/* 2. Search / Explore */}
         <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.composeItem}
+          activeOpacity={0.7}
+          style={styles.tabItem}
+          onPress={() => {
+            if (activeTab !== "search") {
+              haptics.selection();
+              onTabSelect("search");
+            }
+          }}
+        >
+          <View style={styles.iconWrapper}>
+            <Ionicons
+              name={activeTab === "search" ? "search" : "search-outline"}
+              size={23}
+              color={activeTab === "search" ? "#FFFFFF" : "#71767B"}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* 3. Fast Clip (+) Button */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          style={styles.tabItem}
           onPress={() => {
             haptics.selection();
             if (onComposePress) {
@@ -80,12 +114,16 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             }
           }}
         >
-          <View style={styles.composeBox}>
-            <Ionicons name="add" size={21} color="#FFFFFF" />
+          <View style={styles.iconWrapper}>
+            <Ionicons
+              name="add-outline"
+              size={26}
+              color="#FFFFFF"
+            />
           </View>
         </TouchableOpacity>
 
-        {/* 4. Insights & All Data */}
+        {/* 4. Insights & Analytics */}
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.tabItem}
@@ -96,14 +134,19 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             }
           }}
         >
-          <Ionicons
-            name={activeTab === "insights" ? "stats-chart" : "stats-chart-outline"}
-            size={22}
-            color={activeTab === "insights" ? "#FFFFFF" : threadsTokens.colors.textSecondary}
-          />
+          <View style={styles.iconWrapper}>
+            <Ionicons
+              name={activeTab === "insights" ? "stats-chart" : "stats-chart-outline"}
+              size={22}
+              color={activeTab === "insights" ? "#FFFFFF" : "#71767B"}
+            />
+            {Boolean(unreadCount && unreadCount > 0) && (
+              <View style={styles.blueBadgeDot} />
+            )}
+          </View>
         </TouchableOpacity>
 
-        {/* 5. Profile & Linked Devices */}
+        {/* 5. Profile / Linked Devices */}
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.tabItem}
@@ -114,11 +157,13 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
             }
           }}
         >
-          <Ionicons
-            name={activeTab === "devices" ? "person" : "person-outline"}
-            size={24}
-            color={activeTab === "devices" ? "#FFFFFF" : threadsTokens.colors.textSecondary}
-          />
+          <View style={styles.iconWrapper}>
+            <Ionicons
+              name={activeTab === "devices" ? "person" : "person-outline"}
+              size={22}
+              color={activeTab === "devices" ? "#FFFFFF" : "#71767B"}
+            />
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -131,45 +176,40 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: "#000000",
-    borderTopWidth: 1,
-    borderTopColor: "#1A1A1A",
-    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(255, 255, 255, 0.12)",
+    overflow: "hidden",
+    paddingTop: 8,
   },
   tabRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+    height: 44,
   },
   tabItem: {
     flex: 1,
-    height: 40,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  composeItem: {
-    flex: 1,
+  iconWrapper: {
+    position: "relative",
     alignItems: "center",
     justifyContent: "center",
-  },
-  composeBox: {
-    width: 36,
+    width: 32,
     height: 32,
-    borderRadius: 10,
-    backgroundColor: "#161616",
-    borderWidth: 1,
-    borderColor: "#282828",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  redDot: {
+  blueBadgeDot: {
     position: "absolute",
-    top: -2,
-    right: -2,
+    top: 2,
+    right: 2,
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: threadsTokens.colors.likeRed,
+    backgroundColor: "#1D9BF0",
+    borderWidth: 1.5,
+    borderColor: "#000000",
   },
 });
