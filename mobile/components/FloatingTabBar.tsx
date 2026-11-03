@@ -48,7 +48,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
     >
       {/* Twitter Frosted Glass Backdrop Blur */}
       <BlurView
-        intensity={70}
+        intensity={50}
         tint="systemUltraThinMaterialDark"
         blurReductionFactor={2}
         experimentalBlurMethod="dimezisBlurView"

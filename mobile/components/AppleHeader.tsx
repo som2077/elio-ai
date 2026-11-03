@@ -55,7 +55,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
     <View style={[styles.headerContainer, { paddingTop: insets.top }]}>
       {/* Twitter Frosted Glass Backdrop Blur */}
       <BlurView
-        intensity={70}
+        intensity={50}
         tint="systemUltraThinMaterialDark"
         blurReductionFactor={2}
         experimentalBlurMethod="dimezisBlurView"
