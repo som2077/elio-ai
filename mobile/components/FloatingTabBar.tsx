@@ -48,18 +48,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
     >
       {/* Twitter Frosted Glass Backdrop Blur */}
       <BlurView
-        intensity={85}
-        tint="dark"
+        intensity={70}
+        tint="systemUltraThinMaterialDark"
+        blurReductionFactor={2}
         experimentalBlurMethod="dimezisBlurView"
         style={StyleSheet.absoluteFill}
-      />
-      {/* Translucent Dark Scrim for pure contrast */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: "rgba(0, 0, 0, 0.75)" },
-        ]}
-        pointerEvents="none"
       />
 
       <View style={styles.tabRow}>
@@ -177,7 +170,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255, 255, 255, 0.12)",
+    borderTopColor: "rgba(255, 255, 255, 0.08)",
     overflow: "hidden",
     paddingTop: 8,
   },
