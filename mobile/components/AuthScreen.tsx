@@ -7,8 +7,12 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
+  Alert,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Video, ResizeMode } from "expo-av";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../services/supabase";
 import { motionTokens } from "../utils/motion";
 
@@ -29,6 +33,7 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
+  const insets = useSafeAreaInsets();
   const [googleLoading, setGoogleLoading] = useState(false);
   const [message, setMessage] = useState<{
     text: string;
@@ -78,7 +83,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }).start();
   };
 
-  // 1-Tap Google Sign-In (Auto Signup for new users / Signin for existing)
+  const handleOpenTerms = () => {
+    Alert.alert(
+      "Terms of Service",
+      "By using Elio AI, you agree to save and manage your personal video clips securely and adhere to our terms.",
+      [{ text: "OK" }],
+    );
+  };
+
+  const handleOpenPrivacy = () => {
+    Alert.alert(
+      "Privacy Policy",
+      "We respect your privacy. Your saved video bookmarks, notes, and activity are stored securely in your private vault and never shared.",
+      [{ text: "OK" }],
+    );
+  };
+
+  // 1-Tap Google Sign-In
   const handleGoogleSignIn = async () => {
     try {
       setGoogleLoading(true);
@@ -87,7 +108,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
       if (!WebBrowser) {
         throw new Error(
-          "WebBrowser module not available in this APK build. Please rebuild the app."
+          "WebBrowser module not available in this APK build. Please rebuild the app.",
         );
       }
 
@@ -104,12 +125,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl
+          redirectUrl,
         );
 
         if (result.type === "success" && result.url) {
           const urlParams = new URLSearchParams(
-            result.url.split("#")[1] || result.url.split("?")[1]
+            result.url.split("#")[1] || result.url.split("?")[1],
           );
           const accessToken = urlParams.get("access_token");
           const refreshToken = urlParams.get("refresh_token");
@@ -144,72 +165,92 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#080C14" translucent={false} />
-      <View style={styles.content}>
-        {/* Brand Header */}
-        <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoIcon}>✦</Text>
-          </View>
-          <Text style={styles.appName}>Elio AI</Text>
-          <Text style={styles.tagline}>
-            AI Watchlist & Intelligent Video Recall
-          </Text>
-        </View>
+      <StatusBar
+        style="light"
+        backgroundColor="transparent"
+        translucent={true}
+      />
 
-        {/* Message Alert Banner */}
+      {/* TOP TO BOTTOM: 3D Animated Social Ribbons starting from status bar (Threads layout) */}
+      <View style={styles.videoHeroSection}>
+        <Video
+          source={require("../assets/gemini_generated_video_b2132d12.mp4")}
+          style={styles.fullVideo}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={true}
+          isLooping={true}
+          isMuted={true}
+          volume={0}
+          rate={0.8} // <-- Video speed: 1.0 (normal), 1.2 / 1.5 (fast), 0.8 (slow)
+          shouldCorrectPitch={false}
+          useNativeControls={false}
+        />
+
+        {/* Alert Banner (if any error/message) */}
         {message && (
           <View
             style={[
               styles.alertBanner,
-              message.type === "error" && styles.alertError,
-              message.type === "success" && styles.alertSuccess,
+              { marginTop: Math.max(insets.top, 16) + 12 },
+              message.type === "error"
+                ? styles.alertError
+                : styles.alertSuccess,
             ]}
           >
             <Text style={styles.alertText}>{message.text}</Text>
           </View>
         )}
+      </View>
 
-        {/* Card Container */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome to Elio AI</Text>
-          <Text style={styles.cardSubtitle}>
-            1-Tap instant access. Your saved social clips and AI summaries sync
-            seamlessly across devices.
-          </Text>
+      {/* BOTTOM: USP Headline, Luxury Continue with Google Pill, and Terms/Privacy Policy */}
+      <View
+        style={[
+          styles.bottomActionSection,
+          { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+        ]}
+      >
+        {/* USP Message customized for Elio Video Recall Vault */}
+        <Text style={styles.uspHeadline}>
+          Find what you{"\n"}saved twice{"\n"}as fast.
+        </Text>
 
-          {/* 1-Tap Hero Google Button */}
-          <Animated.View style={{ transform: [{ scale: googleBtnScale }] }}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={styles.googleBtn}
-              onPress={handleGoogleSignIn}
-              onPressIn={() => animatePressIn(googleBtnScale)}
-              onPressOut={() => animatePressOut(googleBtnScale)}
-              disabled={googleLoading}
-            >
-              {googleLoading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator color="#0F172A" />
-                  <Text style={styles.loadingText}>Opening Google...</Text>
-                </View>
-              ) : (
-                <View style={styles.googleBtnContent}>
-                  <View style={styles.googleIconBadge}>
-                    <Text style={styles.googleIcon}>G</Text>
-                  </View>
-                  <Text style={styles.googleBtnText}>Continue with Google</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+        <Animated.View
+          style={{ width: "100%", transform: [{ scale: googleBtnScale }] }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.92}
+            style={styles.primaryPillBtn}
+            onPress={handleGoogleSignIn}
+            onPressIn={() => animatePressIn(googleBtnScale)}
+            onPressOut={() => animatePressOut(googleBtnScale)}
+            disabled={googleLoading}
+          >
+            {googleLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color="#000000" size="small" />
+                <Text style={styles.loadingText}>Opening Google...</Text>
+              </View>
+            ) : (
+              <View style={styles.pillContentRow}>
+                <Ionicons name="logo-google" size={19} color="#000000" />
+                <Text style={styles.pillBtnText}>Continue with Google</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
 
-          {/* Security footnote */}
-          <View style={styles.footerNote}>
-            <Text style={styles.footerNoteText}>
-              🔒 Protected with Supabase Row-Level Security
+        {/* Terms of Service & Privacy Policy customized for Elio */}
+        <View style={styles.termsContainer}>
+          <Text style={styles.termsText}>
+            By continuing, you agree to Elio's{"\n"}
+            <Text style={styles.termsLink} onPress={handleOpenTerms}>
+              Terms of Service
             </Text>
-          </View>
+            {" and "}
+            <Text style={styles.termsLink} onPress={handleOpenPrivacy}>
+              Privacy Policy
+            </Text>
+          </Text>
         </View>
       </View>
     </View>
@@ -219,55 +260,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#080C14",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  content: {
-    width: "100%",
-    maxWidth: 420,
-    alignSelf: "center",
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: "#6366F1",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    shadowColor: "#6366F1",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 10,
-  },
-  logoIcon: {
-    fontSize: 28,
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  appName: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#F8FAFC",
-    letterSpacing: -0.5,
-  },
-  tagline: {
-    fontSize: 14,
-    color: "#94A3B8",
-    marginTop: 6,
-    textAlign: "center",
+    backgroundColor: "#000000",
+    justifyContent: "space-between",
   },
   alertBanner: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 18,
+    marginHorizontal: 24,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     borderWidth: 1,
+    alignItems: "center",
   },
   alertError: {
     backgroundColor: "rgba(239, 68, 68, 0.12)",
@@ -281,68 +284,52 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
     fontSize: 13,
     textAlign: "center",
-    lineHeight: 18,
   },
-  card: {
-    backgroundColor: "#0F172A",
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 8,
+  videoHeroSection: {
+    flex: 1,
+    width: "100%",
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#F8FAFC",
+  fullVideo: {
+    width: "100%",
+    height: "85%",
+  },
+  bottomActionSection: {
+    width: "100%",
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  uspHeadline: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#FFFFFF",
     textAlign: "center",
-    marginBottom: 8,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: "#94A3B8",
-    textAlign: "center",
-    lineHeight: 19,
+    letterSpacing: -0.6,
+    lineHeight: 38,
     marginBottom: 24,
   },
-  googleBtn: {
+  primaryPillBtn: {
+    width: "100%",
+    height: 56,
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    shadowColor: "#000000",
+    borderRadius: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
     elevation: 4,
   },
-  googleBtnContent: {
+  pillContentRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
   },
-  googleIconBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#4285F4",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  googleIcon: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontWeight: "800",
-  },
-  googleBtnText: {
+  pillBtnText: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: "600",
+    color: "#000000",
     letterSpacing: -0.2,
   },
   loadingRow: {
@@ -352,16 +339,25 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   loadingText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#0F172A",
+    color: "#000000",
   },
-  footerNote: {
-    marginTop: 20,
+  termsContainer: {
+    marginTop: 18,
     alignItems: "center",
+    paddingHorizontal: 8,
   },
-  footerNoteText: {
-    fontSize: 12,
-    color: "#64748B",
+  termsText: {
+    fontSize: 13,
+    color: "#8E8E93",
+    textAlign: "center",
+    lineHeight: 19,
+    letterSpacing: -0.1,
+  },
+  termsLink: {
+    color: "#8E8E93",
+    textDecorationLine: "underline",
+    fontWeight: "500",
   },
 });

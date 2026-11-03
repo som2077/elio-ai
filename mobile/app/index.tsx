@@ -17,7 +17,6 @@ import { supabase } from "../services/supabase";
 import { SavedVideo } from "../types/video";
 import { VideoCard } from "../components/VideoCard";
 import { VideoGridCard } from "../components/VideoGridCard";
-import { HeroSpotlightCard } from "../components/HeroSpotlightCard";
 import { FloatingTabBar, TabKey } from "../components/FloatingTabBar";
 import { SearchBar } from "../components/SearchBar";
 import { InsightsView } from "../components/InsightsView";
@@ -26,14 +25,15 @@ import { SkeletonCard } from "../components/SkeletonCard";
 import { GridSkeletonCard } from "../components/GridSkeletonCard";
 import { VideoDetailSheet } from "../components/VideoDetailSheet";
 import { ToastHUD, ToastConfig } from "../components/ToastHUD";
-import { BentoStatsStrip } from "../components/BentoStatsStrip";
 import { openVideoDirectly } from "../services/deepLink";
 import { AuthScreen } from "../components/AuthScreen";
 import { QRScannerModal } from "../components/QRScannerModal";
 import { LinkedDevicesModal } from "../components/LinkedDevicesModal";
 import { AppleHeader } from "../components/AppleHeader";
-import { AppleFilterPills, FilterCategory } from "../components/AppleFilterPills";
 import { EmptyState } from "../components/EmptyState";
+import { FeedsDrawer, FeedFilterType } from "../components/FeedsDrawer";
+import { CreateFeedModal } from "../components/CreateFeedModal";
+import { QuickClipModal } from "../components/QuickClipModal";
 import { triggerLayoutMotion } from "../utils/motion";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
@@ -44,20 +44,24 @@ export default function HomeScreen() {
   const [showScanner, setShowScanner] = useState(false);
   const [showDevicesModal, setShowDevicesModal] = useState(false);
 
-  // Tab & Layout states
+  // Threads modals & drawers
+  const [showFeedsDrawer, setShowFeedsDrawer] = useState(false);
+  const [showCreateFeedModal, setShowCreateFeedModal] = useState(false);
+  const [showQuickClipModal, setShowQuickClipModal] = useState(false);
+  const [feedDrawerFilter, setFeedDrawerFilter] = useState<FeedFilterType>("for_you");
+
+  // Tab & Layout states (Pinterest brick cards as primary)
   const [activeTab, setActiveTab] = useState<TabKey>("feed");
   const [layoutMode, setLayoutMode] = useState<"grid" | "list">("grid");
-  const [spotlightDismissed, setSpotlightDismissed] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPlatform, setSearchPlatform] = useState("all");
 
-  // Video data & filter states
+  // Video data & states
   const [videos, setVideos] = useState<SavedVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<FilterCategory>("all");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Dynamic Island Toast HUD & Detail Modal states
@@ -225,23 +229,28 @@ export default function HomeScreen() {
     [videos]
   );
 
-  // Spotlight video (top unread clip)
-  const spotlightVideo = useMemo(() => {
-    if (spotlightDismissed) return null;
-    return videos.find((v) => v.status === "unread") || null;
-  }, [videos, spotlightDismissed]);
-
   // Feed filtered videos
   const feedVideos = useMemo(() => {
     return videos.filter((v) => {
-      if (filter === "youtube") return v.platform === "youtube";
-      if (filter === "instagram") return v.platform === "instagram";
-      if (filter === "twitter") return v.platform === "twitter";
-      if (filter === "tiktok") return v.platform === "tiktok";
-      if (filter === "unread") return v.status === "unread";
+      // Feed drawer filter
+      if (feedDrawerFilter === "following") return v.status === "unread";
+      if (
+        feedDrawerFilter === "saved" ||
+        feedDrawerFilter === "favorites" ||
+        feedDrawerFilter === "ghost_posts"
+      ) {
+        return v.status === "watched";
+      }
+      if (
+        ["youtube", "instagram", "twitter", "tiktok", "reddit"].includes(
+          feedDrawerFilter
+        )
+      ) {
+        return v.platform === feedDrawerFilter;
+      }
       return true;
     });
-  }, [videos, filter]);
+  }, [videos, feedDrawerFilter]);
 
   // Search filtered videos
   const searchResults = useMemo(() => {
@@ -258,6 +267,70 @@ export default function HomeScreen() {
       return titleMatch || creatorMatch || notesMatch;
     });
   }, [videos, searchQuery, searchPlatform]);
+
+  // Split feed videos into two balanced columns for Pinterest-style staggered masonry
+  const { feedMasonryCol1, feedMasonryCol2 } = useMemo(() => {
+    const col1: SavedVideo[] = [];
+    const col2: SavedVideo[] = [];
+    let h1 = 0;
+    let h2 = 0;
+
+    feedVideos.forEach((v) => {
+      const p = (v.platform || "").toLowerCase();
+      const cat = (v.category || "").toLowerCase();
+      const title = (v.title || "").toLowerCase();
+      const isTall =
+        cat === "reel" ||
+        cat === "short" ||
+        p === "tiktok" ||
+        p === "instagram" ||
+        title.includes("short") ||
+        title.includes("reel");
+      const estHeight = isTall ? 240 : p === "youtube" && !title.includes("short") ? 165 : 190;
+
+      if (h1 <= h2) {
+        col1.push(v);
+        h1 += estHeight + 60;
+      } else {
+        col2.push(v);
+        h2 += estHeight + 60;
+      }
+    });
+
+    return { feedMasonryCol1: col1, feedMasonryCol2: col2 };
+  }, [feedVideos]);
+
+  // Split search videos into two balanced columns for Pinterest-style staggered masonry
+  const { searchMasonryCol1, searchMasonryCol2 } = useMemo(() => {
+    const col1: SavedVideo[] = [];
+    const col2: SavedVideo[] = [];
+    let h1 = 0;
+    let h2 = 0;
+
+    searchResults.forEach((v) => {
+      const p = (v.platform || "").toLowerCase();
+      const cat = (v.category || "").toLowerCase();
+      const title = (v.title || "").toLowerCase();
+      const isTall =
+        cat === "reel" ||
+        cat === "short" ||
+        p === "tiktok" ||
+        p === "instagram" ||
+        title.includes("short") ||
+        title.includes("reel");
+      const estHeight = isTall ? 240 : p === "youtube" && !title.includes("short") ? 165 : 190;
+
+      if (h1 <= h2) {
+        col1.push(v);
+        h1 += estHeight + 60;
+      } else {
+        col2.push(v);
+        h2 += estHeight + 60;
+      }
+    });
+
+    return { searchMasonryCol1: col1, searchMasonryCol2: col2 };
+  }, [searchResults]);
 
   if (authLoading) {
     return (
@@ -283,7 +356,7 @@ export default function HomeScreen() {
       {/* VIEW: WATCHLIST FEED */}
       {activeTab === "feed" && (
         <View style={styles.tabContentContainer}>
-          {/* Top Apple Header */}
+          {/* Top Apple / Threads Header */}
           <AppleHeader
             userEmail={session?.user?.email}
             totalCount={videos.length}
@@ -294,88 +367,33 @@ export default function HomeScreen() {
               setLayoutMode((prev) => (prev === "grid" ? "list" : "grid"));
             }}
             onOpenScanner={() => setShowScanner(true)}
-          />
-
-          {/* Bento Stats Telemetry Strip */}
-          <BentoStatsStrip
-            totalCount={videos.length}
-            unreadCount={unreadCount}
-            videos={videos}
-            onPressUnread={() => {
+            onOpenSearch={() => {
               triggerLayoutMotion();
-              setFilter("unread");
+              setActiveTab("search");
             }}
-          />
-
-          {/* Horizontal Filter Bar */}
-          <AppleFilterPills
-            filter={filter}
-            videos={videos}
-            onSelectFilter={(newFilter) => {
-              triggerLayoutMotion();
-              setFilter(newFilter);
-            }}
+            onOpenFeedsDrawer={() => setShowFeedsDrawer(true)}
           />
 
           {loading ? (
-            layoutMode === "grid" ? (
-              <View style={styles.gridLoadingContainer}>
-                <View style={styles.gridSkeletonRow}>
-                  <GridSkeletonCard />
-                  <GridSkeletonCard />
+            <ScrollView contentContainerStyle={styles.masonryScrollContent} showsVerticalScrollIndicator={false}>
+              <View style={styles.masonryRow}>
+                <View style={styles.masonryColumn}>
+                  <GridSkeletonCard height={220} />
+                  <GridSkeletonCard height={165} />
+                  <GridSkeletonCard height={240} />
                 </View>
-                <View style={styles.gridSkeletonRow}>
-                  <GridSkeletonCard />
-                  <GridSkeletonCard />
+                <View style={styles.masonryColumn}>
+                  <GridSkeletonCard height={170} />
+                  <GridSkeletonCard height={235} />
+                  <GridSkeletonCard height={180} />
                 </View>
               </View>
-            ) : (
-              <ScrollView contentContainerStyle={styles.listContent}>
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </ScrollView>
-            )
+            </ScrollView>
           ) : layoutMode === "grid" ? (
-            /* 2-COLUMN COSMOS POSTER GRID */
-            <FlatList
-              key="grid-view-2-col"
-              data={feedVideos}
-              numColumns={2}
-              keyExtractor={(item) => item.id}
-              ListHeaderComponent={
-                spotlightVideo ? (
-                  <HeroSpotlightCard
-                    video={spotlightVideo}
-                    onPress={() =>
-                      openVideoDirectly(
-                        spotlightVideo.clean_url,
-                        spotlightVideo.platform as any,
-                        spotlightVideo.platform_video_id
-                      )
-                    }
-                    onDismiss={() => setSpotlightDismissed(true)}
-                  />
-                ) : null
-              }
-              renderItem={({ item }) => (
-                <VideoGridCard
-                  video={item}
-                  onPress={() => {
-                    setDetailVideo(item);
-                    setShowDetailSheet(true);
-                  }}
-                  onLongPress={() => {
-                    setDetailVideo(item);
-                    setShowDetailSheet(true);
-                  }}
-                  onToggleStatus={() => toggleStatus(item)}
-                />
-              )}
-              contentContainerStyle={styles.gridContent}
-              ListEmptyComponent={
-                <EmptyState onLinkPress={() => setShowScanner(true)} />
-              }
+            /* 2-COLUMN PINTEREST BRICK MASONRY */
+            <ScrollView
+              contentContainerStyle={styles.masonryScrollContent}
+              showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -388,29 +406,57 @@ export default function HomeScreen() {
                   colors={[appleColors.accent]}
                 />
               }
-            />
+            >
+              {feedVideos.length === 0 ? (
+                <EmptyState onLinkPress={() => setShowScanner(true)} />
+              ) : (
+                <View style={styles.masonryRow}>
+                  <View style={styles.masonryColumn}>
+                    {feedMasonryCol1.map((item, idx) => (
+                      <VideoGridCard
+                        key={item.id}
+                        video={item}
+                        index={idx * 2}
+                        onPress={() => {
+                          setDetailVideo(item);
+                          setShowDetailSheet(true);
+                        }}
+                        onLongPress={() => {
+                          setDetailVideo(item);
+                          setShowDetailSheet(true);
+                        }}
+                        onToggleStatus={() => toggleStatus(item)}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.masonryColumn}>
+                    {feedMasonryCol2.map((item, idx) => (
+                      <VideoGridCard
+                        key={item.id}
+                        video={item}
+                        index={idx * 2 + 1}
+                        onPress={() => {
+                          setDetailVideo(item);
+                          setShowDetailSheet(true);
+                        }}
+                        onLongPress={() => {
+                          setDetailVideo(item);
+                          setShowDetailSheet(true);
+                        }}
+                        onToggleStatus={() => toggleStatus(item)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
           ) : (
-            /* 1-COLUMN EDITORIAL LIST */
+            /* 1-COLUMN WIDE PINTEREST BRICK LIST */
             <FlatList
               key="list-view-1-col"
               data={feedVideos}
               numColumns={1}
               keyExtractor={(item) => item.id}
-              ListHeaderComponent={
-                spotlightVideo ? (
-                  <HeroSpotlightCard
-                    video={spotlightVideo}
-                    onPress={() =>
-                      openVideoDirectly(
-                        spotlightVideo.clean_url,
-                        spotlightVideo.platform as any,
-                        spotlightVideo.platform_video_id
-                      )
-                    }
-                    onDismiss={() => setSpotlightDismissed(true)}
-                  />
-                ) : null
-              }
               renderItem={({ item }) => (
                 <VideoCard
                   video={item}
@@ -455,29 +501,17 @@ export default function HomeScreen() {
             onChangeQuery={setSearchQuery}
             onSelectPlatform={setSearchPlatform}
             onClear={() => setSearchQuery("")}
+            onBack={() => {
+              triggerLayoutMotion();
+              setActiveTab("feed");
+            }}
           />
 
-          <FlatList
-            key="search-grid-2-col"
-            data={searchResults}
-            numColumns={2}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <VideoGridCard
-                video={item}
-                onPress={() => {
-                  setDetailVideo(item);
-                  setShowDetailSheet(true);
-                }}
-                onLongPress={() => {
-                  setDetailVideo(item);
-                  setShowDetailSheet(true);
-                }}
-                onToggleStatus={() => toggleStatus(item)}
-              />
-            )}
-            contentContainerStyle={styles.gridContent}
-            ListEmptyComponent={
+          <ScrollView
+            contentContainerStyle={styles.masonryScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {searchResults.length === 0 ? (
               <View style={styles.emptySearchBox}>
                 <Ionicons
                   name={searchQuery ? "search-outline" : "compass-outline"}
@@ -510,17 +544,64 @@ export default function HomeScreen() {
                   </View>
                 )}
               </View>
-            }
-          />
+            ) : (
+              <View style={styles.masonryRow}>
+                <View style={styles.masonryColumn}>
+                  {searchMasonryCol1.map((item, idx) => (
+                    <VideoGridCard
+                      key={item.id}
+                      video={item}
+                      index={idx * 2}
+                      onPress={() => {
+                        setDetailVideo(item);
+                        setShowDetailSheet(true);
+                      }}
+                      onLongPress={() => {
+                        setDetailVideo(item);
+                        setShowDetailSheet(true);
+                      }}
+                      onToggleStatus={() => toggleStatus(item)}
+                    />
+                  ))}
+                </View>
+                <View style={styles.masonryColumn}>
+                  {searchMasonryCol2.map((item, idx) => (
+                    <VideoGridCard
+                      key={item.id}
+                      video={item}
+                      index={idx * 2 + 1}
+                      onPress={() => {
+                        setDetailVideo(item);
+                        setShowDetailSheet(true);
+                      }}
+                      onLongPress={() => {
+                        setDetailVideo(item);
+                        setShowDetailSheet(true);
+                      }}
+                      onToggleStatus={() => toggleStatus(item)}
+                    />
+                  ))}
+                </View>
+              </View>
+            )}
+          </ScrollView>
         </View>
       )}
 
-      {/* VIEW: ACTIVITY & INSIGHTS */}
+      {/* VIEW: ACTIVITY & INSIGHTS (ALL DATA TELEMETRY) */}
       {activeTab === "insights" && (
         <InsightsView
           videos={videos}
           selectedDate={selectedDate}
           onSelectDate={(date) => setSelectedDate(date)}
+          onVideoPress={(video) => {
+            setDetailVideo(video);
+            setShowDetailSheet(true);
+          }}
+          onBack={() => {
+            triggerLayoutMotion();
+            setActiveTab("feed");
+          }}
         />
       )}
 
@@ -533,13 +614,52 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* FLOATING GLASS BOTTOM NAVIGATION DOCK */}
+      {/* THREADS 5-TAB BOTTOM NAVIGATION DOCK */}
       <FloatingTabBar
         activeTab={activeTab}
         unreadCount={unreadCount}
         onTabSelect={(tab) => {
           triggerLayoutMotion();
           setActiveTab(tab);
+        }}
+        onComposePress={() => setShowQuickClipModal(true)}
+      />
+
+      {/* Threads Feeds Switcher Drawer */}
+      <FeedsDrawer
+        visible={showFeedsDrawer}
+        activeFeed={feedDrawerFilter}
+        onClose={() => setShowFeedsDrawer(false)}
+        onSelectFeed={(feedKey) => {
+          setFeedDrawerFilter(feedKey);
+          triggerLayoutMotion();
+        }}
+        onCreateFeedPress={() => setShowCreateFeedModal(true)}
+      />
+
+      {/* Threads Create Feed Modal */}
+      <CreateFeedModal
+        visible={showCreateFeedModal}
+        onClose={() => setShowCreateFeedModal(false)}
+        onCreateFeed={(feedName) => {
+          setToast({
+            message: `Feed "${feedName}" created`,
+            type: "success",
+          });
+        }}
+      />
+
+      {/* Threads Quick Clip Composer Modal */}
+      <QuickClipModal
+        visible={showQuickClipModal}
+        userEmail={session?.user?.email}
+        onClose={() => setShowQuickClipModal(false)}
+        onClipSaved={() => {
+          fetchVideos();
+          setToast({
+            message: "Clip saved to vault",
+            type: "success",
+          });
         }}
       />
 
@@ -603,6 +723,18 @@ const styles = StyleSheet.create({
   gridSkeletonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  masonryScrollContent: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 110,
+  },
+  masonryRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  masonryColumn: {
+    flex: 1,
   },
   gridContent: {
     paddingHorizontal: 8,

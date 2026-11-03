@@ -1,7 +1,6 @@
 import React, { useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Animated, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
@@ -12,18 +11,23 @@ interface AppleHeaderProps {
   layoutMode: "grid" | "list";
   onToggleLayout: () => void;
   onOpenScanner: () => void;
+  onOpenSearch?: () => void;
+  onOpenFeedsDrawer?: () => void;
 }
 
 export const AppleHeader: React.FC<AppleHeaderProps> = ({
-  userEmail,
-  totalCount,
-  unreadCount,
+  userEmail: _userEmail,
+  totalCount: _totalCount,
+  unreadCount: _unreadCount,
   layoutMode,
   onToggleLayout,
   onOpenScanner,
+  onOpenSearch,
+  onOpenFeedsDrawer,
 }) => {
   const qrScale = useRef(new Animated.Value(1)).current;
   const layoutScale = useRef(new Animated.Value(1)).current;
+  const searchScale = useRef(new Animated.Value(1)).current;
 
   const animatePressIn = (val: Animated.Value) => {
     Animated.spring(val, {
@@ -45,43 +49,35 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
   return (
     <View style={styles.headerContainer}>
-      {/* Brand & Greeting Block */}
-      <View style={styles.brandRow}>
-        <View style={styles.brandLeft}>
-          {/* Mascot Squircle Badge */}
-          <View style={styles.mascotBadge}>
-            <View style={styles.mascotHead}>
-              <View style={styles.mascotEyeLeft} />
-              <View style={styles.mascotEyeRight} />
-            </View>
-          </View>
+      {/* Top Bar: Hamburger Menu, Center Threads Logo, Right Actions */}
+      <View style={styles.topBar}>
+        {/* Left Hamburger Drawer Trigger */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.iconBtn}
+          onPress={() => {
+            haptics.selection();
+            if (onOpenFeedsDrawer) onOpenFeedsDrawer();
+          }}
+        >
+          <Ionicons name="reorder-two-outline" size={30} color="#FFFFFF" />
+        </TouchableOpacity>
 
-          <View style={styles.titleColumn}>
-            <View style={styles.titleRow}>
-              <Text style={styles.brandTitle}>Elio</Text>
-              <Ionicons
-                name="checkmark-circle"
-                size={14}
-                color={appleColors.twitterBlue}
-                style={{ marginLeft: 2 }}
-              />
-              <View style={styles.livePulseDot} />
-            </View>
-            <Text style={styles.subtitle}>
-              {unreadCount > 0
-                ? `${unreadCount} unread • ${totalCount} saved clips`
-                : `All caught up • ${totalCount} clips`}
-            </Text>
-          </View>
+        {/* Center Elio AI Logo */}
+        <View style={styles.logoCenter} pointerEvents="none">
+          <Image
+            source={require("../assets/elio-logo-header.png")}
+            style={styles.elioLogo}
+            resizeMode="contain"
+          />
         </View>
 
-        {/* Right Action Icons: Grid/List Toggle + Link PC */}
+        {/* Right Actions: Grid/List Switcher, QR Scanner & Search Button */}
         <View style={styles.actionsRight}>
-          {/* Grid vs List View Mode Toggle */}
           <Animated.View style={{ transform: [{ scale: layoutScale }] }}>
             <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.actionCircleBtn}
+              activeOpacity={0.75}
+              style={styles.iconBtn}
               onPressIn={() => animatePressIn(layoutScale)}
               onPressOut={() => animatePressOut(layoutScale)}
               onPress={() => {
@@ -91,26 +87,39 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
             >
               <Ionicons
                 name={layoutMode === "grid" ? "list-outline" : "grid-outline"}
-                size={18}
+                size={21}
                 color="#FFFFFF"
               />
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Quick Link PC QR Scanner */}
           <Animated.View style={{ transform: [{ scale: qrScale }] }}>
             <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.linkPill}
+              activeOpacity={0.75}
+              style={styles.iconBtn}
               onPressIn={() => animatePressIn(qrScale)}
               onPressOut={() => animatePressOut(qrScale)}
               onPress={() => {
-                haptics.light();
+                haptics.selection();
                 onOpenScanner();
               }}
             >
-              <Ionicons name="qr-code-outline" size={14} color="#070A11" />
-              <Text style={styles.linkPillText}>Link PC</Text>
+              <Ionicons name="qr-code-outline" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </Animated.View>
+
+          <Animated.View style={{ transform: [{ scale: searchScale }] }}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              style={styles.iconBtn}
+              onPressIn={() => animatePressIn(searchScale)}
+              onPressOut={() => animatePressOut(searchScale)}
+              onPress={() => {
+                haptics.selection();
+                if (onOpenSearch) onOpenSearch();
+              }}
+            >
+              <Ionicons name="search-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -121,111 +130,40 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 10,
-    backgroundColor: '#000000',
+    backgroundColor: "#000000",
     borderBottomWidth: 1,
-    borderBottomColor: appleColors.twitterBorder,
+    borderBottomColor: "#1A1A1A",
   },
-  brandRow: {
+  topBar: {
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingHorizontal: 16,
+    position: "relative",
   },
-  brandLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  mascotBadge: {
+  iconBtn: {
     width: 38,
     height: 38,
-    borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
-  mascotHead: {
-    width: 22,
-    height: 20,
-    borderRadius: 7,
-    backgroundColor: "#FFFFFF",
-    transform: [{ rotate: "12deg" }],
-    flexDirection: "row",
+  logoCenter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
   },
-  mascotEyeLeft: {
-    width: 2.5,
-    height: 5,
-    borderRadius: 1.5,
-    backgroundColor: "#070A11",
-  },
-  mascotEyeRight: {
-    width: 2.5,
-    height: 5,
-    borderRadius: 1.5,
-    backgroundColor: "#070A11",
-  },
-  titleColumn: {
-    justifyContent: "center",
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  brandTitle: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
-  livePulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: appleColors.accentLight,
-  },
-  subtitle: {
-    color: appleColors.textSecondary,
-    fontSize: 11,
-    fontWeight: "500",
-    marginTop: 2,
+  elioLogo: {
+    width: 36,
+    height: 36,
   },
   actionsRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  actionCircleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  linkPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: appleColors.telegramCyan,
-    paddingHorizontal: 12,
-    paddingVertical: 7.5,
-    borderRadius: 18,
-    gap: 5,
-  },
-  linkPillText: {
-    color: "#070A11",
-    fontSize: 11.5,
-    fontWeight: "800",
-    letterSpacing: 0.1,
+    gap: 4,
   },
 });

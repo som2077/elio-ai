@@ -174,3 +174,38 @@ export const appleShadows = {
     elevation: 3,
   },
 };
+
+/**
+ * Instagram Threads OLED Dark Design Tokens
+ * Calibrated directly from reference screenshots
+ */
+export const threadsTokens = {
+  colors: {
+    canvas: '#000000',
+    card: '#101010',
+    surfaceElevated: '#141414',
+    surfaceCard: '#181818',
+    surfaceInput: '#161616',
+    border: '#1E1E1E',
+    borderSubtle: '#181818',
+    borderStrong: '#2A2A2A',
+    textPrimary: '#F3F5F7',
+    textSecondary: '#777777',
+    textTertiary: '#555555',
+    verifiedBlue: '#0095F6',
+    likeRed: '#FF3040',
+    repostGreen: '#00BA7C',
+    destructive: '#FF3B30',
+    actionMuted: '#777777',
+    actionActive: '#FFFFFF',
+  },
+  radii: {
+    avatar: 999,
+    card: 16,
+    input: 14,
+    pill: 999,
+    sheet: 24,
+    button: 12,
+  },
+};
+

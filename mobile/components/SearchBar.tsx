@@ -17,6 +17,7 @@ interface SearchBarProps {
   onChangeQuery: (text: string) => void;
   onSelectPlatform: (platform: string) => void;
   onClear: () => void;
+  onBack?: () => void;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -25,6 +26,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onChangeQuery,
   onSelectPlatform,
   onClear,
+  onBack,
 }) => {
   const platforms = [
     { key: "all", label: "All Clips", icon: "sparkles" as const },
@@ -38,30 +40,45 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <View style={styles.container}>
       {/* Search Input Box */}
-      <View style={styles.inputBox}>
-        <Ionicons name="search" size={17} color={appleColors.textTertiary} />
-        <TextInput
-          value={query}
-          onChangeText={onChangeQuery}
-          placeholder="Search clips, creators, topics..."
-          placeholderTextColor={appleColors.textTertiary}
-          style={styles.textInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-        />
-        {query.length > 0 && (
+      <View style={styles.inputRow}>
+        {onBack && (
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
               haptics.selection();
-              onClear();
+              onBack();
             }}
-            style={styles.clearBtn}
+            style={styles.backBtn}
           >
-            <Ionicons name="close-circle" size={16} color={appleColors.textTertiary} />
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         )}
+        <View style={styles.inputBox}>
+          <Ionicons name="search" size={17} color={appleColors.textTertiary} />
+          <TextInput
+            value={query}
+            onChangeText={onChangeQuery}
+            placeholder="Search clips, creators, topics..."
+            placeholderTextColor={appleColors.textTertiary}
+            style={styles.textInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus={true}
+            clearButtonMode="while-editing"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                haptics.selection();
+                onClear();
+              }}
+              style={styles.clearBtn}
+            >
+              <Ionicons name="close-circle" size={16} color={appleColors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Platform Quick Filter Pills */}
@@ -113,7 +130,19 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 10,
   },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backBtn: {
+    width: 36,
+    height: 42,
+    alignItems: "flex-start",
+    justifyContent: "center",
+    marginRight: 4,
+  },
   inputBox: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.06)",

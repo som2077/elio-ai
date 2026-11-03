@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,12 @@ import {
   StyleSheet,
   Animated,
   Share,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SavedVideo } from '../types/video';
-import { appleColors, appleRadii } from '../theme/appleTokens';
-import { haptics } from '../utils/haptics';
-import { motionTokens } from '../utils/motion';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SavedVideo } from "../types/video";
+import { appleColors } from "../theme/appleTokens";
+import { haptics } from "../utils/haptics";
+import { motionTokens } from "../utils/motion";
 
 interface VideoCardProps {
   video: SavedVideo;
@@ -23,9 +23,9 @@ interface VideoCardProps {
 }
 
 /**
- * Twitter (X) & Telegram Inspired Feed Post Card
- * Features authentic X Post layout with creator avatar, verified badge,
- * embedded 16:9 media, Telegram double-checkmarks, and iconic action engagement row.
+ * Clean Visual Video Card (Wide Pinterest Brick)
+ * Focused on content, thumbnail, and quick video playback.
+ * Completely free of fake tweet/social post clutter.
  */
 export const VideoCard: React.FC<VideoCardProps> = ({
   video,
@@ -33,25 +33,20 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   onToggleStatus,
   onLongPress,
 }) => {
-  const isWatched = video.status === 'watched';
-  const platform = (video.platform || 'youtube').toLowerCase();
-  const platformConfig =
-    appleColors.platforms[platform as keyof typeof appleColors.platforms] ||
-    appleColors.platforms.youtube;
-
+  const isWatched = video.status === "watched";
+  const [imageError, setImageError] = useState(false);
   const cardScale = useRef(new Animated.Value(1)).current;
-  const retweetScale = useRef(new Animated.Value(1)).current;
 
-  const handleCardPressIn = () => {
+  const animatePressIn = () => {
     Animated.spring(cardScale, {
-      toValue: 0.99,
+      toValue: 0.985,
       useNativeDriver: true,
       damping: motionTokens.spring.settle.damping,
       stiffness: motionTokens.spring.settle.stiffness,
     }).start();
   };
 
-  const handleCardPressOut = () => {
+  const animatePressOut = () => {
     Animated.spring(cardScale, {
       toValue: 1,
       useNativeDriver: true,
@@ -60,488 +55,429 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }).start();
   };
 
-  const handleToggle = () => {
-    if (!isWatched) {
-      haptics.success();
-    } else {
-      haptics.light();
+  const getPlatformDetails = (platformName: string) => {
+    const p = (platformName || "").toLowerCase();
+    switch (p) {
+      case "youtube":
+        return {
+          icon: "logo-youtube" as const,
+          color: "#FF0033",
+          name: "YouTube",
+        };
+      case "instagram":
+        return {
+          icon: "logo-instagram" as const,
+          color: "#E1306C",
+          name: "Instagram",
+        };
+      case "twitter":
+        return {
+          icon: "logo-twitter" as const,
+          color: "#1DA1F2",
+          name: "𝕏",
+        };
+      case "tiktok":
+        return {
+          icon: "videocam-outline" as const,
+          color: "#00F2FE",
+          name: "TikTok",
+        };
+      case "reddit":
+        return {
+          icon: "logo-reddit" as const,
+          color: "#FF4500",
+          name: "Reddit",
+        };
+      default:
+        return {
+          icon: "play-circle-outline" as const,
+          color: appleColors.accentLight,
+          name: "Video",
+        };
     }
-
-    Animated.sequence([
-      Animated.timing(retweetScale, {
-        toValue: 0.75,
-        duration: 80,
-        useNativeDriver: true,
-      }),
-      Animated.spring(retweetScale, {
-        toValue: 1.3,
-        speed: 40,
-        bounciness: 10,
-        useNativeDriver: true,
-      }),
-      Animated.spring(retweetScale, {
-        toValue: 1,
-        speed: 30,
-        bounciness: 4,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    onToggleStatus();
   };
 
   const handleShare = async () => {
     try {
       haptics.light();
       await Share.share({
-        message: `${video.title || 'Check this out'}: ${video.clean_url}`,
+        message: `${video.title || "Check this video"}: ${video.clean_url}`,
         url: video.clean_url,
       });
     } catch {}
   };
 
-  const getPlatformIcon = (p: string): keyof typeof Ionicons.glyphMap => {
-    switch (p) {
-      case 'youtube':
-        return 'logo-youtube';
-      case 'instagram':
-        return 'logo-instagram';
-      case 'twitter':
-        return 'logo-twitter';
-      case 'reddit':
-        return 'logo-reddit';
-      case 'tiktok':
-        return 'musical-notes-outline';
-      case 'linkedin':
-        return 'logo-linkedin';
-      case 'facebook':
-        return 'logo-facebook';
-      case 'pinterest':
-        return 'logo-pinterest';
-      default:
-        return 'film-outline';
-    }
+  const platformInfo = getPlatformDetails(video.platform);
+  const hasValidThumbnail =
+    Boolean(video.thumbnail_url) &&
+    !imageError &&
+    !video.thumbnail_url?.includes(".mp4") &&
+    !video.thumbnail_url?.includes(".m3u8");
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
-  const getRelativeTime = (dateStr: string) => {
-    try {
-      const diff = Date.now() - new Date(dateStr).getTime();
-      const mins = Math.floor(diff / 60000);
-      if (mins < 1) return 'now';
-      if (mins < 60) return `${mins}m`;
-      const hours = Math.floor(mins / 60);
-      if (hours < 24) return `${hours}h`;
-      const days = Math.floor(hours / 24);
-      if (days < 30) return `${days}d`;
-      return new Date(dateStr).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
-      return '';
-    }
-  };
+  const durationText = formatDuration(video.duration_seconds);
 
-  const creatorDisplay = video.creator_name || `${platformConfig.label} Creator`;
-  const cleanHandle = (video.creator_name || platform)
-    .replace(/\s+/g, '')
-    .toLowerCase();
+  const creatorInitial = (
+    video.creator_name?.trim()?.charAt(0) ||
+    platformInfo.name.charAt(0)
+  ).toUpperCase();
 
   return (
-    <Animated.View style={{ transform: [{ scale: cardScale }] }}>
-      <View style={styles.tweetContainer}>
-        {/* Left Column: Creator / Platform Avatar */}
-        <View style={styles.avatarColumn}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[
-              styles.avatarCircle,
-              { backgroundColor: platformConfig.bg, borderColor: platformConfig.border },
-            ]}
-            onPress={onPress}
-          >
-            <Ionicons
-              name={getPlatformIcon(platform)}
-              size={18}
-              color={platformConfig.color}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Right Column: Tweet Post Body */}
-        <View style={styles.contentColumn}>
-          {/* Header Row: Name, Verified Badge, Handle, Date, Options */}
-          <View style={styles.headerRow}>
-            <View style={styles.authorMeta}>
-              <Text style={styles.displayName} numberOfLines={1}>
-                {creatorDisplay}
-              </Text>
-              <Ionicons
-                name="checkmark-circle"
-                size={13}
-                color={appleColors.twitterBlue}
-                style={styles.verifiedIcon}
-              />
-              <Text style={styles.handleText} numberOfLines={1}>
-                @{cleanHandle}
-              </Text>
-              <Text style={styles.dotSeparator}>·</Text>
-              <Text style={styles.timeText}>{getRelativeTime(video.created_at)}</Text>
-            </View>
-
-            {Boolean(onLongPress) && (
-              <TouchableOpacity
-                activeOpacity={0.6}
-                style={styles.moreBtn}
-                onPress={() => {
-                  haptics.selection();
-                  onLongPress!();
-                }}
-              >
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={14}
-                  color={appleColors.twitterMuted}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Title / Post Caption */}
-          <TouchableOpacity
-            activeOpacity={0.88}
-            onPress={onPress}
-            onLongPress={onLongPress}
-            delayLongPress={260}
-          >
-            <Text
-              style={[styles.postTitle, isWatched && styles.postTitleWatched]}
-              numberOfLines={3}
-            >
-              {video.title || 'Untitled Social Clip'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Embedded Widescreen 16:9 Media Frame */}
-          <TouchableOpacity
-            activeOpacity={0.92}
-            style={styles.mediaContainer}
-            onPress={onPress}
-            onLongPress={onLongPress}
-            delayLongPress={260}
-            onPressIn={handleCardPressIn}
-            onPressOut={handleCardPressOut}
-          >
+    <Animated.View style={[styles.cardWrapper, { transform: [{ scale: cardScale }] }]}>
+      <TouchableOpacity
+        activeOpacity={0.92}
+        style={styles.cardContainer}
+        onPressIn={animatePressIn}
+        onPressOut={animatePressOut}
+        onPress={() => {
+          haptics.light();
+          onPress();
+        }}
+        onLongPress={() => {
+          if (onLongPress) {
+            haptics.selection();
+            onLongPress();
+          }
+        }}
+        delayLongPress={260}
+      >
+        {/* Full-width Media Thumbnail */}
+        <View style={styles.thumbnailBox}>
+          {hasValidThumbnail ? (
             <Image
-              source={{
-                uri:
-                  video.thumbnail_url &&
-                  !video.thumbnail_url.includes('.mp4') &&
-                  !video.thumbnail_url.includes('.m3u8')
-                    ? video.thumbnail_url
-                    : 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80',
-              }}
-              style={styles.mediaThumbnail}
+              source={{ uri: video.thumbnail_url }}
+              style={styles.thumbnailImage}
               resizeMode="cover"
+              onError={() => setImageError(true)}
             />
-            <View style={styles.mediaScrim} />
-
-            {/* Category Tag in Top Left */}
-            <View style={styles.categoryPill}>
-              <Text style={styles.categoryPillText}>
-                {video.category?.toUpperCase() || 'CLIP'}
-              </Text>
-            </View>
-
-            {/* Telegram-style double-check status badge in Top Right */}
-            <View
-              style={[
-                styles.telegramStatusBadge,
-                isWatched && styles.telegramStatusBadgeWatched,
-              ]}
-            >
-              <Ionicons
-                name={isWatched ? 'checkmark-done' : 'time-outline'}
-                size={13}
-                color={isWatched ? '#FFFFFF' : appleColors.textSecondary}
-              />
-              <Text
+          ) : (
+            <View style={styles.placeholderBox}>
+              <View
                 style={[
-                  styles.telegramStatusText,
-                  isWatched && styles.telegramStatusTextWatched,
+                  styles.placeholderIconRing,
+                  { borderColor: `${platformInfo.color}40` },
                 ]}
               >
-                {isWatched ? 'Watched' : 'Queue'}
-              </Text>
+                <Ionicons
+                  name={platformInfo.icon}
+                  size={36}
+                  color={platformInfo.color}
+                />
+              </View>
+              <Text style={styles.placeholderText}>Video Clip</Text>
+            </View>
+          )}
+
+          {/* Top Overlays */}
+          <View style={styles.thumbnailTopRow}>
+            {/* Platform Badge */}
+            <View style={styles.platformBadge}>
+              <Ionicons
+                name={platformInfo.icon}
+                size={12}
+                color={platformInfo.color}
+              />
+              <Text style={styles.platformText}>{platformInfo.name}</Text>
             </View>
 
-            {/* Center Optical Play Button */}
-            <View style={styles.playOverlay}>
-              <Ionicons name="play" size={20} color="#FFFFFF" style={{ marginLeft: 3 }} />
-            </View>
-          </TouchableOpacity>
-
-          {/* Twitter (X) Action Engagement Bar */}
-          <View style={styles.actionBar}>
-            {/* 1. Comments / Notes */}
+            {/* Status Indicator */}
             <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
+              activeOpacity={0.75}
+              style={[
+                styles.statusBadge,
+                isWatched ? styles.statusWatched : styles.statusUnread,
+              ]}
               onPress={() => {
                 haptics.selection();
-                if (onLongPress) onLongPress();
+                onToggleStatus();
               }}
             >
               <Ionicons
-                name="chatbubble-outline"
-                size={16}
-                color={video.user_notes ? appleColors.twitterBlue : appleColors.twitterMuted}
+                name={isWatched ? "checkmark-done" : "bookmark"}
+                size={12}
+                color={isWatched ? "#070A11" : "#FFFFFF"}
               />
-              {Boolean(video.user_notes) && (
-                <Text style={[styles.actionCount, { color: appleColors.twitterBlue }]}>
-                  Notes
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            {/* 2. Retweet / Watched Status Toggle (Bounces & Lights Green) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={handleToggle}
-            >
-              <Animated.View style={{ transform: [{ scale: retweetScale }] }}>
-                <Ionicons
-                  name={isWatched ? 'repeat' : 'repeat-outline'}
-                  size={18}
-                  color={isWatched ? appleColors.twitterGreen : appleColors.twitterMuted}
-                />
-              </Animated.View>
               <Text
                 style={[
-                  styles.actionCount,
-                  isWatched && { color: appleColors.twitterGreen },
+                  styles.statusText,
+                  isWatched && styles.statusTextWatched,
                 ]}
               >
-                {isWatched ? 'Done' : 'Mark'}
+                {isWatched ? "WATCHED" : "IN QUEUE"}
               </Text>
             </TouchableOpacity>
+          </View>
 
-            {/* 3. Bookmark / Vault Options */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={() => {
-                haptics.light();
-                if (onLongPress) onLongPress();
-              }}
-            >
-              <Ionicons
-                name="bookmark-outline"
-                size={16}
-                color={appleColors.twitterMuted}
-              />
-            </TouchableOpacity>
+          {/* Center Play Button Overlay */}
+          <View style={styles.centerPlayFab}>
+            <Ionicons name="play" size={18} color="#FFFFFF" style={{ marginLeft: 2 }} />
+          </View>
 
-            {/* 4. Native OS Share */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={handleShare}
-            >
-              <Ionicons
-                name="share-outline"
-                size={16}
-                color={appleColors.twitterMuted}
-              />
-            </TouchableOpacity>
+          {/* Bottom Overlay: Duration */}
+          {Boolean(durationText) && (
+            <View style={styles.durationOverlay}>
+              <Text style={styles.durationText}>{durationText}</Text>
+            </View>
+          )}
+        </View>
 
-            {/* 5. Direct Open Link */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionBtn}
-              onPress={onPress}
-            >
-              <Ionicons
-                name="open-outline"
-                size={16}
-                color={appleColors.twitterBlue}
-              />
-            </TouchableOpacity>
+        {/* Pin Details Below Thumbnail */}
+        <View style={styles.contentSection}>
+          <Text style={styles.videoTitle} numberOfLines={2}>
+            {video.title || "Untitled Video Clip"}
+          </Text>
+
+          {/* Creator & Actions Row */}
+          <View style={styles.creatorActionRow}>
+            <View style={styles.creatorLeft}>
+              {video.creator_avatar_url ? (
+                <Image
+                  source={{ uri: video.creator_avatar_url }}
+                  style={styles.creatorAvatarImg}
+                />
+              ) : (
+                <View style={styles.creatorAvatarCircle}>
+                  <Text style={styles.creatorAvatarText}>{creatorInitial}</Text>
+                </View>
+              )}
+              <Text style={styles.creatorName} numberOfLines={1}>
+                {video.creator_name || platformInfo.name}
+              </Text>
+            </View>
+
+            <View style={styles.actionsRight}>
+              {/* Share Button */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.actionIconBtn}
+                onPress={handleShare}
+              >
+                <Ionicons name="share-outline" size={17} color="#A1A1AA" />
+              </TouchableOpacity>
+
+              {/* 3-dots More Actions */}
+              {Boolean(onLongPress) && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.actionIconBtn}
+                  onPress={() => {
+                    haptics.selection();
+                    onLongPress!();
+                  }}
+                >
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={17}
+                    color="#A1A1AA"
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  tweetContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: appleColors.twitterBorder,
-    backgroundColor: '#000000',
+  cardWrapper: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
   },
-  avatarColumn: {
-    marginRight: 10,
-    alignItems: 'center',
+  cardContainer: {
+    backgroundColor: "transparent",
   },
-  avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  thumbnailBox: {
+    width: "100%",
+    height: 200,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#161618",
+    position: "relative",
+    justifyContent: "space-between",
   },
-  contentColumn: {
-    flex: 1,
+  thumbnailImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+  placeholderBox: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#141418",
   },
-  authorMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 6,
-  },
-  displayName: {
-    color: '#FFFFFF',
-    fontSize: 14.5,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-    maxWidth: '45%',
-  },
-  verifiedIcon: {
-    marginLeft: 3,
-  },
-  handleText: {
-    color: appleColors.twitterMuted,
-    fontSize: 13,
-    marginLeft: 4,
-    maxWidth: '28%',
-  },
-  dotSeparator: {
-    color: appleColors.twitterMuted,
-    fontSize: 13,
-    marginHorizontal: 4,
-  },
-  timeText: {
-    color: appleColors.twitterMuted,
-    fontSize: 12.5,
-  },
-  moreBtn: {
-    padding: 4,
-    marginRight: -4,
-  },
-  postTitle: {
-    color: '#E7E9EA',
-    fontSize: 14.5,
-    lineHeight: 20,
-    letterSpacing: -0.1,
-    marginBottom: 10,
-  },
-  postTitleWatched: {
-    color: appleColors.twitterMuted,
-  },
-  mediaContainer: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: '#0F141C',
-    borderWidth: 1,
-    borderColor: appleColors.twitterBorder,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
+  placeholderIconRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
   },
-  mediaThumbnail: {
-    ...StyleSheet.absoluteFillObject,
+  placeholderText: {
+    color: "#71717A",
+    fontSize: 12,
+    fontWeight: "600",
   },
-  mediaScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  thumbnailTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 10,
+    zIndex: 2,
   },
-  categoryPill: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 6,
-    paddingVertical: 2.5,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+  platformBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.68)",
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    gap: 5,
   },
-  categoryPillText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+  platformText: {
+    color: "#FFFFFF",
+    fontSize: 10.5,
+    fontWeight: "700",
   },
-  telegramStatusBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: appleRadii.pill,
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 0.5,
     gap: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  telegramStatusBadgeWatched: {
-    backgroundColor: appleColors.telegramCyan,
-    borderColor: appleColors.telegramCyan,
+  statusUnread: {
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
-  telegramStatusText: {
-    color: appleColors.textSecondary,
-    fontSize: 10,
-    fontWeight: '600',
+  statusWatched: {
+    backgroundColor: appleColors.accentLight,
+    borderColor: appleColors.accentLight,
   },
-  telegramStatusTextWatched: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+  statusText: {
+    color: "#FFFFFF",
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
-  playOverlay: {
+  statusTextWatched: {
+    color: "#070A11",
+  },
+  centerPlayFab: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "40%",
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
   },
-  actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    paddingRight: 10,
+  durationOverlay: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    zIndex: 2,
   },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
+  durationText: {
+    color: "#FFFFFF",
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+  contentSection: {
+    paddingTop: 10,
     paddingHorizontal: 4,
   },
-  actionCount: {
-    color: appleColors.twitterMuted,
-    fontSize: 11,
-    fontWeight: '500',
+  videoTitle: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+    letterSpacing: -0.2,
+  },
+  creatorActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  creatorLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  creatorAvatarImg: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 8,
+  },
+  creatorAvatarCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#27272A",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+  },
+  creatorAvatarText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#E4E4E7",
+  },
+  creatorName: {
+    color: "#A1A1AA",
+    fontSize: 12.5,
+    fontWeight: "500",
+    flex: 1,
+  },
+  actionsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

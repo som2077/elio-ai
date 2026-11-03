@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { appleColors, appleRadii } from "../theme/appleTokens";
+import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
 export type TabKey = "feed" | "search" | "insights" | "devices";
@@ -17,188 +17,159 @@ interface FloatingTabBarProps {
   activeTab: TabKey;
   unreadCount?: number;
   onTabSelect: (tab: TabKey) => void;
+  onComposePress?: () => void;
 }
 
+/**
+ * Essential Functional Bottom Navigation Dock
+ * Features:
+ * 1. Home (Watchlist & Saved Clips Feed)
+ * 2. Compose / '+' (1-Tap Video URL Clipper)
+ * 3. Insights (Activity & All Data Telemetry)
+ * 4. Profile / Devices (Paired Desktop Extension Sync & Account)
+ */
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   activeTab,
   unreadCount = 0,
   onTabSelect,
+  onComposePress,
 }) => {
   const insets = useSafeAreaInsets();
-
-  const tabs: {
-    key: TabKey;
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    activeIcon: keyof typeof Ionicons.glyphMap;
-    badge?: number;
-  }[] = [
-    {
-      key: "feed",
-      label: "Watchlist",
-      icon: "film-outline",
-      activeIcon: "film",
-      badge: unreadCount,
-    },
-    {
-      key: "search",
-      label: "Search",
-      icon: "search-outline",
-      activeIcon: "search",
-    },
-    {
-      key: "insights",
-      label: "Insights",
-      icon: "stats-chart-outline",
-      activeIcon: "stats-chart",
-    },
-    {
-      key: "devices",
-      label: "Devices",
-      icon: "hardware-chip-outline",
-      activeIcon: "hardware-chip",
-    },
-  ];
 
   return (
     <View
       style={[
-        styles.dockContainer,
+        styles.barContainer,
         {
-          bottom: Math.max(insets.bottom + 8, 20),
+          paddingBottom: Math.max(insets.bottom, 12),
         },
       ]}
-      pointerEvents="box-none"
     >
-      <View style={styles.glassDock}>
-        {tabs.map((tab) => {
-          const isActive = activeTab === tab.key;
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              activeOpacity={0.8}
-              style={[styles.tabButton, isActive && styles.activeTabButton]}
-              onPress={() => {
-                if (!isActive) {
-                  haptics.selection();
-                  onTabSelect(tab.key);
-                }
-              }}
-            >
-              <View style={styles.iconWrapper}>
-                <Ionicons
-                  name={isActive ? tab.activeIcon : tab.icon}
-                  size={20}
-                  color={isActive ? "#FFFFFF" : appleColors.textTertiary}
-                />
-                {Boolean(tab.badge && tab.badge > 0) && (
-                  <View style={styles.badgePill}>
-                    <Text style={styles.badgeText}>
-                      {tab.badge! > 99 ? "99+" : tab.badge}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text
-                style={[
-                  styles.tabLabel,
-                  isActive ? styles.activeTabLabel : styles.inactiveTabLabel,
-                ]}
-              >
-                {tab.label}
-              </Text>
-              {isActive && <View style={styles.activeGlowDot} />}
-            </TouchableOpacity>
-          );
-        })}
+      <View style={styles.tabRow}>
+        {/* 1. Home / Watchlist Feed */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.tabItem}
+          onPress={() => {
+            if (activeTab !== "feed") {
+              haptics.selection();
+              onTabSelect("feed");
+            }
+          }}
+        >
+          <View style={{ position: "relative" }}>
+            <Ionicons
+              name={activeTab === "feed" ? "home" : "home-outline"}
+              size={24}
+              color={activeTab === "feed" ? "#FFFFFF" : threadsTokens.colors.textSecondary}
+            />
+            {Boolean(unreadCount && unreadCount > 0) && (
+              <View style={styles.redDot} />
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* 2. Fast Clip (+) Button */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.composeItem}
+          onPress={() => {
+            haptics.selection();
+            if (onComposePress) {
+              onComposePress();
+            }
+          }}
+        >
+          <View style={styles.composeBox}>
+            <Ionicons name="add" size={21} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
+        {/* 4. Insights & All Data */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.tabItem}
+          onPress={() => {
+            if (activeTab !== "insights") {
+              haptics.selection();
+              onTabSelect("insights");
+            }
+          }}
+        >
+          <Ionicons
+            name={activeTab === "insights" ? "stats-chart" : "stats-chart-outline"}
+            size={22}
+            color={activeTab === "insights" ? "#FFFFFF" : threadsTokens.colors.textSecondary}
+          />
+        </TouchableOpacity>
+
+        {/* 5. Profile & Linked Devices */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.tabItem}
+          onPress={() => {
+            if (activeTab !== "devices") {
+              haptics.selection();
+              onTabSelect("devices");
+            }
+          }}
+        >
+          <Ionicons
+            name={activeTab === "devices" ? "person" : "person-outline"}
+            size={24}
+            color={activeTab === "devices" ? "#FFFFFF" : threadsTokens.colors.textSecondary}
+          />
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  dockContainer: {
+  barContainer: {
     position: "absolute",
+    bottom: 0,
     left: 0,
     right: 0,
-    alignItems: "center",
-    zIndex: 999,
+    backgroundColor: "#000000",
+    borderTopWidth: 1,
+    borderTopColor: "#1A1A1A",
+    paddingTop: 10,
   },
-  glassDock: {
+  tabRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(14, 18, 30, 0.94)",
-    borderRadius: 36,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.55,
-        shadowRadius: 24,
-      },
-      android: {
-        elevation: 16,
-      },
-    }),
-  },
-  tabButton: {
-    alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-around",
     paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 24,
-    minWidth: 70,
   },
-  activeTabButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-  },
-  iconWrapper: {
-    position: "relative",
+  tabItem: {
+    flex: 1,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    height: 24,
   },
-  tabLabel: {
-    fontSize: 10,
-    marginTop: 3,
-    fontWeight: "600",
-    letterSpacing: -0.1,
+  composeItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  activeTabLabel: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
-  inactiveTabLabel: {
-    color: appleColors.textTertiary,
-  },
-  activeGlowDot: {
-    width: 3.5,
-    height: 3.5,
-    borderRadius: 2,
-    backgroundColor: appleColors.accentLight,
-    marginTop: 2,
-  },
-  badgePill: {
-    position: "absolute",
-    top: -4,
-    right: -10,
-    backgroundColor: appleColors.accent,
+  composeBox: {
+    width: 36,
+    height: 32,
     borderRadius: 10,
-    minWidth: 16,
-    height: 16,
+    backgroundColor: "#161616",
+    borderWidth: 1,
+    borderColor: "#282828",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
-    borderWidth: 1.5,
-    borderColor: "#0E121E",
   },
-  badgeText: {
-    color: "#000000",
-    fontSize: 9,
-    fontWeight: "900",
+  redDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: threadsTokens.colors.likeRed,
   },
 });

@@ -10,28 +10,38 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SavedVideo } from "../types/video";
-import { appleColors, appleRadii } from "../theme/appleTokens";
+import { appleColors } from "../theme/appleTokens";
 import { motionTokens } from "../utils/motion";
 import { haptics } from "../utils/haptics";
 
 interface VideoGridCardProps {
   video: SavedVideo;
+  index?: number;
   onPress: () => void;
   onToggleStatus: () => void;
   onLongPress?: () => void;
 }
 
+/**
+ * Pinterest-style Masonry Brick Card
+ * - Variable height media thumbnail with smooth rounded corners
+ * - Platform pill & quick status indicator overlaid on media
+ * - Clean title & creator info directly below thumbnail (outside image)
+ * - 3-dots more menu for actions
+ */
 export const VideoGridCard: React.FC<VideoGridCardProps> = ({
   video,
+  index = 0,
   onPress,
   onToggleStatus,
   onLongPress,
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
+  const [imageError, setImageError] = useState(false);
 
   const animatePressIn = () => {
     Animated.spring(scale, {
-      toValue: motionTokens.scale.pressed,
+      toValue: 0.97,
       useNativeDriver: true,
       damping: motionTokens.spring.settle.damping,
       stiffness: motionTokens.spring.settle.stiffness,
@@ -89,14 +99,56 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
     }
   };
 
+  // Determine dynamic masonry brick image height
+  const getBrickImageHeight = () => {
+    const p = (video.platform || "").toLowerCase();
+    const cat = (video.category || "").toLowerCase();
+    const title = (video.title || "").toLowerCase();
+
+    // Reels, Shorts, TikTok are tall portrait bricks
+    if (
+      cat === "reel" ||
+      cat === "short" ||
+      p === "tiktok" ||
+      p === "instagram" ||
+      title.includes("short") ||
+      title.includes("reel")
+    ) {
+      return 240;
+    }
+
+    // Standard YouTube landscape brick
+    if (p === "youtube" && !title.includes("short")) {
+      return 165;
+    }
+
+    // Pseudo-random staggered height based on video ID for natural brick wall look
+    const charCode = (video.id || "a").charCodeAt(0) + index;
+    const heights = [170, 215, 185, 235, 195];
+    return heights[charCode % heights.length];
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds || seconds <= 0) return null;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
   const platformInfo = getPlatformDetails(video.platform);
   const isUnread = video.status === "unread";
-  const [imageError, setImageError] = useState(false);
+  const durationText = formatDuration(video.duration_seconds);
+  const imageHeight = getBrickImageHeight();
   const hasValidThumbnail =
     Boolean(video.thumbnail_url) &&
     !imageError &&
     !video.thumbnail_url?.includes(".mp4") &&
     !video.thumbnail_url?.includes(".m3u8");
+
+  const creatorInitial = (
+    video.creator_name?.trim()?.charAt(0) ||
+    platformInfo.name.charAt(0)
+  ).toUpperCase();
 
   return (
     <Animated.View style={[styles.cardWrapper, { transform: [{ scale }] }]}>
@@ -117,8 +169,8 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
         }}
         delayLongPress={260}
       >
-        {/* Poster Media Image */}
-        <View style={styles.imageBox}>
+        {/* 1. Pinterest Thumbnail Brick */}
+        <View style={[styles.imageBox, { height: imageHeight }]}>
           {hasValidThumbnail ? (
             <Image
               source={{ uri: video.thumbnail_url }}
@@ -128,19 +180,25 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
             />
           ) : (
             <View style={styles.placeholderBox}>
-              <Ionicons
-                name={platformInfo.icon}
-                size={36}
-                color={platformInfo.color || appleColors.textTertiary}
-              />
+              <View
+                style={[
+                  styles.placeholderIconRing,
+                  { borderColor: `${platformInfo.color}40` },
+                ]}
+              >
+                <Ionicons
+                  name={platformInfo.icon}
+                  size={32}
+                  color={platformInfo.color}
+                />
+              </View>
+              <Text style={styles.placeholderText}>Video Clip</Text>
             </View>
           )}
 
-          {/* Scrim Gradient Backdrop for Text Readability */}
-          <View style={styles.scrimOverlay} />
-
-          {/* Top Row: Platform Badge + Status Indicator */}
-          <View style={styles.topRow}>
+          {/* Top Row Overlays: Platform Pill & Status Pill */}
+          <View style={styles.thumbnailTopRow}>
+            {/* Platform Badge */}
             <View style={styles.platformBadge}>
               <Ionicons
                 name={platformInfo.icon}
@@ -150,9 +208,9 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
               <Text style={styles.platformText}>{platformInfo.name}</Text>
             </View>
 
-            {/* Telegram-style double-checkmark status pill */}
+            {/* Status Quick Toggle */}
             <TouchableOpacity
-              activeOpacity={0.7}
+              activeOpacity={0.75}
               style={[
                 styles.statusPill,
                 !isUnread ? styles.statusPillWatched : styles.statusPillUnread,
@@ -163,43 +221,79 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
               }}
             >
               <Ionicons
-                name={!isUnread ? "checkmark-done" : "time-outline"}
-                size={12}
-                color={!isUnread ? "#FFFFFF" : appleColors.telegramCyan}
+                name={!isUnread ? "checkmark-done" : "bookmark"}
+                size={11}
+                color={!isUnread ? "#070A11" : "#FFFFFF"}
               />
-              <Text
-                style={[
-                  styles.statusPillText,
-                  !isUnread && styles.statusPillTextWatched,
-                ]}
-              >
-                {!isUnread ? "SEEN" : "QUEUE"}
-              </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Center Play Icon Overlay */}
-          <View style={styles.playFab}>
-            <Ionicons name="play" size={13} color="#FFFFFF" style={{ marginLeft: 2 }} />
-          </View>
-
-          {/* Bottom Content Scrim */}
-          <View style={styles.bottomInfo}>
-            <Text style={styles.title} numberOfLines={2}>
-              {video.title || "Untitled Video Clip"}
-            </Text>
-
-            {Boolean(video.creator_name) && (
-              <View style={styles.creatorRow}>
+          {/* Bottom Right: Duration or Play Icon */}
+          <View style={styles.bottomOverlayRow}>
+            {durationText ? (
+              <View style={styles.durationBadge}>
                 <Ionicons
-                  name="person-circle-outline"
-                  size={12}
-                  color={appleColors.textSecondary}
+                  name="play"
+                  size={8}
+                  color="#FFFFFF"
+                  style={{ marginRight: 3 }}
                 />
-                <Text style={styles.creatorText} numberOfLines={1}>
-                  {video.creator_name}
-                </Text>
+                <Text style={styles.durationText}>{durationText}</Text>
               </View>
+            ) : (
+              <View style={styles.playFab}>
+                <Ionicons
+                  name="play"
+                  size={11}
+                  color="#FFFFFF"
+                  style={{ marginLeft: 1 }}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* 2. Pin Info Below Thumbnail (Pinterest Style) */}
+        <View style={styles.pinDetails}>
+          {/* Video Title */}
+          <Text style={styles.pinTitle} numberOfLines={2}>
+            {video.title || "Untitled Video"}
+          </Text>
+
+          {/* Creator & Options Menu */}
+          <View style={styles.pinMetaRow}>
+            <View style={styles.creatorMeta}>
+              {video.creator_avatar_url ? (
+                <Image
+                  source={{ uri: video.creator_avatar_url }}
+                  style={styles.creatorAvatarImg}
+                />
+              ) : (
+                <View style={styles.creatorAvatarCircle}>
+                  <Text style={styles.creatorAvatarText}>{creatorInitial}</Text>
+                </View>
+              )}
+              <Text style={styles.creatorNameText} numberOfLines={1}>
+                {video.creator_name || platformInfo.name}
+              </Text>
+            </View>
+
+            {/* 3-dots More Actions */}
+            {Boolean(onLongPress) && (
+              <TouchableOpacity
+                activeOpacity={0.65}
+                style={styles.moreBtn}
+                onPress={() => {
+                  haptics.selection();
+                  onLongPress!();
+                }}
+              >
+                <Ionicons
+                  name="ellipsis-horizontal"
+                  size={14}
+                  color="#8E8E93"
+                />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -210,31 +304,19 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    flex: 1,
-    margin: 6,
+    width: "100%",
+    marginBottom: 12,
   },
   cardContainer: {
-    backgroundColor: "#000000",
+    backgroundColor: "transparent",
     borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: appleColors.twitterBorder,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
   },
   imageBox: {
     width: "100%",
-    height: 220,
+    borderRadius: 16,
+    overflow: "hidden",
     position: "relative",
+    backgroundColor: "#161618",
     justifyContent: "space-between",
   },
   posterImage: {
@@ -254,17 +336,24 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#121828",
+    backgroundColor: "#16161A",
   },
-  scrimOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(7, 10, 19, 0.35)",
+  placeholderIconRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
-  topRow: {
+  placeholderText: {
+    color: "#6B7280",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  thumbnailTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -274,85 +363,121 @@ const styles = StyleSheet.create({
   platformBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(10, 13, 22, 0.88)",
+    backgroundColor: "rgba(0, 0, 0, 0.68)",
     paddingHorizontal: 7,
     paddingVertical: 3.5,
-    borderRadius: 12,
+    borderRadius: 9,
     borderWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "rgba(255, 255, 255, 0.14)",
     gap: 4,
   },
   platformText: {
     color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "800",
+    fontSize: 9.5,
+    fontWeight: "700",
     letterSpacing: 0.2,
   },
   statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 10,
-    borderWidth: 0.5,
-    gap: 4,
-  },
-  statusPillUnread: {
-    backgroundColor: "rgba(42, 171, 238, 0.15)",
-    borderColor: "rgba(42, 171, 238, 0.35)",
-  },
-  statusPillWatched: {
-    backgroundColor: appleColors.telegramCyan,
-    borderColor: appleColors.telegramCyan,
-  },
-  statusPillText: {
-    color: appleColors.telegramCyan,
-    fontSize: 8.5,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
-  statusPillTextWatched: {
-    color: "#000000",
-  },
-  playFab: {
-    position: "absolute",
-    alignSelf: "center",
-    top: "38%",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.25)",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 0.5,
+  },
+  statusPillUnread: {
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  statusPillWatched: {
+    backgroundColor: appleColors.accentLight,
+    borderColor: appleColors.accentLight,
+  },
+  bottomOverlayRow: {
+    alignItems: "flex-end",
+    padding: 8,
     zIndex: 2,
   },
-  bottomInfo: {
-    padding: 10,
-    paddingTop: 16,
-    backgroundColor: "rgba(7, 10, 19, 0.88)",
-    borderTopWidth: 0.5,
-    borderColor: "rgba(255, 255, 255, 0.05)",
-    zIndex: 2,
-  },
-  title: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
-    letterSpacing: -0.2,
-  },
-  creatorRow: {
+  durationBadge: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 5,
-    gap: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.12)",
   },
-  creatorText: {
-    color: appleColors.textSecondary,
-    fontSize: 10,
+  durationText: {
+    color: "#FFFFFF",
+    fontSize: 9.5,
+    fontWeight: "700",
+  },
+  playFab: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinDetails: {
+    paddingTop: 8,
+    paddingHorizontal: 3,
+    paddingBottom: 2,
+  },
+  pinTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 17.5,
+    letterSpacing: -0.15,
+  },
+  pinMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  creatorMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 6,
+  },
+  creatorAvatarImg: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginRight: 6,
+  },
+  creatorAvatarCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#27272A",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 6,
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  creatorAvatarText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#E4E4E7",
+  },
+  creatorNameText: {
+    color: "#A1A1AA",
+    fontSize: 11.5,
     fontWeight: "500",
     flex: 1,
+  },
+  moreBtn: {
+    padding: 3,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

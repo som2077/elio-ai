@@ -1,51 +1,41 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  appleColors,
-  appleRadii,
-  appleTypography,
-  appleShadows,
-} from '../theme/appleTokens';
+import { threadsTokens } from '../theme/appleTokens';
 import { haptics } from '../utils/haptics';
 
 interface EmptyStateProps {
   onLinkPress: () => void;
+  title?: string;
+  subtitle?: string;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ onLinkPress }) => {
+/**
+ * Authentic Instagram Threads Saved Empty State
+ * Calibrated directly from Screenshot 5:
+ * "Posts that you save will appear here."
+ */
+export const EmptyState: React.FC<EmptyStateProps> = ({
+  onLinkPress,
+  title,
+  subtitle,
+}) => {
   return (
     <View style={styles.container}>
-      {/* 3D Mascot in Concentric Squircle Frame */}
-      <View style={styles.mascotGlowWrap}>
-        <View style={styles.mascotGlow} />
-        <View style={styles.mascotFrame}>
-          <Image
-            source={require('../assets/app-icon-original.jpg')}
-            style={styles.mascotImage}
-            resizeMode="cover"
-          />
-        </View>
-      </View>
-
-      {/* Editorial Copy */}
-      <Text style={styles.heading}>Your Video Vault is Empty</Text>
-      <Text style={styles.description}>
-        Like or bookmark videos on YouTube, Instagram, Twitter, and TikTok in your
-        desktop browser. They will sync here automatically!
+      <Text style={styles.messageText}>
+        {subtitle || 'Posts that you save will appear here.'}
       </Text>
 
-      {/* Apple Primary Action Button */}
       <TouchableOpacity
-        activeOpacity={0.88}
-        style={styles.actionBtn}
+        activeOpacity={0.8}
+        style={styles.linkBtn}
         onPress={() => {
           haptics.light();
           onLinkPress();
         }}
       >
-        <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
-        <Text style={styles.actionBtnText}>Link Desktop Extension</Text>
+        <Ionicons name="qr-code-outline" size={16} color="#FFFFFF" />
+        <Text style={styles.linkBtnText}>Link Desktop Extension</Text>
       </TouchableOpacity>
     </View>
   );
@@ -55,64 +45,31 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
+    paddingVertical: 120,
+    paddingHorizontal: 32,
   },
-  mascotGlowWrap: {
-    position: 'relative',
-    marginBottom: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mascotGlow: {
-    position: 'absolute',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: appleColors.accentGlow,
-  },
-  mascotFrame: {
-    width: 90,
-    height: 90,
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: appleColors.borderSpecularTop,
-    ...appleShadows.elevated,
-  },
-  mascotImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heading: {
-    ...appleTypography.title2,
+  messageText: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: threadsTokens.colors.textSecondary,
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  description: {
-    ...appleTypography.subhead,
-    color: appleColors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 290,
+    lineHeight: 22,
     marginBottom: 24,
   },
-  actionBtn: {
+  linkBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: appleColors.accent,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: appleRadii.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#161616',
     borderWidth: 1,
-    borderColor: appleColors.accentLight,
-    ...appleShadows.accentPill,
+    borderColor: '#262626',
   },
-  actionBtnText: {
-    ...appleTypography.caption,
-    fontSize: 13,
+  linkBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#FFFFFF',
-    fontWeight: '700',
   },
 });
