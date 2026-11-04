@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
@@ -73,22 +74,32 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
   return (
     <>
-      {/* 1. Subtle Status Bar Blur (Active when header collapses: Twitter's "littel blur" over content) */}
+      {/* 1. Subtle Linear Gradient Status Bar Blur (Twitter's exact linear blur on scroll) */}
       <Animated.View
         style={[
           styles.statusBarBlurContainer,
           {
-            height: insets.top,
+            height: insets.top + 14,
             opacity: statusBarBlurOpacity,
           },
         ]}
         pointerEvents="none"
       >
         <BlurView
-          intensity={30}
+          intensity={25}
           tint="systemUltraThinMaterialDark"
           blurReductionFactor={2}
           experimentalBlurMethod="dimezisBlurView"
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={[
+            "rgba(0, 0, 0, 0.75)",
+            "rgba(0, 0, 0, 0.42)",
+            "rgba(0, 0, 0, 0.12)",
+            "transparent",
+          ]}
+          locations={[0, 0.4, 0.75, 1]}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
