@@ -1,22 +1,16 @@
-import React, { useRef, useEffect } from 'react';
+import React from "react";
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
   StyleSheet,
-  Animated,
-  Dimensions,
-  TouchableWithoutFeedback,
-  Share,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SavedVideo } from '../types/video';
-import { threadsTokens } from '../theme/appleTokens';
-import { haptics } from '../utils/haptics';
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SavedVideo } from "../types/video";
+import { threadsTokens } from "../theme/appleTokens";
+import { haptics } from "../utils/haptics";
+import { IndustryBottomSheet } from "./IndustryBottomSheet";
 
 interface VideoDetailSheetProps {
   video: SavedVideo | null;
@@ -29,18 +23,12 @@ interface VideoDetailSheetProps {
 }
 
 /**
- * Authentic Instagram Threads Action Sheet
- * Matches Screenshot 4 layout and actions:
- * - Drag handle at top
- * - "Copy link"
- * - "Save" (toggle watched/unread)
- * - "Open in App"
- * - "Not interested"
- * - Hairline separator
- * - "Mute"
- * - "Restrict"
- * - "Block" / "Remove clip" (Red)
- * - "Report" (Red)
+ * Authentic Instagram Threads / Twitter Action Sheet
+ * Powered by IndustryBottomSheet:
+ * - 60fps gesture drag-to-dismiss (PanResponder)
+ * - Velocity flick detection
+ * - Specular highlight top border
+ * - Haptic feedback
  */
 export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   video,
@@ -51,43 +39,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   onCopyLink,
   onDelete,
 }) => {
-  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          damping: 26,
-          stiffness: 240,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: SCREEN_HEIGHT,
-          duration: 180,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 160,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [visible]);
-
   if (!video) return null;
 
-  const isWatched = video.status === 'watched';
+  const isWatched = video.status === "watched";
 
   const handleCopy = () => {
     haptics.light();
@@ -112,13 +66,13 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   const handleDeletePrompt = () => {
     haptics.warning();
     Alert.alert(
-      'Remove Clip',
-      'Are you sure you want to remove this clip from your vault?',
+      "Remove Clip",
+      "Are you sure you want to remove this clip from your vault?",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Remove',
-          style: 'destructive',
+          text: "Remove",
+          style: "destructive",
           onPress: () => {
             onClose();
             onDelete(video);
@@ -129,197 +83,145 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   };
 
   return (
-    <Modal
+    <IndustryBottomSheet
       visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={onClose}
-      statusBarTranslucent
+      onClose={onClose}
+      maxHeightRatio={0.75}
     >
-      <View style={styles.overlay}>
-        {/* Backdrop */}
-        <TouchableWithoutFeedback onPress={onClose}>
-          <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
-        </TouchableWithoutFeedback>
-
-        {/* Threads Action Sheet Panel */}
-        <Animated.View
-          style={[
-            styles.sheetContainer,
-            {
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
+      {/* Action List Section 1 */}
+      <View style={styles.actionGroup}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={handleCopy}
         >
-          {/* Top Grabber Handle */}
-          <View style={styles.handleWrap}>
-            <View style={styles.handleBar} />
-          </View>
+          <Text style={styles.actionLabel}>Copy link</Text>
+          <Ionicons name="link-outline" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
 
-          {/* Action List Section 1 */}
-          <View style={styles.actionGroup}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={handleCopy}
-            >
-              <Text style={styles.actionLabel}>Copy link</Text>
-              <Ionicons name="link-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={handleSaveToggle}
+        >
+          <Text style={styles.actionLabel}>
+            {isWatched ? "Move back to Queue" : "Save"}
+          </Text>
+          <Ionicons
+            name={isWatched ? "bookmark" : "bookmark-outline"}
+            size={22}
+            color="#FFFFFF"
+          />
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={handleSaveToggle}
-            >
-              <Text style={styles.actionLabel}>
-                {isWatched ? 'Move back to Queue' : 'Save'}
-              </Text>
-              <Ionicons
-                name={isWatched ? 'bookmark' : 'bookmark-outline'}
-                size={22}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={handleOpenPlay}
+        >
+          <Text style={styles.actionLabel}>Open in App</Text>
+          <Ionicons name="open-outline" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={handleOpenPlay}
-            >
-              <Text style={styles.actionLabel}>Open in App</Text>
-              <Ionicons name="open-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={() => {
-                haptics.light();
-                onClose();
-              }}
-            >
-              <Text style={styles.actionLabel}>Not interested</Text>
-              <Ionicons name="eye-off-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Section Divider */}
-          <View style={styles.divider} />
-
-          {/* Action List Section 2 */}
-          <View style={styles.actionGroup}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={() => {
-                haptics.light();
-                onClose();
-              }}
-            >
-              <Text style={styles.actionLabel}>Mute</Text>
-              <Ionicons name="volume-mute-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={() => {
-                haptics.light();
-                onClose();
-              }}
-            >
-              <Text style={styles.actionLabel}>Restrict</Text>
-              <Ionicons name="person-remove-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={handleDeletePrompt}
-            >
-              <Text style={[styles.actionLabel, styles.dangerText]}>
-                Remove clip
-              </Text>
-              <Ionicons
-                name="trash-outline"
-                size={22}
-                color={threadsTokens.colors.destructive}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={() => {
-                haptics.warning();
-                onClose();
-              }}
-            >
-              <Text style={[styles.actionLabel, styles.dangerText]}>Report</Text>
-              <Ionicons
-                name="alert-circle-outline"
-                size={22}
-                color={threadsTokens.colors.destructive}
-              />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={() => {
+            haptics.light();
+            onClose();
+          }}
+        >
+          <Text style={styles.actionLabel}>Not interested</Text>
+          <Ionicons name="eye-off-outline" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
-    </Modal>
+
+      {/* Section Divider */}
+      <View style={styles.divider} />
+
+      {/* Action List Section 2 */}
+      <View style={styles.actionGroup}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={() => {
+            haptics.light();
+            onClose();
+          }}
+        >
+          <Text style={styles.actionLabel}>Mute</Text>
+          <Ionicons name="volume-mute-outline" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={() => {
+            haptics.light();
+            onClose();
+          }}
+        >
+          <Text style={styles.actionLabel}>Restrict</Text>
+          <Ionicons name="person-remove-outline" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={handleDeletePrompt}
+        >
+          <Text style={[styles.actionLabel, styles.dangerText]}>
+            Remove clip
+          </Text>
+          <Ionicons
+            name="trash-outline"
+            size={22}
+            color={threadsTokens.colors.destructive}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.actionRow}
+          onPress={() => {
+            haptics.warning();
+            onClose();
+          }}
+        >
+          <Text style={[styles.actionLabel, styles.dangerText]}>Report</Text>
+          <Ionicons
+            name="alert-circle-outline"
+            size={22}
+            color={threadsTokens.colors.destructive}
+          />
+        </TouchableOpacity>
+      </View>
+    </IndustryBottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  sheetContainer: {
-    backgroundColor: '#181818',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 8,
-    paddingBottom: 36,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: '#262626',
-  },
-  handleWrap: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginBottom: 4,
-  },
-  handleBar: {
-    width: 38,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#3E3E3E',
-  },
   actionGroup: {
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
   },
   actionLabel: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#FFFFFF',
+    fontWeight: "500",
+    color: "#FFFFFF",
+    letterSpacing: -0.2,
   },
   dangerText: {
     color: threadsTokens.colors.destructive,
   },
   divider: {
     height: 1,
-    backgroundColor: '#262626',
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     marginVertical: 4,
   },
 });

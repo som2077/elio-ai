@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -14,6 +13,7 @@ import { supabase } from "../services/supabase";
 import { LinkedDevice } from "../types/video";
 import { appleColors, appleRadii, appleTypography } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
+import { IndustryBottomSheet } from "./IndustryBottomSheet";
 
 interface LinkedDevicesModalProps {
   visible: boolean;
@@ -246,79 +246,63 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
   if (!visible) return null;
 
   return (
-    <Modal
+    <IndustryBottomSheet
       visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
+      onClose={onClose}
+      title="Connected Browsers"
+      subtitle="Extensions syncing likes to this mobile inbox"
+      maxHeightRatio={0.88}
+      headerRight={
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={() => {
+            haptics.light();
+            onClose();
+          }}
+        >
+          <Ionicons name="close" size={18} color={appleColors.textSecondary} />
+        </TouchableOpacity>
+      }
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.sheetContainer}>
-          {/* iOS Bottom Sheet Grab Handle */}
-          <View style={styles.grabBarWrap}>
-            <View style={styles.grabBar} />
-          </View>
-
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Connected Browsers</Text>
-              <Text style={styles.headerSubtitle}>
-                Extensions syncing likes to this mobile inbox
+      {/* List or Loading or Empty */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color="#6366F1" size="large" />
+          <Text style={styles.loadingText}>Checking linked devices...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={devices}
+          keyExtractor={(item) => item.device_id || item.id}
+          renderItem={renderDeviceItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>💻</Text>
+              <Text style={styles.emptyTitle}>No Browsers Linked Yet</Text>
+              <Text style={styles.emptyDesc}>
+                Install the Elio AI extension on Chrome, Brave, or Edge and
+                scan its QR code to sync liked videos across all your
+                devices.
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => {
-                haptics.light();
-                onClose();
-              }}
-            >
-              <Ionicons name="close" size={18} color={appleColors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+          }
+        />
+      )}
 
-          {/* List or Loading or Empty */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#6366F1" size="large" />
-              <Text style={styles.loadingText}>Checking linked devices...</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={devices}
-              keyExtractor={(item) => item.device_id || item.id}
-              renderItem={renderDeviceItem}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>💻</Text>
-                  <Text style={styles.emptyTitle}>No Browsers Linked Yet</Text>
-                  <Text style={styles.emptyDesc}>
-                    Install the Elio AI extension on Chrome, Brave, or Edge and
-                    scan its QR code to sync liked videos across all your
-                    devices.
-                  </Text>
-                </View>
-              }
-            />
-          )}
-
-          {/* Bottom Actions */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.linkNewBtn}
-              onPress={() => {
-                onClose();
-                onLinkNewDevice?.();
-              }}
-            >
-              <Text style={styles.linkNewBtnText}>+ Link New Browser QR</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      {/* Bottom Actions */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.linkNewBtn}
+          onPress={() => {
+            onClose();
+            onLinkNewDevice?.();
+          }}
+        >
+          <Text style={styles.linkNewBtnText}>+ Link New Browser QR</Text>
+        </TouchableOpacity>
       </View>
-    </Modal>
+    </IndustryBottomSheet>
   );
 };
 

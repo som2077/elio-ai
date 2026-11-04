@@ -1,18 +1,15 @@
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import {
   View,
   Text,
-  Modal,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   ScrollView,
   Switch,
-  Animated,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { haptics } from "../utils/haptics";
+import { IndustryBottomSheet } from "./IndustryBottomSheet";
 
 export interface PlatformConfig {
   key: string;
@@ -83,204 +80,164 @@ export const ALL_AVAILABLE_PLATFORMS: PlatformConfig[] = [
 
 interface PlatformFilterModalProps {
   visible: boolean;
+  selectedPlatform?: string;
   pinnedPlatforms: string[];
+  platformCounts?: Record<string, number>;
+  onSelectPlatform?: (platformKey: string) => void;
   onTogglePlatform: (platformKey: string) => void;
   onClose: () => void;
 }
 
 export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
   visible,
+  selectedPlatform = "all",
   pinnedPlatforms,
+  platformCounts,
+  onSelectPlatform,
   onTogglePlatform,
   onClose,
 }) => {
-  const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(500)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          damping: 24,
-          stiffness: 280,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      translateY.setValue(500);
-      opacityAnim.setValue(0);
+  const handleSelect = (key: string) => {
+    haptics.medium();
+    if (onSelectPlatform) {
+      onSelectPlatform(key);
     }
-  }, [visible]);
-
-  const handleClose = () => {
-    Animated.parallel([
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 500,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onClose();
-    });
+    onClose();
   };
 
-  if (!visible) return null;
-
   return (
-    <Modal
+    <IndustryBottomSheet
       visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-      statusBarTranslucent
+      onClose={onClose}
+      title="Platforms"
+      subtitle="Tap to view clips or toggle switch to pin to top bar"
+      maxHeightRatio={0.88}
     >
-      <View style={styles.overlay}>
-        {/* Full-screen Dark Backdrop */}
-        <TouchableWithoutFeedback onPress={handleClose}>
-          <Animated.View style={[styles.backdrop, { opacity: opacityAnim }]} />
-        </TouchableWithoutFeedback>
-
-        {/* Sliding Bottom Sheet Container */}
-        <Animated.View
+      {/* Scrollable Platforms List */}
+      <ScrollView
+        style={styles.scrollList}
+        contentContainerStyle={styles.scrollListContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* "All Platforms" Option */}
+        <TouchableOpacity
+          activeOpacity={0.7}
           style={[
-            styles.sheetContainer,
-            {
-              paddingBottom: Math.max(insets.bottom, 16) + 12,
-              transform: [{ translateY }],
-            },
+            styles.platformRow,
+            selectedPlatform === "all" && styles.platformRowActive,
           ]}
+          onPress={() => handleSelect("all")}
         >
-          {/* Top Grab Handle */}
-          <View style={styles.grabHandle} />
-
-          {/* Title Header */}
-          <View style={styles.headerArea}>
-            <Text style={styles.titleText}>Platforms</Text>
-            <Text style={styles.subtitleText}>
-              Choose platforms to pin on your top bar
-            </Text>
-          </View>
-
-          {/* Platforms List */}
-          <ScrollView
-            style={styles.scrollList}
-            contentContainerStyle={styles.scrollListContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {ALL_AVAILABLE_PLATFORMS.map((platform) => {
-              const isPinned = pinnedPlatforms.includes(platform.key);
-              return (
-                <View key={platform.key} style={styles.platformRow}>
-                  {/* Platform Icon & Label */}
-                  <View style={styles.platformInfo}>
-                    <View
-                      style={[
-                        styles.iconCircle,
-                        { backgroundColor: platform.bgColor },
-                      ]}
-                    >
-                      <Ionicons
-                        name={platform.icon}
-                        size={20}
-                        color={platform.color}
-                      />
-                    </View>
-                    <View style={styles.textContainer}>
-                      <Text style={styles.platformLabel}>{platform.label}</Text>
-                      <Text style={styles.pinnedStatus}>
-                        {isPinned ? "Pinned to top bar" : "Hidden from top bar"}
-                      </Text>
-                    </View>
+          <View style={styles.platformInfo}>
+            <View
+              style={[
+                styles.iconCircle,
+                { backgroundColor: "rgba(29, 155, 240, 0.15)" },
+              ]}
+            >
+              <Ionicons name="layers-outline" size={20} color="#1D9BF0" />
+            </View>
+            <View style={styles.textContainer}>
+              <View style={styles.labelRow}>
+                <Text style={styles.platformLabel}>All Platforms</Text>
+                {selectedPlatform === "all" && (
+                  <View style={styles.activeTag}>
+                    <Text style={styles.activeTagText}>Active</Text>
                   </View>
+                )}
+              </View>
+              <Text style={styles.pinnedStatus}>
+                {platformCounts?.all ?? 0} saved clips total • Always available
+              </Text>
+            </View>
+          </View>
+          {selectedPlatform === "all" && (
+            <Ionicons name="checkmark-circle" size={22} color="#1D9BF0" />
+          )}
+        </TouchableOpacity>
 
-                  {/* Right Switch (matching Twitter snooze/topics switches) */}
-                  <Switch
-                    value={isPinned}
-                    onValueChange={() => {
-                      haptics.selection();
-                      onTogglePlatform(platform.key);
-                    }}
-                    trackColor={{ false: "#2F3336", true: "#1D9BF0" }}
-                    thumbColor="#FFFFFF"
+        {/* Individual Platforms */}
+        {ALL_AVAILABLE_PLATFORMS.map((platform) => {
+          const isPinned = pinnedPlatforms.includes(platform.key);
+          const isSelected = selectedPlatform === platform.key;
+          const count = platformCounts ? platformCounts[platform.key] || 0 : 0;
+
+          return (
+            <View
+              key={platform.key}
+              style={[
+                styles.platformRow,
+                isSelected && styles.platformRowActive,
+              ]}
+            >
+              {/* Tappable Left Area (Switches feed to this platform) */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.platformInfo}
+                onPress={() => handleSelect(platform.key)}
+              >
+                <View
+                  style={[
+                    styles.iconCircle,
+                    { backgroundColor: platform.bgColor },
+                  ]}
+                >
+                  <Ionicons
+                    name={platform.icon}
+                    size={20}
+                    color={platform.color}
                   />
                 </View>
-              );
-            })}
-          </ScrollView>
+                <View style={styles.textContainer}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.platformLabel}>{platform.label}</Text>
+                    {isSelected && (
+                      <View style={styles.activeTag}>
+                        <Text style={styles.activeTagText}>Active</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.pinnedStatus}>
+                    {count} clip{count === 1 ? "" : "s"} •{" "}
+                    {isPinned ? "Pinned to bar" : "Hidden from bar"}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
-          {/* Bottom "Done" Action Button */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={styles.doneButton}
-            onPress={() => {
-              haptics.medium();
-              handleClose();
-            }}
-          >
-            <Text style={styles.doneButtonText}>Done</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </Modal>
+              {/* Right Switch (Toggles pinned state on top bar) */}
+              <Switch
+                value={isPinned}
+                onValueChange={() => {
+                  haptics.selection();
+                  onTogglePlatform(platform.key);
+                }}
+                trackColor={{ false: "#2F3336", true: "#1D9BF0" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Bottom "Done" Action Button */}
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.doneButton}
+        onPress={() => {
+          haptics.medium();
+          onClose();
+        }}
+      >
+        <Text style={styles.doneButtonText}>Done</Text>
+      </TouchableOpacity>
+    </IndustryBottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.65)",
-  },
-  sheetContainer: {
-    backgroundColor: "#16181C",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    maxHeight: "82%",
-  },
-  grabHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#3E4144",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  headerArea: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  titleText: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-  },
-  subtitleText: {
-    color: "#71767B",
-    fontSize: 13,
-    marginTop: 4,
-  },
   scrollList: {
-    maxHeight: 380,
+    maxHeight: 330,
+    marginTop: 4,
   },
   scrollListContent: {
     paddingBottom: 8,
@@ -289,9 +246,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 13,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.06)",
+    borderBottomColor: "rgba(255, 255, 255, 0.05)",
+  },
+  platformRowActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
   },
   platformInfo: {
     flexDirection: "row",
@@ -310,10 +272,27 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
   },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   platformLabel: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+    letterSpacing: -0.2,
+  },
+  activeTag: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: "rgba(29, 155, 240, 0.2)",
+  },
+  activeTagText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1D9BF0",
   },
   pinnedStatus: {
     color: "#71767B",
@@ -326,7 +305,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 16,
+    marginTop: 14,
+    marginBottom: 4,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

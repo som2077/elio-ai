@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Animated,
   Image,
   ScrollView,
+  Dimensions,
+  LayoutChangeEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,6 +31,18 @@ const PLATFORM_LABELS: Record<string, string> = {
   pinterest: "Pinterest",
 };
 
+const PLATFORM_COLORS: Record<string, string> = {
+  all: "#1D9BF0",
+  youtube: "#FF0033",
+  instagram: "#E1306C",
+  twitter: "#1D9BF0",
+  reddit: "#FF4500",
+  tiktok: "#00F2FE",
+  facebook: "#1877F2",
+  linkedin: "#0A66C2",
+  pinterest: "#E60023",
+};
+
 interface AppleHeaderProps {
   userEmail?: string;
   totalCount: number;
@@ -40,7 +54,9 @@ interface AppleHeaderProps {
   // Filter props
   selectedPlatform: string;
   onSelectPlatform: (platform: string) => void;
+  onPressActiveTab?: () => void;
   pinnedPlatforms: string[];
+  platformCounts?: Record<string, number>;
   onOpenPlatformModal: () => void;
 }
 
@@ -54,12 +70,89 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   translateY,
   selectedPlatform,
   onSelectPlatform,
+  onPressActiveTab,
   pinnedPlatforms,
+  platformCounts,
   onOpenPlatformModal,
 }) => {
   const insets = useSafeAreaInsets();
   const qrScale = useRef(new Animated.Value(1)).current;
   const searchScale = useRef(new Animated.Value(1)).current;
+
+  // Sliding indicator refs
+  const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
+  const tabsScrollViewRef = useRef<ScrollView>(null);
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
+  const indicatorWidthAnim = useRef(new Animated.Value(0)).current;
+  const indicatorOpacity = useRef(new Animated.Value(0)).current;
+  const hasInitializedIndicator = useRef(false);
+
+  const updateIndicator = (
+    targetX: number,
+    targetWidth: number,
+    immediate: boolean,
+  ) => {
+    if (immediate) {
+      indicatorAnim.setValue(targetX);
+      indicatorWidthAnim.setValue(targetWidth);
+      indicatorOpacity.setValue(1);
+      hasInitializedIndicator.current = true;
+    } else {
+      Animated.parallel([
+        Animated.spring(indicatorAnim, {
+          toValue: targetX,
+          damping: 24,
+          stiffness: 280,
+          mass: 0.8,
+          useNativeDriver: false,
+        }),
+        Animated.spring(indicatorWidthAnim, {
+          toValue: targetWidth,
+          damping: 24,
+          stiffness: 280,
+          mass: 0.8,
+          useNativeDriver: false,
+        }),
+        Animated.timing(indicatorOpacity, {
+          toValue: 1,
+          duration: 120,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  };
+
+  const handleTabLayout = (key: string, event: LayoutChangeEvent) => {
+    const { x, width } = event.nativeEvent.layout;
+    tabLayouts.current[key] = { x, width };
+
+    if (key === selectedPlatform) {
+      const targetWidth = Math.max(26, width - 20);
+      const targetX = x + (width - targetWidth) / 2;
+      updateIndicator(targetX, targetWidth, !hasInitializedIndicator.current);
+    }
+  };
+
+  // When selected platform changes, animate indicator and auto-center tab
+  useEffect(() => {
+    const layout = tabLayouts.current[selectedPlatform];
+    if (layout) {
+      const targetWidth = Math.max(26, layout.width - 20);
+      const targetX = layout.x + (layout.width - targetWidth) / 2;
+      updateIndicator(targetX, targetWidth, false);
+
+      // Auto-center in horizontal ScrollView
+      const screenWidth = Dimensions.get("window").width;
+      const scrollTargetX = Math.max(
+        0,
+        layout.x - (screenWidth / 2 - layout.width / 2),
+      );
+      tabsScrollViewRef.current?.scrollTo({
+        x: scrollTargetX,
+        animated: true,
+      });
+    }
+  }, [selectedPlatform]);
 
   const animatePressIn = (val: Animated.Value) => {
     Animated.spring(val, {
@@ -88,7 +181,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
       })
     : 1;
 
-  // Subtle status bar blur fades in as the header bar collapses ("littel littel blur" like Twitter)
+  // Subtle status bar blur fades in as the header bar collapses
   const statusBarBlurOpacity = translateY
     ? translateY.interpolate({
         inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -20, 0],
@@ -96,6 +189,8 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         extrapolate: "clamp",
       })
     : 0;
+
+  const allCount = platformCounts?.all ?? 0;
 
   return (
     <>
@@ -202,14 +297,15 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           </View>
         </View>
 
-        {/* Row 2: Twitter-style Clean Horizontal Tabs Bar (No pill containers) */}
+        {/* Row 2: Twitter-style Clean Horizontal Tabs Bar with Smooth Sliding Indicator */}
         <View style={styles.tabsRow}>
           <ScrollView
+            ref={tabsScrollViewRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabsScrollContent}
           >
-            {/* "Platforms" Trigger Tab (Opens Bottom Sheet Modal) - Clean text tab like Twitter */}
+            {/* "Platforms" Trigger Tab (Opens Bottom Sheet Modal) */}
             <TouchableOpacity
               activeOpacity={0.7}
               style={styles.tabItem}
@@ -233,52 +329,115 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
             {/* "All" Platform Tab */}
             <TouchableOpacity
+              key="all"
               activeOpacity={0.7}
               style={styles.tabItem}
+              onLayout={(e) => handleTabLayout("all", e)}
               onPress={() => {
-                haptics.selection();
-                onSelectPlatform("all");
+                if (selectedPlatform === "all") {
+                  onPressActiveTab?.();
+                } else {
+                  haptics.selection();
+                  onSelectPlatform("all");
+                }
               }}
             >
-              <Text
-                style={[
-                  styles.tabItemText,
-                  selectedPlatform === "all" && styles.tabItemTextActive,
-                ]}
-              >
-                All
-              </Text>
-              {selectedPlatform === "all" && (
-                <View style={styles.activeUnderline} />
-              )}
+              <View style={styles.tabItemInner}>
+                <Text
+                  style={[
+                    styles.tabItemText,
+                    selectedPlatform === "all" && styles.tabItemTextActive,
+                  ]}
+                >
+                  All
+                </Text>
+                {allCount > 0 && (
+                  <View
+                    style={[
+                      styles.tabBadge,
+                      selectedPlatform === "all" && styles.tabBadgeActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tabBadgeText,
+                        selectedPlatform === "all" && styles.tabBadgeTextActive,
+                      ]}
+                    >
+                      {allCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
 
-            {/* Pinned Platforms (3-4 by default, more added via bottom sheet) */}
+            {/* Pinned Platforms (YouTube, Instagram, Twitter, Reddit, etc.) */}
             {pinnedPlatforms.map((platformKey) => {
               const isActive = selectedPlatform === platformKey;
               const label = PLATFORM_LABELS[platformKey] || platformKey;
+              const count = platformCounts
+                ? platformCounts[platformKey] || 0
+                : 0;
               return (
                 <TouchableOpacity
                   key={platformKey}
                   activeOpacity={0.7}
                   style={styles.tabItem}
+                  onLayout={(e) => handleTabLayout(platformKey, e)}
                   onPress={() => {
-                    haptics.selection();
-                    onSelectPlatform(platformKey);
+                    if (isActive) {
+                      onPressActiveTab?.();
+                    } else {
+                      haptics.selection();
+                      onSelectPlatform(platformKey);
+                    }
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.tabItemText,
-                      isActive && styles.tabItemTextActive,
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                  {isActive && <View style={styles.activeUnderline} />}
+                  <View style={styles.tabItemInner}>
+                    <Text
+                      style={[
+                        styles.tabItemText,
+                        isActive && styles.tabItemTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                    {count > 0 && (
+                      <View
+                        style={[
+                          styles.tabBadge,
+                          isActive && styles.tabBadgeActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.tabBadgeText,
+                            isActive && styles.tabBadgeTextActive,
+                          ]}
+                        >
+                          {count}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
               );
             })}
+
+            {/* Single Industry Grade Fluid Sliding Indicator Underline */}
+            <Animated.View
+              style={[
+                styles.slidingIndicator,
+                {
+                  backgroundColor:
+                    PLATFORM_COLORS[selectedPlatform] || "#1D9BF0",
+                  width: indicatorWidthAnim,
+                  transform: [{ translateX: indicatorAnim }],
+                  opacity: indicatorOpacity,
+                },
+              ]}
+              pointerEvents="none"
+            />
           </ScrollView>
         </View>
       </Animated.View>
@@ -327,8 +486,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   elioLogo: {
-    width: 44,
-    height: 44,
+    width: 60,
+    height: 60,
   },
   actionsRight: {
     flexDirection: "row",
@@ -344,13 +503,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
+    position: "relative",
   },
   tabItem: {
     paddingHorizontal: 12,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
   },
   tabItemInner: {
     flexDirection: "row",
@@ -376,13 +535,31 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
   },
-  activeUnderline: {
+  tabBadge: {
+    marginLeft: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+  },
+  tabBadgeActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.16)",
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#71767B",
+  },
+  tabBadgeTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  slidingIndicator: {
     position: "absolute",
     bottom: 2,
-    left: 12,
-    right: 12,
+    left: 0,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: "#1D9BF0",
+    zIndex: 10,
   },
 });

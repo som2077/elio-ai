@@ -194,6 +194,18 @@ export default function HomeScreen() {
     });
   };
 
+  const handleSelectPlatform = (platformKey: string) => {
+    if (platformKey === selectedPlatform) {
+      haptics.light();
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      return;
+    }
+    haptics.selection();
+    triggerLayoutMotion(200);
+    setSelectedPlatform(platformKey);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  };
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPlatform, setSearchPlatform] = useState("all");
@@ -466,6 +478,19 @@ export default function HomeScreen() {
     [videos],
   );
 
+  const platformCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: videos.length,
+    };
+    videos.forEach((v) => {
+      const p = (v.platform || "").toLowerCase();
+      if (p) {
+        counts[p] = (counts[p] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [videos]);
+
   // Feed filtered videos (Platform Tabs + Feed Drawer)
   const feedVideos = useMemo(() => {
     return videos.filter((v) => {
@@ -620,7 +645,11 @@ export default function HomeScreen() {
                 },
               ]}
               ListEmptyComponent={
-                <EmptyState onLinkPress={() => setShowScanner(true)} />
+                <EmptyState
+                  platform={selectedPlatform}
+                  onLinkPress={() => setShowScanner(true)}
+                  onResetPlatform={() => handleSelectPlatform("all")}
+                />
               }
               refreshControl={
                 <RefreshControl
@@ -645,8 +674,13 @@ export default function HomeScreen() {
             unreadCount={unreadCount}
             translateY={headerTranslateY}
             selectedPlatform={selectedPlatform}
-            onSelectPlatform={setSelectedPlatform}
+            onSelectPlatform={handleSelectPlatform}
+            onPressActiveTab={() => {
+              haptics.light();
+              flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            }}
             pinnedPlatforms={pinnedPlatforms}
+            platformCounts={platformCounts}
             onOpenPlatformModal={() => setShowPlatformModal(true)}
             onOpenScanner={() => setShowScanner(true)}
             onOpenSearch={() => {
@@ -887,7 +921,10 @@ export default function HomeScreen() {
       {/* Platform Filter Bottom Sheet Modal */}
       <PlatformFilterModal
         visible={showPlatformModal}
+        selectedPlatform={selectedPlatform}
         pinnedPlatforms={pinnedPlatforms}
+        platformCounts={platformCounts}
+        onSelectPlatform={handleSelectPlatform}
         onTogglePlatform={togglePinnedPlatform}
         onClose={() => setShowPlatformModal(false)}
       />
