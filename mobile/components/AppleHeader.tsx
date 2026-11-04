@@ -93,11 +93,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
-          colors={[
-            "rgba(0, 0, 0, 0.42)",
-            "rgba(0, 0, 0, 0.20)",
-            "transparent",
-          ]}
+          colors={["rgba(0, 0, 0, 0.42)", "rgba(0, 0, 0, 0.20)", "transparent"]}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -138,10 +134,10 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
             <Ionicons name="reorder-two-outline" size={30} color="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Center Elio AI Logo */}
+          {/* Center Logo */}
           <View style={styles.logoCenter} pointerEvents="none">
             <Image
-              source={require("../assets/elio-logo-header.png")}
+              source={require("../assets/centerImage.png")}
               style={styles.elioLogo}
               resizeMode="contain"
             />
