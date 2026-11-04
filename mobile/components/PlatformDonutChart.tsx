@@ -1,6 +1,5 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { PieChart, pieDataItem } from "react-native-gifted-charts";
 import { Ionicons } from "@expo/vector-icons";
 
 interface PlatformStatItem {
@@ -18,12 +17,12 @@ interface PlatformDonutChartProps {
 }
 
 /**
- * Industry-Grade Content Source Donut Chart
+ * Pure React Native Platform Distribution Bar & Breakdown
+ * (100% Native-Module-Free, Zero Dependency on react-native-svg)
  * Features:
- * - Sleek Donut Ring with platform-specific branding accents
- * - Center Metric displaying total clip volume
- * - High-contrast legend pills with percentages and counts
- * - Twitter Lights-Out dark mode palette (#16181C, #2F3336)
+ * - Proportional Multi-Segmented Brand Progress Track
+ * - Platform Share Breakdown with Icons and Percentage Badges
+ * - Twitter Lights-Out Dark Palette (#16181C, #2F3336)
  */
 export const PlatformDonutChart: React.FC<PlatformDonutChartProps> = ({
   data,
@@ -38,69 +37,71 @@ export const PlatformDonutChart: React.FC<PlatformDonutChartProps> = ({
     );
   }
 
-  const pieData: pieDataItem[] = data.map((item) => ({
-    value: item.count,
-    color: item.color,
-    text: `${item.pct}%`,
-  }));
-
   return (
     <View style={styles.card}>
+      {/* Header */}
       <View style={styles.headerRow}>
-        <Text style={styles.cardTitle}>Platform Distribution</Text>
-        <Text style={styles.cardSub}>{data.length} Sources</Text>
+        <View>
+          <Text style={styles.cardTitle}>Platform Distribution</Text>
+          <Text style={styles.cardSub}>Content source breakdown</Text>
+        </View>
+        <View style={styles.totalBadge}>
+          <Text style={styles.totalBadgeNum}>{totalClips}</Text>
+          <Text style={styles.totalBadgeText}>Total Clips</Text>
+        </View>
       </View>
 
-      <View style={styles.chartLayoutRow}>
-        {/* Donut Ring with Center Summary */}
-        <View style={styles.donutWrap}>
-          <PieChart
-            donut
-            data={pieData}
-            radius={65}
-            innerRadius={46}
-            innerCircleColor="#16181C"
-            centerLabelComponent={() => (
-              <View style={styles.centerLabel}>
-                <Text style={styles.centerNumber}>{totalClips}</Text>
-                <Text style={styles.centerText}>Clips</Text>
-              </View>
-            )}
+      {/* Proportional Segmented Progress Track */}
+      <View style={styles.segmentedTrack}>
+        {data.map((item) => (
+          <View
+            key={item.key}
+            style={[
+              styles.trackSegment,
+              {
+                flex: item.count,
+                backgroundColor: item.color,
+              },
+            ]}
           />
-        </View>
+        ))}
+      </View>
 
-        {/* Platform Breakdown Legend */}
-        <View style={styles.legendCol}>
-          {data.map((item) => (
-            <View key={item.key} style={styles.legendRow}>
-              <View style={styles.legendLeft}>
-                <Ionicons
-                  name={item.icon}
-                  size={15}
-                  color={item.color}
-                  style={styles.platformIcon}
-                />
+      {/* Platform Breakdown Cards Grid */}
+      <View style={styles.legendGrid}>
+        {data.map((item) => (
+          <View key={item.key} style={styles.legendItemCard}>
+            <View style={styles.legendItemLeft}>
+              <View
+                style={[
+                  styles.iconCircle,
+                  { backgroundColor: `${item.color}20` },
+                ]}
+              >
+                <Ionicons name={item.icon} size={15} color={item.color} />
+              </View>
+              <View>
                 <Text style={styles.platformName} numberOfLines={1}>
                   {item.label}
                 </Text>
-              </View>
-
-              <View style={styles.legendRight}>
-                <Text style={styles.platformCount}>{item.count}</Text>
-                <View
-                  style={[
-                    styles.pctPill,
-                    { backgroundColor: `${item.color}22` },
-                  ]}
-                >
-                  <Text style={[styles.pctText, { color: item.color }]}>
-                    {item.pct}%
-                  </Text>
-                </View>
+                <Text style={styles.clipCountSub}>
+                  {item.count} {item.count === 1 ? "clip" : "clips"}
+                </Text>
               </View>
             </View>
-          ))}
-        </View>
+
+            <View
+              style={[
+                styles.pctPill,
+                { backgroundColor: `${item.color}1C` },
+              ]}
+            >
+              <Text style={[styles.pctText, { color: item.color }]}>
+                {item.pct}%
+              </Text>
+            </View>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -117,9 +118,9 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   cardTitle: {
     color: "#FFFFFF",
@@ -130,72 +131,78 @@ const styles = StyleSheet.create({
   cardSub: {
     color: "#71767B",
     fontSize: 12,
+    marginTop: 2,
   },
-  chartLayoutRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  totalBadge: {
+    alignItems: "flex-end",
   },
-  donutWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 140,
-  },
-  centerLabel: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  centerNumber: {
+  totalBadgeNum: {
     color: "#FFFFFF",
-    fontSize: 19,
+    fontSize: 16,
     fontWeight: "800",
-    letterSpacing: -0.5,
   },
-  centerText: {
+  totalBadgeText: {
     color: "#71767B",
     fontSize: 11,
     fontWeight: "500",
   },
-  legendCol: {
-    flex: 1,
-    paddingLeft: 12,
+  segmentedTrack: {
+    flexDirection: "row",
+    height: 10,
+    borderRadius: 5,
+    overflow: "hidden",
+    backgroundColor: "#202327",
+    marginBottom: 16,
+    gap: 2,
+  },
+  trackSegment: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  legendGrid: {
     gap: 8,
   },
-  legendRow: {
+  legendItemCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: "#000000",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2F3336",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
-  legendLeft: {
+  legendItemLeft: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
     flex: 1,
-    marginRight: 8,
   },
-  platformIcon: {
-    marginRight: 6,
+  iconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
   },
   platformName: {
-    color: "#E7E9EA",
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: "500",
-  },
-  legendRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  platformCount: {
-    color: "#71767B",
-    fontSize: 12,
     fontWeight: "600",
   },
+  clipCountSub: {
+    color: "#71767B",
+    fontSize: 11,
+    marginTop: 1,
+  },
   pctPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   pctText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
   },
   emptyCard: {

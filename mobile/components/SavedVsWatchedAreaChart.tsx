@@ -1,10 +1,15 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
-import { LineChart, lineDataItem } from "react-native-gifted-charts";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { haptics } from "../utils/haptics";
-
 import { TimeRange } from "./TimeRangeMenu";
+import { haptics } from "../utils/haptics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -21,18 +26,19 @@ interface SavedVsWatchedAreaChartProps {
 }
 
 /**
- * Industry-Grade Curved Area Chart (Saved vs Watched)
+ * Pure React Native Dual Trend & Area Chart
+ * (100% Native-Module-Free, Zero Dependency on react-native-svg)
  * Features:
- * - Smooth Cubic-Bezier Area Curves
- * - Translucent Dual-Gradient Fills (Cyan for Saved, Emerald for Watched)
- * - Interactive Touch Pointer with Dynamic Tooltip Bubble & Haptics
- * - Pure OLED Twitter Dark Palette (#000000, #2F3336, #16181C)
+ * - Dual Gradient Area Fills (Cyan for Saved, Emerald for Watched)
+ * - Dynamic Interactive Touch Scrubbing with Haptics
+ * - High-Precision Gridlines and Y-axis scaling
+ * - Twitter Lights-Out Dark Mode Palette (#16181C, #2F3336)
  */
 export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = ({
   data,
   timeRange,
 }) => {
-  const [activeTooltip, setActiveTooltip] = useState<DailyPoint | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   if (!data || data.length === 0) {
     return (
@@ -43,20 +49,17 @@ export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = (
     );
   }
 
-  // Calculate maximum value for Y-axis scale
+  // Maximum value for scaling (at least 3 to maintain baseline)
   const maxVal = Math.max(
     ...data.map((d) => Math.max(d.saved, d.watched)),
     3
   );
+  const midVal = Math.ceil(maxVal / 2);
 
-  // Spacing based on time range
-  const chartWidth = SCREEN_WIDTH - 64;
-  const pointSpacing = Math.max(
-    Math.floor((chartWidth - 20) / Math.max(data.length - 1, 1)),
-    14
-  );
+  const totalSaved = data.reduce((acc, d) => acc + d.saved, 0);
+  const totalWatched = data.reduce((acc, d) => acc + d.watched, 0);
 
-  // Label frequency: for 7d show all, for 14d show every 2nd, for 30d show every 5th, for 90d show every 14th
+  // Label frequency step
   const step =
     timeRange === "7d"
       ? 1
@@ -66,26 +69,14 @@ export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = (
       ? 5
       : 14;
 
-  const line1Data: lineDataItem[] = data.map((d, index) => {
-    const showLabel = index % step === 0 || index === data.length - 1;
-    return {
-      value: d.saved,
-      label: showLabel ? d.displayDate : "",
-      labelTextStyle: styles.axisLabelText,
-      dataPointText: "",
-    };
-  });
-
-  const line2Data: lineDataItem[] = data.map((d) => ({
-    value: d.watched,
-  }));
-
-  const totalSaved = data.reduce((acc, d) => acc + d.saved, 0);
-  const totalWatched = data.reduce((acc, d) => acc + d.watched, 0);
+  const activePoint =
+    selectedIndex !== null && selectedIndex >= 0 && selectedIndex < data.length
+      ? data[selectedIndex]
+      : null;
 
   return (
     <View style={styles.card}>
-      {/* Header with KPI & Legend */}
+      {/* Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.chartTitle}>Consumption & Queue Trend</Text>
@@ -94,6 +85,7 @@ export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = (
           </Text>
         </View>
 
+        {/* Legend */}
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: "#1D9BF0" }]} />
@@ -106,88 +98,136 @@ export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = (
         </View>
       </View>
 
-      {/* Interactive Tooltip Callout */}
-      {activeTooltip && (
+      {/* Interactive Tooltip Bubble */}
+      {activePoint ? (
         <View style={styles.tooltipBubble}>
-          <Text style={styles.tooltipDate}>{activeTooltip.dateKey}</Text>
+          <Text style={styles.tooltipDate}>{activePoint.dateKey}</Text>
           <View style={styles.tooltipStatsRow}>
             <Text style={[styles.tooltipStat, { color: "#1D9BF0" }]}>
-              📥 {activeTooltip.saved} Saved
+              📥 {activePoint.saved} Saved
             </Text>
             <Text style={[styles.tooltipStat, { color: "#00BA7C" }]}>
-              ✅ {activeTooltip.watched} Watched
+              ✅ {activePoint.watched} Watched
             </Text>
           </View>
         </View>
+      ) : (
+        <Text style={styles.scrubHintText}>Tap any day to inspect</Text>
       )}
 
-      {/* Gifted Charts Line/Area Canvas */}
-      <View style={styles.chartWrapper}>
-        <LineChart
-          data={line1Data}
-          data2={line2Data}
-          height={160}
-          width={chartWidth}
-          spacing={pointSpacing}
-          initialSpacing={12}
-          endSpacing={12}
-          color1="#1D9BF0"
-          color2="#00BA7C"
-          thickness1={2.5}
-          thickness2={2.2}
-          curved
-          areaChart
-          startFillColor1="rgba(29, 155, 240, 0.32)"
-          endFillColor1="rgba(29, 155, 240, 0.0)"
-          startFillColor2="rgba(0, 186, 124, 0.28)"
-          endFillColor2="rgba(0, 186, 124, 0.0)"
-          startOpacity={0.8}
-          endOpacity={0.05}
-          noOfSections={3}
-          maxValue={Math.ceil(maxVal * 1.15)}
-          rulesColor="#2F3336"
-          rulesType="solid"
-          yAxisColor="transparent"
-          xAxisColor="#2F3336"
-          yAxisTextStyle={styles.yAxisText}
-          backgroundColor="transparent"
-          hideDataPoints={data.length > 14}
-          dataPointsColor1="#1D9BF0"
-          dataPointsColor2="#00BA7C"
-          dataPointsRadius={3.5}
-          pointerConfig={{
-            pointerStripHeight: 155,
-            pointerStripColor: "rgba(255, 255, 255, 0.2)",
-            pointerStripWidth: 1.5,
-            pointerColor: "#FFFFFF",
-            radius: 5,
-            pointerLabelWidth: 100,
-            pointerLabelHeight: 90,
-            activatePointersOnLongPress: false,
-            autoAdjustPointerLabelPosition: true,
-            pointerLabelComponent: (items: any) => {
-              const item = items[0];
-              const idx = line1Data.findIndex((p) => p.value === item.value);
-              const point = idx >= 0 && idx < data.length ? data[idx] : null;
-              if (point) {
-                haptics.selection();
-              }
-              return (
-                <View style={styles.pointerBubble}>
-                  <Text style={styles.pointerDate}>
-                    {point ? point.dateKey : ""}
-                  </Text>
-                  <Text style={styles.pointerValSaved}>
-                    📥 {items[0]?.value || 0} Saved
-                  </Text>
-                  <Text style={styles.pointerValWatched}>
-                    ✅ {items[1]?.value || 0} Watched
-                  </Text>
+      {/* Canvas Area with Gridlines & Columns */}
+      <View style={styles.canvasContainer}>
+        {/* Y-Axis Gridlines */}
+        <View style={styles.gridOverlay}>
+          <View style={styles.gridLineRow}>
+            <Text style={styles.yAxisText}>{maxVal}</Text>
+            <View style={styles.gridLine} />
+          </View>
+          <View style={styles.gridLineRow}>
+            <Text style={styles.yAxisText}>{midVal}</Text>
+            <View style={styles.gridLine} />
+          </View>
+          <View style={styles.gridLineRow}>
+            <Text style={styles.yAxisText}>0</Text>
+            <View style={styles.gridLine} />
+          </View>
+        </View>
+
+        {/* Data Columns */}
+        <View style={styles.columnsRow}>
+          {data.map((item, index) => {
+            const isSelected = selectedIndex === index;
+            const savedHeightPct = Math.max((item.saved / maxVal) * 100, 0);
+            const watchedHeightPct = Math.max((item.watched / maxVal) * 100, 0);
+            const showLabel =
+              index % step === 0 || index === data.length - 1;
+
+            return (
+              <TouchableOpacity
+                key={item.dateKey || index}
+                activeOpacity={0.8}
+                style={[
+                  styles.dataColumn,
+                  isSelected && styles.dataColumnSelected,
+                ]}
+                onPress={() => {
+                  haptics.selection();
+                  setSelectedIndex(isSelected ? null : index);
+                }}
+              >
+                {/* Column Bars with Linear Gradient */}
+                <View style={styles.barsContainer}>
+                  {/* 1. Saved Gradient Bar */}
+                  {item.saved > 0 ? (
+                    <View
+                      style={[
+                        styles.barTrack,
+                        { height: `${Math.max(savedHeightPct, 8)}%` },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[
+                          "#1D9BF0",
+                          "rgba(29, 155, 240, 0.45)",
+                          "rgba(29, 155, 240, 0.05)",
+                        ]}
+                        style={styles.gradientFill}
+                      />
+                      <View
+                        style={[
+                          styles.barCapDot,
+                          { backgroundColor: "#1D9BF0" },
+                        ]}
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.emptyPointDot} />
+                  )}
+
+                  {/* 2. Watched Gradient Bar */}
+                  {item.watched > 0 && (
+                    <View
+                      style={[
+                        styles.barTrack,
+                        { height: `${Math.max(watchedHeightPct, 8)}%` },
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={[
+                          "#00BA7C",
+                          "rgba(0, 186, 124, 0.45)",
+                          "rgba(0, 186, 124, 0.05)",
+                        ]}
+                        style={styles.gradientFill}
+                      />
+                      <View
+                        style={[
+                          styles.barCapDot,
+                          { backgroundColor: "#00BA7C" },
+                        ]}
+                      />
+                    </View>
+                  )}
                 </View>
-              );
-            },
-          }}
-        />
+
+                {/* X-Axis Date Label */}
+                <View style={styles.xAxisLabelBox}>
+                  {showLabel && (
+                    <Text
+                      style={[
+                        styles.xAxisText,
+                        isSelected && styles.xAxisTextSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.displayDate}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -207,7 +247,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: 10,
   },
   chartTitle: {
     color: "#FFFFFF",
@@ -240,19 +280,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
+  scrubHintText: {
+    color: "#71767B",
+    fontSize: 11,
+    fontStyle: "italic",
+    marginBottom: 8,
+  },
   tooltipBubble: {
     backgroundColor: "#000000",
     borderWidth: 1,
     borderColor: "#2F3336",
     borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     marginBottom: 8,
     alignSelf: "flex-start",
   },
   tooltipDate: {
     color: "#71767B",
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "500",
   },
   tooltipStatsRow: {
@@ -262,49 +308,103 @@ const styles = StyleSheet.create({
   },
   tooltipStat: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  chartWrapper: {
-    marginLeft: -10,
-    marginRight: -10,
-    paddingTop: 8,
+  canvasContainer: {
+    height: 160,
+    position: "relative",
+    paddingLeft: 20,
+    justifyContent: "flex-end",
   },
-  axisLabelText: {
-    color: "#71767B",
-    fontSize: 10,
-    fontWeight: "500",
+  gridOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 22,
+    justifyContent: "space-between",
+  },
+  gridLineRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   yAxisText: {
-    color: "#71767B",
+    width: 18,
     fontSize: 10,
-  },
-  pointerBubble: {
-    backgroundColor: "#000000",
-    borderRadius: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#2F3336",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  pointerDate: {
     color: "#71767B",
-    fontSize: 10.5,
-    marginBottom: 3,
+    fontWeight: "500",
+    textAlign: "right",
+    marginRight: 6,
   },
-  pointerValSaved: {
-    color: "#1D9BF0",
-    fontSize: 11.5,
-    fontWeight: "700",
+  gridLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#2F3336",
   },
-  pointerValWatched: {
-    color: "#00BA7C",
-    fontSize: 11.5,
-    fontWeight: "700",
+  columnsRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingBottom: 22,
+  },
+  dataColumn: {
+    flex: 1,
+    height: "100%",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingHorizontal: 1,
+  },
+  dataColumnSelected: {
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: 4,
+  },
+  barsContainer: {
+    width: "100%",
+    height: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 2,
+  },
+  barTrack: {
+    flex: 1,
+    maxWidth: 8,
+    borderRadius: 3,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  gradientFill: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  barCapDot: {
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 2,
     marginTop: 1,
+  },
+  emptyPointDot: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "rgba(113, 118, 123, 0.3)",
+    marginBottom: 2,
+  },
+  xAxisLabelBox: {
+    position: "absolute",
+    bottom: -20,
+    left: -12,
+    right: -12,
+    alignItems: "center",
+  },
+  xAxisText: {
+    color: "#71767B",
+    fontSize: 9.5,
+    fontWeight: "500",
+  },
+  xAxisTextSelected: {
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
   emptyContainer: {
     height: 180,
