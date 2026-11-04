@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -67,19 +68,56 @@ export default function HomeScreen() {
   // Tab states
   const [activeTab, setActiveTab] = useState<TabKey>("feed");
 
-  // Twitter Collapsible Header on Scroll
+  // Twitter Collapsible Header & Bottom Navbar on Scroll
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const isHeaderVisible = useRef(true);
+  const [isHeaderVisibleState, setIsHeaderVisibleState] = useState(true);
   const lastScrollY = useRef(0);
+  const flatListRef = useRef<FlatList<SavedVideo>>(null);
+
+  // TabBar slides down out of view when header hides
+  const tabBarTranslateY = headerTranslateY.interpolate({
+    inputRange: [-48, 0],
+    outputRange: [110, 0],
+    extrapolate: "clamp",
+  });
+
+  // Floating "Scroll to Top" button pops in at bottom-right when navbar is hidden
+  const scrollToTopOpacity = headerTranslateY.interpolate({
+    inputRange: [-48, -20, 0],
+    outputRange: [1, 0.4, 0],
+    extrapolate: "clamp",
+  });
+
+  const scrollToTopScale = headerTranslateY.interpolate({
+    inputRange: [-48, -20, 0],
+    outputRange: [1, 0.6, 0],
+    extrapolate: "clamp",
+  });
+
+  const scrollToTop = () => {
+    haptics.medium();
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    if (!isHeaderVisible.current) {
+      isHeaderVisible.current = true;
+      setIsHeaderVisibleState(true);
+      Animated.timing(headerTranslateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const currentY = event.nativeEvent.contentOffset.y;
     const diff = currentY - lastScrollY.current;
 
     if (currentY <= 15) {
-      // Near top of feed -> always show full header
+      // Near top of feed -> always show full header and navbar
       if (!isHeaderVisible.current) {
         isHeaderVisible.current = true;
+        setIsHeaderVisibleState(true);
         Animated.timing(headerTranslateY, {
           toValue: 0,
           duration: 180,
@@ -87,9 +125,10 @@ export default function HomeScreen() {
         }).start();
       }
     } else if (diff > 8 && currentY > 50) {
-      // Scrolling down -> smoothly slide header bar up
+      // Scrolling down -> hide header and navbar
       if (isHeaderVisible.current) {
         isHeaderVisible.current = false;
+        setIsHeaderVisibleState(false);
         Animated.timing(headerTranslateY, {
           toValue: -48,
           duration: 200,
@@ -97,9 +136,10 @@ export default function HomeScreen() {
         }).start();
       }
     } else if (diff < -12) {
-      // Scrolling up -> smoothly slide header bar back down
+      // Scrolling up -> show header and navbar
       if (!isHeaderVisible.current) {
         isHeaderVisible.current = true;
+        setIsHeaderVisibleState(true);
         Animated.timing(headerTranslateY, {
           toValue: 0,
           duration: 180,
@@ -502,6 +542,7 @@ export default function HomeScreen() {
           ) : (
             /* 1-COLUMN FEED LIST (CLASSIC POST VIEW) */
             <FlatList
+              ref={flatListRef}
               key="list-view-1-col"
               data={feedVideos}
               numColumns={1}
@@ -692,10 +733,41 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* THREADS 5-TAB BOTTOM NAVIGATION DOCK */}
+      {/* FLOATING SCROLL TO TOP BUTTON (BOTTOM RIGHT) */}
+      {activeTab === "feed" && (
+        <Animated.View
+          pointerEvents={isHeaderVisibleState ? "none" : "auto"}
+          style={[
+            styles.scrollToTopBtnContainer,
+            {
+              bottom: Math.max(insets.bottom, 14) + 16,
+              opacity: scrollToTopOpacity,
+              transform: [{ scale: scrollToTopScale }],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.75}
+            style={styles.scrollToTopBtn}
+            onPress={scrollToTop}
+          >
+            <BlurView
+              intensity={45}
+              tint="systemUltraThinMaterialDark"
+              blurReductionFactor={2}
+              experimentalBlurMethod="dimezisBlurView"
+              style={StyleSheet.absoluteFill}
+            />
+            <Ionicons name="arrow-up" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* THREADS 4-TAB BOTTOM NAVIGATION DOCK */}
       <FloatingTabBar
         activeTab={activeTab}
         unreadCount={unreadCount}
+        translateY={tabBarTranslateY}
         onTabSelect={(tab) => {
           triggerLayoutMotion();
           setActiveTab(tab);
@@ -860,5 +932,26 @@ const styles = StyleSheet.create({
     color: appleColors.accentLight,
     fontSize: 12,
     fontWeight: "600",
+  },
+  scrollToTopBtnContainer: {
+    position: "absolute",
+    right: 20,
+    zIndex: 99,
+  },
+  scrollToTopBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(22, 24, 28, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    elevation: 8,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
   },
 });

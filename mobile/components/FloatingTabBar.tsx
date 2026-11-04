@@ -4,6 +4,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,7 @@ interface FloatingTabBarProps {
   unreadCount?: number;
   onTabSelect: (tab: TabKey) => void;
   onComposePress?: () => void;
+  translateY?: Animated.Value | Animated.AnimatedInterpolation<number>;
 }
 
 /**
@@ -34,15 +36,17 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   unreadCount = 0,
   onTabSelect,
   onComposePress,
+  translateY,
 }) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.barContainer,
         {
           paddingBottom: Math.max(insets.bottom, 10),
+          transform: [{ translateY: translateY || 0 }],
         },
       ]}
     >
@@ -139,7 +143,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           </View>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

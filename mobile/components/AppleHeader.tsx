@@ -94,12 +94,11 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         />
         <LinearGradient
           colors={[
-            "rgba(0, 0, 0, 0.75)",
             "rgba(0, 0, 0, 0.42)",
             "rgba(0, 0, 0, 0.20)",
             "transparent",
           ]}
-          locations={[0, 0.4, 0.75, 1]}
+          locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
