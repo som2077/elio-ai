@@ -106,10 +106,25 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Sync & Devices</Text>
-        <Text style={styles.headerSubtitle}>
-          Manage paired desktop browsers and realtime video sync connections.
-        </Text>
+        <View style={styles.headerTopRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.headerTitle}>Profile & Sync</Text>
+            <Text style={styles.headerSubtitle}>
+              Manage paired desktop extensions and realtime sync connections.
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.scanHeaderBtn}
+            onPress={() => {
+              haptics.selection();
+              onOpenScanner();
+            }}
+          >
+            <Ionicons name="qr-code-outline" size={17} color="#000000" />
+            <Text style={styles.scanHeaderBtnText}>Scan QR</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Account Info Card */}
@@ -234,6 +249,31 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 16,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  scanHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  scanHeaderBtnText: {
+    color: "#000000",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.2,
   },
   headerTitle: {
     color: "#FFFFFF",

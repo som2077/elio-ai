@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import {
   View,
   TouchableOpacity,
@@ -9,7 +9,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
-import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
 export type TabKey = "feed" | "search" | "insights" | "devices";
@@ -22,13 +21,153 @@ interface FloatingTabBarProps {
   translateY?: Animated.Value | Animated.AnimatedInterpolation<number>;
 }
 
+interface AnimatedTabItemProps {
+  isActive: boolean;
+  activeIcon: keyof typeof Ionicons.glyphMap;
+  inactiveIcon: keyof typeof Ionicons.glyphMap;
+  iconSize: number;
+  onPress: () => void;
+  showBadge?: boolean;
+  isCompose?: boolean;
+}
+
 /**
- * Twitter / X Inspired Frosted Glass Translucent Navigation Bar
+ * Twitter (X) & Meta Threads Inspired Animated Tab Button
+ * Micro-interactions:
+ * - Fluid tactile press depression on touch-down
+ * - Physical spring overshoot pop on selection / release
+ * - 45° rotation spin pop for the compose (+) button
+ * - Animated spring entry for the notification badge dot
+ */
+const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
+  isActive,
+  activeIcon,
+  inactiveIcon,
+  iconSize,
+  onPress,
+  showBadge = false,
+  isCompose = false,
+}) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+  const badgeScale = useRef(new Animated.Value(showBadge ? 1 : 0)).current;
+
+  // Twitter / Threads signature spring pop when tab becomes active
+  useEffect(() => {
+    if (isActive) {
+      scale.setValue(0.8);
+      Animated.spring(scale, {
+        toValue: 1,
+        damping: 10,
+        stiffness: 280,
+        mass: 0.6,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [isActive]);
+
+  // Spring animation for notification badge
+  useEffect(() => {
+    Animated.spring(badgeScale, {
+      toValue: showBadge ? 1 : 0,
+      damping: 12,
+      stiffness: 280,
+      mass: 0.6,
+      useNativeDriver: true,
+    }).start();
+  }, [showBadge]);
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.82,
+      damping: 18,
+      stiffness: 320,
+      useNativeDriver: true,
+    }).start();
+
+    if (isCompose) {
+      Animated.spring(rotate, {
+        toValue: 1,
+        damping: 12,
+        stiffness: 240,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      damping: 10,
+      stiffness: 280,
+      mass: 0.6,
+      useNativeDriver: true,
+    }).start();
+
+    if (isCompose) {
+      Animated.spring(rotate, {
+        toValue: 0,
+        damping: 12,
+        stiffness: 220,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const spin = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"],
+  });
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      style={styles.tabItem}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={() => {
+        haptics.selection();
+        onPress();
+      }}
+    >
+      <Animated.View
+        style={[
+          styles.iconWrapper,
+          {
+            transform: [
+              { scale },
+              ...(isCompose ? [{ rotate: spin }] : []),
+            ],
+          },
+        ]}
+      >
+        <Ionicons
+          name={isActive || isCompose ? activeIcon : inactiveIcon}
+          size={iconSize}
+          color={isActive || isCompose ? "#FFFFFF" : "#71767B"}
+        />
+
+        <Animated.View
+          style={[
+            styles.blueBadgeDot,
+            {
+              transform: [{ scale: badgeScale }],
+              opacity: badgeScale,
+            },
+          ]}
+          pointerEvents="none"
+        />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+/**
+ * Twitter / X & Meta Threads Frosted Glass Navigation Bar
  * Features:
- * - Native BlurView backdrop with 85 intensity
- * - Translucent obsidian glass tint (rgba(0, 0, 0, 0.75))
+ * - Ultra-responsive animated icons with Apple/Twitter spring physics
+ * - Translucent obsidian glass blur backdrop
  * - Hairline top divider (rgba(255, 255, 255, 0.12))
- * - Pure flat glyphs with active white & inactive muted state
  * - Twitter blue notification badge dot
  */
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
@@ -50,98 +189,78 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         },
       ]}
     >
-      {/* Twitter Frosted Glass Backdrop Blur */}
+      {/* Authentic Frosted Glass Blur Backdrop */}
       <BlurView
-        intensity={50}
-        tint="systemUltraThinMaterialDark"
-        blurReductionFactor={2}
+        intensity={Platform.OS === "ios" ? 75 : 40}
+        tint={Platform.OS === "ios" ? "systemUltraThinMaterialDark" : "dark"}
+        blurReductionFactor={Platform.OS === "android" ? 3 : 1}
         experimentalBlurMethod="dimezisBlurView"
         style={StyleSheet.absoluteFill}
       />
 
+      {/* Subtle translucent obsidian glass tint for icon contrast */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: "rgba(0, 0, 0, 0.45)" },
+        ]}
+        pointerEvents="none"
+      />
+
       <View style={styles.tabRow}>
         {/* 1. Home / Watchlist Feed */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.tabItem}
+        <AnimatedTabItem
+          isActive={activeTab === "feed"}
+          activeIcon="home"
+          inactiveIcon="home-outline"
+          iconSize={24}
           onPress={() => {
             if (activeTab !== "feed") {
-              haptics.selection();
               onTabSelect("feed");
             }
           }}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons
-              name={activeTab === "feed" ? "home" : "home-outline"}
-              size={23}
-              color={activeTab === "feed" ? "#FFFFFF" : "#71767B"}
-            />
-          </View>
-        </TouchableOpacity>
+        />
 
         {/* 2. Fast Clip (+) Button */}
-        <TouchableOpacity
-          activeOpacity={0.75}
-          style={styles.tabItem}
+        <AnimatedTabItem
+          isActive={false}
+          activeIcon="add-outline"
+          inactiveIcon="add-outline"
+          iconSize={28}
+          isCompose={true}
           onPress={() => {
-            haptics.selection();
             if (onComposePress) {
               onComposePress();
             }
           }}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons
-              name="add-outline"
-              size={26}
-              color="#FFFFFF"
-            />
-          </View>
-        </TouchableOpacity>
+        />
 
         {/* 3. Insights & Analytics */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.tabItem}
+        <AnimatedTabItem
+          isActive={activeTab === "insights"}
+          activeIcon="stats-chart"
+          inactiveIcon="stats-chart-outline"
+          iconSize={22}
+          showBadge={Boolean(unreadCount && unreadCount > 0)}
           onPress={() => {
             if (activeTab !== "insights") {
-              haptics.selection();
               onTabSelect("insights");
             }
           }}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons
-              name={activeTab === "insights" ? "stats-chart" : "stats-chart-outline"}
-              size={22}
-              color={activeTab === "insights" ? "#FFFFFF" : "#71767B"}
-            />
-            {Boolean(unreadCount && unreadCount > 0) && (
-              <View style={styles.blueBadgeDot} />
-            )}
-          </View>
-        </TouchableOpacity>
+        />
 
         {/* 4. Profile / Linked Devices */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.tabItem}
+        <AnimatedTabItem
+          isActive={activeTab === "devices"}
+          activeIcon="person"
+          inactiveIcon="person-outline"
+          iconSize={23}
           onPress={() => {
             if (activeTab !== "devices") {
-              haptics.selection();
               onTabSelect("devices");
             }
           }}
-        >
-          <View style={styles.iconWrapper}>
-            <Ionicons
-              name={activeTab === "devices" ? "person" : "person-outline"}
-              size={22}
-              color={activeTab === "devices" ? "#FFFFFF" : "#71767B"}
-            />
-          </View>
-        </TouchableOpacity>
+        />
       </View>
     </Animated.View>
   );
@@ -154,9 +273,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(255, 255, 255, 0.08)",
-    overflow: "hidden",
+    borderTopColor: "rgba(255, 255, 255, 0.12)",
     paddingTop: 8,
+    overflow: "hidden",
+    backgroundColor: "transparent",
   },
   tabRow: {
     flexDirection: "row",
@@ -175,13 +295,13 @@ const styles = StyleSheet.create({
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
   },
   blueBadgeDot: {
     position: "absolute",
-    top: 2,
-    right: 2,
+    top: 3,
+    right: 3,
     width: 7,
     height: 7,
     borderRadius: 3.5,

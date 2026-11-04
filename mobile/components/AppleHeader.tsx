@@ -33,7 +33,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
-  all: "#1D9BF0",
+  all: "#FFFFFF",
   youtube: "#FF0033",
   instagram: "#E1306C",
   twitter: "#1D9BF0",
@@ -48,7 +48,7 @@ interface AppleHeaderProps {
   userEmail?: string;
   totalCount: number;
   unreadCount: number;
-  onOpenScanner: () => void;
+  onOpenScanner?: () => void;
   onOpenSearch?: () => void;
   onOpenFeedsDrawer?: () => void;
   translateY?: Animated.Value;
@@ -77,7 +77,6 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   onOpenPlatformModal,
 }) => {
   const insets = useSafeAreaInsets();
-  const qrScale = useRef(new Animated.Value(1)).current;
   const searchScale = useRef(new Animated.Value(1)).current;
 
   // Sliding indicator refs
@@ -241,9 +240,9 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
       >
         {/* Seamless full-height BlurView across entire header pane */}
         <BlurView
-          intensity={50}
-          tint="systemUltraThinMaterialDark"
-          blurReductionFactor={2}
+          intensity={Platform.OS === "ios" ? 50 : 25}
+          tint={Platform.OS === "ios" ? "systemUltraThinMaterialDark" : "dark"}
+          blurReductionFactor={Platform.OS === "android" ? 2 : 1}
           experimentalBlurMethod="dimezisBlurView"
           style={StyleSheet.absoluteFill}
         />
@@ -271,23 +270,8 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
             />
           </View>
 
-          {/* Right Actions: QR Scanner & Search Button */}
+          {/* Right Action: Search Button */}
           <View style={styles.actionsRight}>
-            <Animated.View style={{ transform: [{ scale: qrScale }] }}>
-              <TouchableOpacity
-                activeOpacity={0.75}
-                style={styles.iconBtn}
-                onPressIn={() => animatePressIn(qrScale)}
-                onPressOut={() => animatePressOut(qrScale)}
-                onPress={() => {
-                  haptics.selection();
-                  onOpenScanner();
-                }}
-              >
-                <Ionicons name="qr-code-outline" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </Animated.View>
-
             <Animated.View style={{ transform: [{ scale: searchScale }] }}>
               <TouchableOpacity
                 activeOpacity={0.75}
@@ -468,6 +452,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 12,
+    backgroundColor: "rgba(0, 0, 0, 0.78)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#2F3336",
     overflow: "hidden",
   },
   topBar: {
@@ -531,7 +518,7 @@ const styles = StyleSheet.create({
   tabsDivider: {
     width: 1,
     height: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: "#2F3336",
     marginHorizontal: 4,
   },
   tabItemText: {

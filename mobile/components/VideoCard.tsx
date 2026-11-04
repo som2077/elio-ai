@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SavedVideo } from "../types/video";
@@ -22,12 +23,11 @@ interface VideoCardProps {
 }
 
 /**
- * Modern, Clean Video Card
- * Streamlined layout:
- * - Full-width 16:9 media preview with subtle platform badge & duration
- * - Minimalist frosted glass play button
- * - Clear, legible title directly below
- * - Simple footer meta: Creator, time ago, watch status toggle, and more actions
+ * Authentic Twitter / X Inspired Post Card
+ * - Top: Author Avatar, Display Name, Verified Badge, Handle, Time, Overflow Menu
+ * - Middle: Post Title / Caption (#E7E9EA)
+ * - Below ("nechay jha per video hota ha"): 16:9 Video Preview with #000000 background, #2F3336 border, borderRadius 16
+ * - Footer: Watch Status Toggle, Favorite Heart, and Share actions
  */
 export const VideoCard: React.FC<VideoCardProps> = ({
   video,
@@ -71,6 +71,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     onToggleStatus();
   };
 
+  const handleShare = async () => {
+    try {
+      haptics.light();
+      await Share.share({
+        message: `${video.title || "Check this out"}: ${video.clean_url}`,
+        url: video.clean_url,
+      });
+    } catch {}
+  };
+
   const getPlatformIcon = (p: string): keyof typeof Ionicons.glyphMap => {
     switch (p) {
       case "youtube":
@@ -98,12 +108,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     try {
       const diff = Date.now() - new Date(dateStr).getTime();
       const mins = Math.floor(diff / 60000);
-      if (mins < 1) return "Just now";
-      if (mins < 60) return `${mins}m ago`;
+      if (mins < 1) return "now";
+      if (mins < 60) return `${mins}m`;
       const hours = Math.floor(mins / 60);
-      if (hours < 24) return `${hours}h ago`;
+      if (hours < 24) return `${hours}h`;
       const days = Math.floor(hours / 24);
-      if (days < 30) return `${days}d ago`;
+      if (days < 30) return `${days}d`;
       return new Date(dateStr).toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
@@ -128,12 +138,86 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     !video.thumbnail_url?.includes(".mp4") &&
     !video.thumbnail_url?.includes(".m3u8");
 
-  const creatorDisplay = video.creator_name || platformConfig.label;
+  const creatorDisplay = video.creator_name || `${platformConfig.label} Creator`;
+  const cleanHandle = (video.creator_name || platform)
+    .replace(/\s+/g, "")
+    .toLowerCase();
 
   return (
     <Animated.View style={{ transform: [{ scale: cardScale }] }}>
       <View style={styles.cardContainer}>
-        {/* 1. Full-Width 16:9 Thumbnail Preview */}
+        {/* 1. Header: Author Avatar & Metadata & Overflow Menu */}
+        <View style={styles.authorRow}>
+          {/* Avatar Icon */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.avatarCircle}
+            onPress={onPress}
+          >
+            <Ionicons
+              name={getPlatformIcon(platform)}
+              size={18}
+              color={platformConfig.color}
+            />
+          </TouchableOpacity>
+
+          {/* Author Name, Verified, Handle, Time */}
+          <View style={styles.authorMeta}>
+            <View style={styles.nameRow}>
+              <Text style={styles.authorName} numberOfLines={1}>
+                {creatorDisplay}
+              </Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color="#1D9BF0"
+                style={styles.verifiedIcon}
+              />
+              <Text style={styles.handleText} numberOfLines={1}>
+                @{cleanHandle}
+              </Text>
+              <Text style={styles.dotSeparator}>·</Text>
+              <Text style={styles.timeText}>{getRelativeTime(video.created_at)}</Text>
+            </View>
+          </View>
+
+          {/* More Menu */}
+          <TouchableOpacity
+            activeOpacity={0.6}
+            style={styles.moreButton}
+            onPress={() => {
+              haptics.light();
+              if (onLongPress) onLongPress();
+            }}
+          >
+            <Ionicons name="ellipsis-horizontal" size={17} color="#71767B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* 2. Post Title / Caption */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.titleArea}
+          onPress={onPress}
+          onLongPress={() => {
+            if (onLongPress) {
+              haptics.selection();
+              onLongPress();
+            }
+          }}
+          delayLongPress={260}
+          onPressIn={handleCardPressIn}
+          onPressOut={handleCardPressOut}
+        >
+          <Text
+            style={[styles.titleText, isWatched && styles.titleTextWatched]}
+            numberOfLines={3}
+          >
+            {video.title || `${platformConfig.label} Clip`}
+          </Text>
+        </TouchableOpacity>
+
+        {/* 3. Media Preview ("nechay jha per video hota ha") */}
         <TouchableOpacity
           activeOpacity={0.92}
           style={styles.thumbnailContainer}
@@ -160,12 +244,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               <Ionicons
                 name={getPlatformIcon(platform)}
                 size={44}
-                color={platformConfig.color}
+                color="#71767B"
               />
             </View>
           )}
 
-          {/* Subtle Dark Gradient Overlay for readability */}
+          {/* Subtle Scrim */}
           <View style={styles.thumbnailScrim} />
 
           {/* Platform Badge (Top-Left) */}
@@ -179,14 +263,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             <Text style={styles.platformBadgeText}>{platformConfig.label}</Text>
           </View>
 
-          {/* Duration Badge (Bottom-Right, if exists) */}
+          {/* Duration Badge (Bottom-Right) */}
           {durationStr && (
             <View style={styles.durationBadge}>
               <Text style={styles.durationText}>{durationStr}</Text>
             </View>
           )}
 
-          {/* Sleek Frosted Center Play Button */}
+          {/* Frosted Play Button Circle */}
           <View style={styles.playButtonCircle}>
             <Ionicons
               name="play"
@@ -197,87 +281,56 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* 2. Video Title */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.titleArea}
-          onPress={onPress}
-          onLongPress={() => {
-            if (onLongPress) {
-              haptics.selection();
-              onLongPress();
-            }
-          }}
-          delayLongPress={260}
-          onPressIn={handleCardPressIn}
-          onPressOut={handleCardPressOut}
-        >
-          <Text
-            style={[styles.titleText, isWatched && styles.titleTextWatched]}
-            numberOfLines={2}
-          >
-            {video.title || `${platformConfig.label} Clip`}
-          </Text>
-        </TouchableOpacity>
-
-        {/* 3. Footer Row: Creator · Time Ago  —  Watched Status & More */}
+        {/* 4. Footer Row: Watch Status Pill, Favorite, Share */}
         <View style={styles.footerRow}>
-          {/* Left: Creator info & Relative Time */}
-          <View style={styles.metaLeft}>
-            {video.is_favorite && (
-              <Ionicons
-                name="heart"
-                size={13}
-                color="#F91880"
-                style={{ marginRight: 5 }}
-              />
-            )}
-            <Text style={styles.creatorText} numberOfLines={1}>
-              {creatorDisplay}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.statusPill,
+              isWatched ? styles.statusPillWatched : styles.statusPillUnread,
+            ]}
+            onPress={handleToggle}
+          >
+            <Ionicons
+              name={isWatched ? "checkmark-circle" : "ellipse-outline"}
+              size={13}
+              color={isWatched ? "#1D9BF0" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.statusPillText,
+                isWatched && styles.statusPillTextWatched,
+              ]}
+            >
+              {isWatched ? "Watched" : "In Queue"}
             </Text>
-            <Text style={styles.dotSeparator}>·</Text>
-            <Text style={styles.timeText}>{getRelativeTime(video.created_at)}</Text>
-          </View>
+          </TouchableOpacity>
 
-          {/* Right: Watch Status Toggle Pill & Overflow Menu */}
           <View style={styles.actionsRight}>
+            {/* Favorite / Like Button */}
             <TouchableOpacity
               activeOpacity={0.7}
-              style={[
-                styles.statusPill,
-                isWatched ? styles.statusPillWatched : styles.statusPillUnread,
-              ]}
-              onPress={handleToggle}
-            >
-              <Ionicons
-                name={isWatched ? "checkmark-circle" : "ellipse-outline"}
-                size={12}
-                color={isWatched ? "#1D9BF0" : "#71767B"}
-                style={{ marginRight: 4 }}
-              />
-              <Text
-                style={[
-                  styles.statusPillText,
-                  isWatched && styles.statusPillTextWatched,
-                ]}
-              >
-                {isWatched ? "Watched" : "In Queue"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.6}
-              style={styles.moreButton}
+              style={styles.iconActionBtn}
               onPress={() => {
-                haptics.light();
+                haptics.selection();
                 if (onLongPress) onLongPress();
               }}
             >
               <Ionicons
-                name="ellipsis-horizontal"
-                size={16}
-                color="#71767B"
+                name={video.is_favorite ? "heart" : "heart-outline"}
+                size={18}
+                color={video.is_favorite ? "#F91880" : "#71767B"}
               />
+            </TouchableOpacity>
+
+            {/* Share Button */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.iconActionBtn}
+              onPress={handleShare}
+            >
+              <Ionicons name="share-outline" size={18} color="#71767B" />
             </TouchableOpacity>
           </View>
         </View>
@@ -291,18 +344,84 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255, 255, 255, 0.07)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#2F3336",
     backgroundColor: "#000000",
+  },
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#16181C",
+    borderWidth: 1,
+    borderColor: "#2F3336",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  authorMeta: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "nowrap",
+  },
+  authorName: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+    maxWidth: "40%",
+  },
+  verifiedIcon: {
+    marginHorizontal: 3,
+  },
+  handleText: {
+    color: "#71767B",
+    fontSize: 14,
+    maxWidth: "30%",
+  },
+  dotSeparator: {
+    color: "#71767B",
+    fontSize: 13,
+    marginHorizontal: 4,
+  },
+  timeText: {
+    color: "#71767B",
+    fontSize: 14,
+  },
+  moreButton: {
+    padding: 6,
+    marginRight: -4,
+  },
+  titleArea: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  titleText: {
+    color: "#E7E9EA",
+    fontSize: 15,
+    fontWeight: "400",
+    lineHeight: 20,
+    letterSpacing: -0.15,
+  },
+  titleTextWatched: {
+    color: "#71767B",
   },
   thumbnailContainer: {
     width: "100%",
     aspectRatio: 16 / 9,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#11141A",
+    backgroundColor: "#000000",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderColor: "#2F3336",
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
@@ -314,11 +433,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#12141A",
+    backgroundColor: "#16181C",
   },
   thumbnailScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.15)",
+    backgroundColor: "rgba(0, 0, 0, 0.12)",
   },
   platformBadge: {
     position: "absolute",
@@ -326,12 +445,12 @@ const styles = StyleSheet.create({
     left: 10,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.68)",
+    backgroundColor: "rgba(0, 0, 0, 0.72)",
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderColor: "#2F3336",
   },
   platformBadgeText: {
     color: "#FFFFFF",
@@ -343,12 +462,12 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 8,
     right: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.78)",
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
     paddingHorizontal: 6,
     paddingVertical: 2.5,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: "#2F3336",
   },
   durationText: {
     color: "#FFFFFF",
@@ -365,69 +484,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  titleArea: {
-    marginTop: 10,
-  },
-  titleText: {
-    color: "#FFFFFF",
-    fontSize: 15.5,
-    fontWeight: "600",
-    lineHeight: 21,
-    letterSpacing: -0.2,
-  },
-  titleTextWatched: {
-    color: "#8E8E93",
-  },
   footerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 8,
-  },
-  metaLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginRight: 10,
-  },
-  creatorText: {
-    color: "#8E8E93",
-    fontSize: 13,
-    fontWeight: "500",
-    maxWidth: "55%",
-  },
-  dotSeparator: {
-    color: "#48484A",
-    fontSize: 13,
-    marginHorizontal: 5,
-  },
-  timeText: {
-    color: "#636366",
-    fontSize: 12.5,
-  },
-  actionsRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    marginTop: 10,
   },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
   },
   statusPillUnread: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderColor: "#2F3336",
   },
   statusPillWatched: {
-    backgroundColor: "rgba(29, 155, 240, 0.14)",
-    borderColor: "rgba(29, 155, 240, 0.28)",
+    backgroundColor: "rgba(29, 155, 240, 0.12)",
+    borderColor: "rgba(29, 155, 240, 0.3)",
   },
   statusPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "500",
     color: "#71767B",
   },
@@ -435,8 +515,12 @@ const styles = StyleSheet.create({
     color: "#1D9BF0",
     fontWeight: "600",
   },
-  moreButton: {
-    padding: 4,
-    marginRight: -4,
+  actionsRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  iconActionBtn: {
+    padding: 6,
   },
 });

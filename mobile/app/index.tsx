@@ -688,7 +688,6 @@ export default function HomeScreen() {
             pinnedPlatforms={pinnedPlatforms}
             platformCounts={platformCounts}
             onOpenPlatformModal={() => setShowPlatformModal(true)}
-            onOpenScanner={() => setShowScanner(true)}
             onOpenSearch={() => {
               triggerLayoutMotion();
               setActiveTab("search");
