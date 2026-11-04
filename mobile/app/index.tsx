@@ -9,10 +9,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Animated,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "../services/supabase";
 import { SavedVideo } from "../types/video";
@@ -38,7 +44,10 @@ import { QuickClipModal } from "../components/QuickClipModal";
 import { triggerLayoutMotion } from "../utils/motion";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
-import { processSharedContent, flushPendingShares } from "../services/shareHandler";
+import {
+  processSharedContent,
+  flushPendingShares,
+} from "../services/shareHandler";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -52,10 +61,54 @@ export default function HomeScreen() {
   const [showFeedsDrawer, setShowFeedsDrawer] = useState(false);
   const [showCreateFeedModal, setShowCreateFeedModal] = useState(false);
   const [showQuickClipModal, setShowQuickClipModal] = useState(false);
-  const [feedDrawerFilter, setFeedDrawerFilter] = useState<FeedFilterType>("for_you");
+  const [feedDrawerFilter, setFeedDrawerFilter] =
+    useState<FeedFilterType>("for_you");
 
   // Tab states
   const [activeTab, setActiveTab] = useState<TabKey>("feed");
+
+  // Twitter Collapsible Header on Scroll
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  const isHeaderVisible = useRef(true);
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const diff = currentY - lastScrollY.current;
+
+    if (currentY <= 15) {
+      // Near top of feed -> always show full header
+      if (!isHeaderVisible.current) {
+        isHeaderVisible.current = true;
+        Animated.timing(headerTranslateY, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (diff > 8 && currentY > 50) {
+      // Scrolling down -> smoothly slide header bar up
+      if (isHeaderVisible.current) {
+        isHeaderVisible.current = false;
+        Animated.timing(headerTranslateY, {
+          toValue: -48,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (diff < -12) {
+      // Scrolling up -> smoothly slide header bar back down
+      if (!isHeaderVisible.current) {
+        isHeaderVisible.current = true;
+        Animated.timing(headerTranslateY, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+    lastScrollY.current = currentY;
+  };
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -236,7 +289,7 @@ export default function HomeScreen() {
           },
           () => {
             fetchVideos(session.user.id);
-          }
+          },
         )
         .subscribe();
 
@@ -254,7 +307,7 @@ export default function HomeScreen() {
     triggerLayoutMotion();
 
     setVideos((prev) =>
-      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v))
+      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v)),
     );
 
     if (detailVideo && detailVideo.id === video.id) {
@@ -262,7 +315,10 @@ export default function HomeScreen() {
     }
 
     setToast({
-      message: newStatus === "watched" ? "Marked as Watched" : "Moved back to In Queue",
+      message:
+        newStatus === "watched"
+          ? "Marked as Watched"
+          : "Moved back to In Queue",
       type: "success",
     });
 
@@ -323,7 +379,7 @@ export default function HomeScreen() {
 
   const unreadCount = useMemo(
     () => videos.filter((v) => v.status === "unread").length,
-    [videos]
+    [videos],
   );
 
   // Feed filtered videos
@@ -340,7 +396,7 @@ export default function HomeScreen() {
       }
       if (
         ["youtube", "instagram", "twitter", "tiktok", "reddit"].includes(
-          feedDrawerFilter
+          feedDrawerFilter,
         )
       ) {
         return v.platform === feedDrawerFilter;
@@ -383,7 +439,11 @@ export default function HomeScreen() {
         p === "instagram" ||
         title.includes("short") ||
         title.includes("reel");
-      const estHeight = isTall ? 240 : p === "youtube" && !title.includes("short") ? 165 : 190;
+      const estHeight = isTall
+        ? 240
+        : p === "youtube" && !title.includes("short")
+          ? 165
+          : 190;
 
       if (h1 <= h2) {
         col1.push(v);
@@ -416,7 +476,11 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={[]}>
-      <StatusBar style="light" backgroundColor="transparent" translucent={true} />
+      <StatusBar
+        style="light"
+        backgroundColor="transparent"
+        translucent={true}
+      />
 
       {/* VIEW: WATCHLIST FEED */}
       {activeTab === "feed" && (
@@ -442,6 +506,8 @@ export default function HomeScreen() {
               data={feedVideos}
               numColumns={1}
               keyExtractor={(item) => item.id}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
               renderItem={({ item }) => (
                 <VideoCard
                   video={item}
@@ -487,6 +553,7 @@ export default function HomeScreen() {
             userEmail={session?.user?.email}
             totalCount={videos.length}
             unreadCount={unreadCount}
+            translateY={headerTranslateY}
             onOpenScanner={() => setShowScanner(true)}
             onOpenSearch={() => {
               triggerLayoutMotion();
@@ -534,18 +601,20 @@ export default function HomeScreen() {
                 </Text>
                 {!searchQuery && (
                   <View style={styles.suggestedTagsRow}>
-                    {["Podcasts", "Design", "Shorts", "Tech", "Tutorials"].map((tag) => (
-                      <TouchableOpacity
-                        key={tag}
-                        style={styles.suggestedTagPill}
-                        onPress={() => {
-                          haptics.selection();
-                          setSearchQuery(tag);
-                        }}
-                      >
-                        <Text style={styles.suggestedTagText}>#{tag}</Text>
-                      </TouchableOpacity>
-                    ))}
+                    {["Podcasts", "Design", "Shorts", "Tech", "Tutorials"].map(
+                      (tag) => (
+                        <TouchableOpacity
+                          key={tag}
+                          style={styles.suggestedTagPill}
+                          onPress={() => {
+                            haptics.selection();
+                            setSearchQuery(tag);
+                          }}
+                        >
+                          <Text style={styles.suggestedTagText}>#{tag}</Text>
+                        </TouchableOpacity>
+                      ),
+                    )}
                   </View>
                 )}
               </View>
