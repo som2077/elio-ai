@@ -53,64 +53,59 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
     }).start();
   };
 
-  // Header content fades out slightly when sliding up
+  // Header container slides up and smoothly fades out on scroll
   const barOpacity = translateY
     ? translateY.interpolate({
-        inputRange: [-48, 0],
-        outputRange: [0, 1],
+        inputRange: [-48, -12, 0],
+        outputRange: [0, 0.7, 1],
         extrapolate: "clamp",
       })
     : 1;
 
-  // Status bar bottom hairline appears when header bar collapses
-  const statusBarHairlineOpacity = translateY
+  // Subtle status bar blur fades in as the header bar collapses ("littel littel blur" like Twitter)
+  const statusBarBlurOpacity = translateY
     ? translateY.interpolate({
-        inputRange: [-48, 0],
-        outputRange: [1, 0],
+        inputRange: [-48, -12, 0],
+        outputRange: [1, 0.3, 0],
         extrapolate: "clamp",
       })
     : 0;
 
   return (
     <>
-      {/* 1. Permanent Status Bar Frosted Blur (Always active even when header slides out) */}
-      <View
+      {/* 1. Subtle Status Bar Blur (Active when header collapses: Twitter's "littel blur" over content) */}
+      <Animated.View
         style={[
           styles.statusBarBlurContainer,
           {
             height: insets.top,
+            opacity: statusBarBlurOpacity,
           },
         ]}
         pointerEvents="none"
       >
         <BlurView
-          intensity={50}
+          intensity={30}
           tint="systemUltraThinMaterialDark"
           blurReductionFactor={2}
           experimentalBlurMethod="dimezisBlurView"
           style={StyleSheet.absoluteFill}
         />
-        {/* Subtle hairline under status bar visible when header is collapsed */}
-        <Animated.View
-          style={[
-            styles.statusBarHairline,
-            { opacity: statusBarHairlineOpacity },
-          ]}
-        />
-      </View>
+      </Animated.View>
 
-      {/* 2. Sliding Collapsible Header Bar */}
+      {/* 2. Full Unified Header Container (Status bar + Header bar in ONE continuous seamless pane) */}
       <Animated.View
         style={[
-          styles.headerBarContainer,
+          styles.headerContainer,
           {
-            top: insets.top,
+            height: insets.top + 48,
+            paddingTop: insets.top,
             transform: [{ translateY: translateY || 0 }],
             opacity: barOpacity,
           },
         ]}
       >
-        {/* Frosted Glass Backdrop Blur for Header Bar */}
+        {/* Seamless full-height BlurView across status bar + header bar */}
         <BlurView
           intensity={50}
           tint="systemUltraThinMaterialDark"
@@ -176,7 +171,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           </View>
         </View>
 
-        {/* Hairline Divider at the bottom of the header */}
+        {/* Hairline Divider at the bottom of the full header */}
         <View style={styles.headerBottomHairline} />
       </Animated.View>
     </>
@@ -189,23 +184,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 12,
+    zIndex: 11,
     overflow: "hidden",
   },
-  statusBarHairline: {
+  headerContainer: {
     position: "absolute",
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-  },
-  headerBarContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 48,
-    zIndex: 11,
+    zIndex: 12,
     overflow: "hidden",
   },
   headerBottomHairline: {
