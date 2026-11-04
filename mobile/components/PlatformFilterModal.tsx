@@ -119,7 +119,7 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
         contentContainerStyle={styles.scrollListContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* "All Platforms" Option */}
+        {/* "Queue" Option */}
         <TouchableOpacity
           activeOpacity={0.7}
           style={[
@@ -139,7 +139,7 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
             </View>
             <View style={styles.textContainer}>
               <View style={styles.labelRow}>
-                <Text style={styles.platformLabel}>All Platforms</Text>
+                <Text style={styles.platformLabel}>Queue (All)</Text>
                 {selectedPlatform === "all" && (
                   <View style={styles.activeTag}>
                     <Text style={styles.activeTagText}>Active</Text>
@@ -147,7 +147,7 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
                 )}
               </View>
               <Text style={styles.pinnedStatus}>
-                {platformCounts?.all ?? 0} saved clips total • Always available
+                {platformCounts?.all ?? 0} saved clips in queue • Always available
               </Text>
             </View>
           </View>

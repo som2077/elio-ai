@@ -134,7 +134,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
               onResetPlatform();
             }}
           >
-            <Text style={styles.resetBtnText}>View All Clips</Text>
+            <Text style={styles.resetBtnText}>View Queue</Text>
           </TouchableOpacity>
         )}
       </View>

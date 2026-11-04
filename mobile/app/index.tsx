@@ -38,7 +38,10 @@ import { openVideoDirectly } from "../services/deepLink";
 import { AuthScreen } from "../components/AuthScreen";
 import { QRScannerModal } from "../components/QRScannerModal";
 import { LinkedDevicesModal } from "../components/LinkedDevicesModal";
-import { AppleHeader, HEADER_COLLAPSIBLE_HEIGHT } from "../components/AppleHeader";
+import {
+  AppleHeader,
+  HEADER_COLLAPSIBLE_HEIGHT,
+} from "../components/AppleHeader";
 import { PlatformFilterModal } from "../components/PlatformFilterModal";
 import { EmptyState } from "../components/EmptyState";
 import { FeedsDrawer, FeedFilterType } from "../components/FeedsDrawer";
@@ -147,7 +150,7 @@ export default function HomeScreen() {
           useNativeDriver: true,
         }).start();
       }
-    } else if (diff < -12) {
+    } else if (diff < -24) {
       // Scrolling up -> show header and navbar
       if (!isHeaderVisible.current) {
         isHeaderVisible.current = true;
@@ -677,7 +680,10 @@ export default function HomeScreen() {
             onSelectPlatform={handleSelectPlatform}
             onPressActiveTab={() => {
               haptics.light();
-              flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+              flatListRef.current?.scrollToOffset({
+                offset: 0,
+                animated: true,
+              });
             }}
             pinnedPlatforms={pinnedPlatforms}
             platformCounts={platformCounts}

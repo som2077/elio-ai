@@ -9,6 +9,7 @@ import {
   ScrollView,
   Dimensions,
   LayoutChangeEvent,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,10 +18,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
-export const HEADER_COLLAPSIBLE_HEIGHT = 88;
+export const HEADER_COLLAPSIBLE_HEIGHT = 104;
 
 const PLATFORM_LABELS: Record<string, string> = {
-  all: "All",
+  all: "Queue",
   youtube: "YouTube",
   instagram: "Instagram",
   twitter: "Twitter / 𝕏",
@@ -199,22 +200,29 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         style={[
           styles.statusBarBlurContainer,
           {
-            height: insets.top - 20,
+            height: insets.top + 32,
             opacity: statusBarBlurOpacity,
           },
         ]}
         pointerEvents="none"
       >
-        <BlurView
-          intensity={2}
-          tint="systemUltraThinMaterialDark"
-          blurReductionFactor={12}
-          experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFill}
-        />
+        {Platform.OS === "ios" && (
+          <BlurView
+            intensity={25}
+            tint="systemUltraThinMaterialDark"
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         <LinearGradient
-          colors={["rgba(0, 0, 0, 0.42)", "rgba(0, 0, 0, 0.20)", "transparent"]}
-          locations={[0, 0.5, 1]}
+          colors={[
+            "rgba(0, 0, 0, 0.85)",
+            "rgba(0, 0, 0, 0.65)",
+            "rgba(0, 0, 0, 0.38)",
+            "rgba(0, 0, 0, 0.16)",
+            "rgba(0, 0, 0, 0.04)",
+            "rgba(0, 0, 0, 0)",
+          ]}
+          locations={[0, 0.35, 0.58, 0.78, 0.92, 1]}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
@@ -327,7 +335,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
             <View style={styles.tabsDivider} />
 
-            {/* "All" Platform Tab */}
+            {/* "Queue" Platform Tab */}
             <TouchableOpacity
               key="all"
               activeOpacity={0.7}
@@ -349,7 +357,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
                     selectedPlatform === "all" && styles.tabItemTextActive,
                   ]}
                 >
-                  All
+                  Queue
                 </Text>
                 {allCount > 0 && (
                   <View
@@ -463,7 +471,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   topBar: {
-    height: 48,
+    height: 56,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -471,8 +479,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   iconBtn: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -486,8 +494,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   elioLogo: {
-    width: 60,
-    height: 60,
+    width: 52,
+    height: 52,
   },
   actionsRight: {
     flexDirection: "row",
@@ -495,19 +503,19 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tabsRow: {
-    height: 40,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
   },
   tabsScrollContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     position: "relative",
   },
   tabItem: {
-    paddingHorizontal: 12,
-    height: 40,
+    paddingHorizontal: 14,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -517,18 +525,18 @@ const styles = StyleSheet.create({
   },
   platformsTabText: {
     color: "#E7E9EA",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "700",
   },
   tabsDivider: {
     width: 1,
-    height: 16,
+    height: 18,
     backgroundColor: "rgba(255, 255, 255, 0.12)",
     marginHorizontal: 4,
   },
   tabItemText: {
     color: "#71767B",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
   },
   tabItemTextActive: {
@@ -536,7 +544,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   tabBadge: {
-    marginLeft: 5,
+    marginLeft: 6,
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: 8,
@@ -546,7 +554,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.16)",
   },
   tabBadgeText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "600",
     color: "#71767B",
   },
@@ -556,10 +564,10 @@ const styles = StyleSheet.create({
   },
   slidingIndicator: {
     position: "absolute",
-    bottom: 2,
+    bottom: 0,
     left: 0,
-    height: 3,
-    borderRadius: 1.5,
+    height: 3.5,
+    borderRadius: 2,
     zIndex: 10,
   },
 });
