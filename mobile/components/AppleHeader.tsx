@@ -79,16 +79,16 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         style={[
           styles.statusBarBlurContainer,
           {
-            height: insets.top + 14,
+            height: insets.top - 20,
             opacity: statusBarBlurOpacity,
           },
         ]}
         pointerEvents="none"
       >
         <BlurView
-          intensity={25}
+          intensity={2}
           tint="systemUltraThinMaterialDark"
-          blurReductionFactor={2}
+          blurReductionFactor={12}
           experimentalBlurMethod="dimezisBlurView"
           style={StyleSheet.absoluteFill}
         />
@@ -96,7 +96,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           colors={[
             "rgba(0, 0, 0, 0.75)",
             "rgba(0, 0, 0, 0.42)",
-            "rgba(0, 0, 0, 0.12)",
+            "rgba(0, 0, 0, 0.20)",
             "transparent",
           ]}
           locations={[0, 0.4, 0.75, 1]}
@@ -181,9 +181,6 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
             </Animated.View>
           </View>
         </View>
-
-        {/* Hairline Divider at the bottom of the full header */}
-        <View style={styles.headerBottomHairline} />
       </Animated.View>
     </>
   );
@@ -205,14 +202,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 12,
     overflow: "hidden",
-  },
-  headerBottomHairline: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
   topBar: {
     height: 48,
