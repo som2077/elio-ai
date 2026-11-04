@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { Video, ResizeMode } from "expo-av";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { appleColors } from "../theme/appleTokens";
 import { supabase } from "../services/supabase";
 import { motionTokens } from "../utils/motion";
 
@@ -366,7 +367,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: appleColors.canvas,
     justifyContent: "space-between",
   },
   alertBanner: {

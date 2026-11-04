@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   Switch,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { haptics } from "../utils/haptics";
@@ -88,6 +89,8 @@ interface PlatformFilterModalProps {
   onClose: () => void;
 }
 
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
   visible,
   selectedPlatform = "all",
@@ -110,7 +113,7 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
       visible={visible}
       onClose={onClose}
       title="Platforms"
-      subtitle="Tap to view clips or toggle switch to pin to top bar"
+      subtitle="Tap platform to view clips, or toggle to pin to top bar"
       maxHeightRatio={0.88}
     >
       {/* Scrollable Platforms List */}
@@ -119,16 +122,18 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
         contentContainerStyle={styles.scrollListContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* "Queue" Option */}
-        <TouchableOpacity
-          activeOpacity={0.7}
+        {/* "Queue (All)" Row */}
+        <View
           style={[
             styles.platformRow,
             selectedPlatform === "all" && styles.platformRowActive,
           ]}
-          onPress={() => handleSelect("all")}
         >
-          <View style={styles.platformInfo}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.platformInfo}
+            onPress={() => handleSelect("all")}
+          >
             <View
               style={[
                 styles.iconCircle,
@@ -147,14 +152,18 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
                 )}
               </View>
               <Text style={styles.pinnedStatus}>
-                {platformCounts?.all ?? 0} saved clips in queue • Always available
+                {platformCounts?.all ?? 0} saved clips
               </Text>
             </View>
-          </View>
-          {selectedPlatform === "all" && (
-            <Ionicons name="checkmark-circle" size={22} color="#1D9BF0" />
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          <Switch
+            value={true}
+            disabled={true}
+            trackColor={{ false: "#2F3336", true: "rgba(29, 155, 240, 0.55)" }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
 
         {/* Individual Platforms */}
         {ALL_AVAILABLE_PLATFORMS.map((platform) => {
@@ -198,8 +207,9 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
                     )}
                   </View>
                   <Text style={styles.pinnedStatus}>
-                    {count} clip{count === 1 ? "" : "s"} •{" "}
-                    {isPinned ? "Pinned to bar" : "Hidden from bar"}
+                    {count > 0
+                      ? `${count} saved clip${count === 1 ? "" : "s"}`
+                      : "No clips yet"}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -236,21 +246,21 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
 
 const styles = StyleSheet.create({
   scrollList: {
-    maxHeight: 330,
-    marginTop: 4,
+    maxHeight: Math.min(SCREEN_HEIGHT * 0.54, 490),
+    marginTop: 6,
   },
   scrollListContent: {
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   platformRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    paddingVertical: 11,
     paddingHorizontal: 8,
-    borderRadius: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 12,
   },
   platformRowActive: {
     backgroundColor: "rgba(255, 255, 255, 0.04)",
@@ -262,12 +272,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 14,
+    marginRight: 12,
   },
   textContainer: {
     flex: 1,
@@ -279,7 +289,7 @@ const styles = StyleSheet.create({
   },
   platformLabel: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: "600",
     letterSpacing: -0.2,
   },
@@ -288,9 +298,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 10,
     backgroundColor: "rgba(29, 155, 240, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(29, 155, 240, 0.35)",
   },
   activeTagText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "700",
     color: "#1D9BF0",
   },
@@ -315,7 +327,8 @@ const styles = StyleSheet.create({
   },
   doneButtonText: {
     color: "#000000",
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: "700",
+    letterSpacing: -0.2,
   },
 });

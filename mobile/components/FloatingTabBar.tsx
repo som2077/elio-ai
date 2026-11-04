@@ -202,7 +202,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       <View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: "rgba(0, 0, 0, 0.45)" },
+          { backgroundColor: "rgba(16, 16, 16, 0.50)" },
         ]}
         pointerEvents="none"
       />
@@ -307,6 +307,6 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
     backgroundColor: "#1D9BF0",
     borderWidth: 1.5,
-    borderColor: "#000000",
+    borderColor: "#101010",
   },
 });

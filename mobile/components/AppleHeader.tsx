@@ -214,12 +214,12 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         )}
         <LinearGradient
           colors={[
-            "rgba(0, 0, 0, 0.85)",
-            "rgba(0, 0, 0, 0.65)",
-            "rgba(0, 0, 0, 0.38)",
-            "rgba(0, 0, 0, 0.16)",
-            "rgba(0, 0, 0, 0.04)",
-            "rgba(0, 0, 0, 0)",
+            "rgba(16, 16, 16, 0.88)",
+            "rgba(16, 16, 16, 0.68)",
+            "rgba(16, 16, 16, 0.40)",
+            "rgba(16, 16, 16, 0.18)",
+            "rgba(16, 16, 16, 0.04)",
+            "rgba(16, 16, 16, 0)",
           ]}
           locations={[0, 0.35, 0.58, 0.78, 0.92, 1]}
           style={StyleSheet.absoluteFill}
@@ -452,9 +452,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.78)",
+    backgroundColor: "rgba(16, 16, 16, 0.85)",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#2F3336",
+    borderBottomColor: "rgba(255, 255, 255, 0.12)",
     overflow: "hidden",
   },
   topBar: {

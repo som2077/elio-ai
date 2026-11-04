@@ -580,7 +580,7 @@ export default function HomeScreen() {
         style={[styles.safeContainer, styles.centerContainer]}
         edges={["top", "left", "right"]}
       >
-        <StatusBar style="light" backgroundColor="#000000" translucent={true} />
+        <StatusBar style="light" backgroundColor={appleColors.canvas} translucent={true} />
         <ActivityIndicator size="large" color={appleColors.accent} />
         <Text style={styles.loadingText}>Syncing Elio AI...</Text>
       </SafeAreaView>
@@ -953,7 +953,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeContainer: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: appleColors.canvas,
   },
   centerContainer: {
     justifyContent: "center",

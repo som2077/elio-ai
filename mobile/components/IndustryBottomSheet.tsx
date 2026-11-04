@@ -224,10 +224,10 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.68)",
+    backgroundColor: "rgba(16, 16, 16, 0.72)",
   },
   sheetContainer: {
-    backgroundColor: "#16181C",
+    backgroundColor: "#181818",
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     borderTopWidth: 1,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 10,
     paddingHorizontal: 20,
-    backgroundColor: "#16181C",
+    backgroundColor: "#181818",
   },
   handleContainer: {
     alignItems: "center",

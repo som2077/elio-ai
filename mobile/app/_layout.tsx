@@ -15,7 +15,7 @@ export default function RootLayout() {
     <SafeAreaProvider style={styles.container}>
       <StatusBar
         style="light"
-        backgroundColor="#000000"
+        backgroundColor={appleColors.canvas}
         translucent={true}
         hidden={false}
       />

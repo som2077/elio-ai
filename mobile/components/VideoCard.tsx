@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SavedVideo } from "../types/video";
-import { appleColors } from "../theme/appleTokens";
+import { appleColors, threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
@@ -345,8 +345,8 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#2F3336",
-    backgroundColor: "#000000",
+    borderBottomColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: threadsTokens.colors.canvas,
   },
   authorRow: {
     flexDirection: "row",
@@ -356,9 +356,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#16181C",
+    backgroundColor: "#181818",
     borderWidth: 1,
-    borderColor: "#2F3336",
+    borderColor: "rgba(255, 255, 255, 0.10)",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 10,
@@ -419,9 +419,9 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "#000000",
+    backgroundColor: "#161616",
     borderWidth: 1,
-    borderColor: "#2F3336",
+    borderColor: "rgba(255, 255, 255, 0.10)",
     position: "relative",
     alignItems: "center",
     justifyContent: "center",
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#16181C",
+    backgroundColor: "#181818",
   },
   thumbnailScrim: {
     ...StyleSheet.absoluteFillObject,

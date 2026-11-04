@@ -6,25 +6,25 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SavedVideo } from "../types/video";
 import { ActivityCalendar } from "./ActivityCalendar";
 import { TimeRangeMenu, TimeRange } from "./TimeRangeMenu";
-import { InsightsTrendChart } from "./InsightsTrendChart";
+import {
+  SavedVsWatchedAreaChart,
+  DailyPoint,
+} from "./SavedVsWatchedAreaChart";
+import { PlatformDonutChart } from "./PlatformDonutChart";
+import { ActivityStreakGrid } from "./ActivityStreakGrid";
 import {
   toDateKey,
   formatDisplayDate,
-  calculateActivityStats,
 } from "../services/dateAnalytics";
-import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-export type InsightsTab = "overview" | "audience";
-export type ClipFilterOption = "latest" | "most_views" | "most_replies" | "most_likes";
+export type InsightsTab = "overview" | "sources";
+export type ClipFilterOption = "all" | "in_queue" | "watched" | "favorites";
 
 interface InsightsViewProps {
   videos: SavedVideo[];
@@ -41,17 +41,10 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   onVideoPress,
   onBack,
 }) => {
-  // Top Navigation Tabs: Overview vs Audience (Platforms)
   const [activeTab, setActiveTab] = useState<InsightsTab>("overview");
-
-  // Time Range Filters (from Screenshots 15-59-01 and 15-59-34)
   const [profileRange, setProfileRange] = useState<TimeRange>("30d");
-  const [postsRange, setPostsRange] = useState<TimeRange>("90d");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showPostsMenu, setShowPostsMenu] = useState(false);
-
-  // Clips sub-filter pill
-  const [clipFilter, setClipFilter] = useState<ClipFilterOption>("latest");
+  const [clipFilter, setClipFilter] = useState<ClipFilterOption>("all");
 
   const getDaysCount = (r: TimeRange): number => {
     switch (r) {
@@ -83,86 +76,85 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
     }
   };
 
-  // Profile / Vault metrics for selected Profile Range
-  const profileMetrics = useMemo(() => {
+  // Video Vault metrics for selected Profile Range
+  const metrics = useMemo(() => {
     const days = getDaysCount(profileRange);
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffKey = toDateKey(cutoff);
 
-    // Filter videos in range
     const inRange = videos.filter((v) => toDateKey(v.created_at) >= cutoffKey);
-    const totalViews = inRange.length;
+    const totalSaved = inRange.length;
     const watched = inRange.filter((v) => v.status === "watched").length;
     const inQueue = inRange.filter((v) => v.status === "unread").length;
-    const notesCount = inRange.filter((v) => Boolean(v.user_notes)).length;
+    const completionRate =
+      totalSaved > 0 ? Math.round((watched / totalSaved) * 100) : 0;
+    const favorites = inRange.filter((v) => v.is_favorite).length;
 
     return {
-      views: totalViews,
-      viewers: watched,
-      followers: inQueue,
-      interactions: notesCount,
+      totalSaved,
+      watched,
+      inQueue,
+      completionRate,
+      favorites,
     };
   }, [videos, profileRange]);
 
-  // Daily Trend Data Points for Trend Line Chart
-  const trendData = useMemo(() => {
+  // Dual Daily Trend Data Points for Saved vs Watched Area Chart
+  const trendData: DailyPoint[] = useMemo(() => {
     const days = getDaysCount(profileRange);
-    const points: { dateKey: string; count: number }[] = [];
-    const dateCounts: Record<string, number> = {};
+    const savedCounts: Record<string, number> = {};
+    const watchedCounts: Record<string, number> = {};
 
     for (const v of videos) {
       if (!v.created_at) continue;
       const k = toDateKey(v.created_at);
-      dateCounts[k] = (dateCounts[k] || 0) + 1;
+      savedCounts[k] = (savedCounts[k] || 0) + 1;
+
+      if (v.status === "watched") {
+        const watchedKey = toDateKey(v.updated_at || v.created_at);
+        watchedCounts[watchedKey] = (watchedCounts[watchedKey] || 0) + 1;
+      }
     }
 
+    const points: DailyPoint[] = [];
     const curr = new Date();
+
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(curr);
       d.setDate(d.getDate() - i);
       const k = toDateKey(d);
+
+      // Compact display date: "4 Nov" or "Wed" for 7d
+      const dayNum = d.getDate();
+      const monthNames = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      ];
+      const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const displayDate =
+        days === 7
+          ? weekdayNames[d.getDay()]
+          : `${dayNum} ${monthNames[d.getMonth()]}`;
+
       points.push({
         dateKey: k,
-        count: dateCounts[k] || 0,
+        displayDate,
+        saved: savedCounts[k] || 0,
+        watched: watchedCounts[k] || 0,
       });
     }
 
     return points;
   }, [videos, profileRange]);
 
-  // Posts/Clips filtered and sorted for Section 2
-  const filteredClips = useMemo(() => {
-    const days = getDaysCount(postsRange);
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    const cutoffKey = toDateKey(cutoff);
-
-    let list = videos.filter((v) => toDateKey(v.created_at) >= cutoffKey);
-
-    if (clipFilter === "most_views") {
-      list = [...list].sort((a, b) => (b.status === "watched" ? 1 : -1));
-    } else if (clipFilter === "most_replies") {
-      list = [...list].sort((a, b) => (b.user_notes ? 1 : -1));
-    } else if (clipFilter === "most_likes") {
-      list = [...list].sort((a, b) => (b.is_favorite ? 1 : -1));
-    } else {
-      // Latest
-      list = [...list].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    }
-
-    return list;
-  }, [videos, postsRange, clipFilter]);
-
-  // Platform Breakdown for Audience Tab
+  // Platform Distribution Stats
   const platformStats = useMemo(() => {
     const counts: Record<string, number> = {
       youtube: 0,
       instagram: 0,
-      tiktok: 0,
       twitter: 0,
+      tiktok: 0,
       reddit: 0,
     };
 
@@ -177,8 +169,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
     > = {
       youtube: { label: "YouTube", icon: "logo-youtube", color: "#FF0033" },
       instagram: { label: "Instagram", icon: "logo-instagram", color: "#E1306C" },
-      tiktok: { label: "TikTok", icon: "musical-notes", color: "#00F2FE" },
       twitter: { label: "X / Twitter", icon: "logo-twitter", color: "#1D9BF0" },
+      tiktok: { label: "TikTok", icon: "musical-notes", color: "#00F2FE" },
       reddit: { label: "Reddit", icon: "logo-reddit", color: "#FF4500" },
     };
 
@@ -198,17 +190,32 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       .sort((a, b) => b.count - a.count);
   }, [videos]);
 
+  // Filtered Clips List
+  const filteredClips = useMemo(() => {
+    let list = [...videos];
+    if (clipFilter === "in_queue") {
+      list = list.filter((v) => v.status === "unread");
+    } else if (clipFilter === "watched") {
+      list = list.filter((v) => v.status === "watched");
+    } else if (clipFilter === "favorites") {
+      list = list.filter((v) => v.is_favorite);
+    }
+    return list.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, [videos, clipFilter]);
+
   const getRelativeTime = (dateStr: string) => {
     try {
       const diff = Date.now() - new Date(dateStr).getTime();
       const mins = Math.floor(diff / 60000);
       if (mins < 1) return "now";
-      if (mins < 60) return `${mins}m`;
+      if (mins < 60) return `${mins}m ago`;
       const hours = Math.floor(mins / 60);
-      if (hours < 24) return `${hours}h`;
+      if (hours < 24) return `${hours}h ago`;
       const days = Math.floor(hours / 24);
-      if (days < 30) return `${days}d`;
-      return `${Math.floor(days / 30)}mo`;
+      if (days < 30) return `${days}d ago`;
+      return `${Math.floor(days / 30)}mo ago`;
     } catch {
       return "now";
     }
@@ -229,12 +236,29 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Insights</Text>
+        <Text style={styles.headerTitle}>Analytics & Insights</Text>
 
-        <View style={{ width: 36 }} />
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.rangeDropdownBtn}
+          onPress={() => {
+            haptics.selection();
+            setShowProfileMenu(true);
+          }}
+        >
+          <Text style={styles.rangeDropdownText}>
+            {getRangeLabel(profileRange)}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={14}
+            color="#71767B"
+            style={{ marginLeft: 4 }}
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Top Segmented Underline Tabs (Overview vs Audience) */}
+      {/* Top Segmented Navigation Tabs */}
       <View style={styles.segmentedTabsRow}>
         <TouchableOpacity
           activeOpacity={0.8}
@@ -253,7 +277,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
               activeTab === "overview" && styles.segmentTabTextActive,
             ]}
           >
-            Overview
+            Overview & Trends
           </Text>
         </TouchableOpacity>
 
@@ -261,265 +285,143 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           activeOpacity={0.8}
           style={[
             styles.segmentTab,
-            activeTab === "audience" && styles.segmentTabActive,
+            activeTab === "sources" && styles.segmentTabActive,
           ]}
           onPress={() => {
             haptics.selection();
-            setActiveTab("audience");
+            setActiveTab("sources");
           }}
         >
           <Text
             style={[
               styles.segmentTabText,
-              activeTab === "audience" && styles.segmentTabTextActive,
+              activeTab === "sources" && styles.segmentTabTextActive,
             ]}
           >
-            Audience
+            Sources & Heatmap
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Tab Content */}
+      {/* Scrollable Body */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* KPI Summary Cards */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.kpiContainer}
+        >
+          <View style={styles.metricCard}>
+            <Text style={styles.metricCardLabel}>Saved</Text>
+            <Text style={styles.metricCardValue}>{metrics.totalSaved}</Text>
+            <Text style={styles.metricCardSub}>In {getRangeLabel(profileRange)}</Text>
+          </View>
+
+          <View style={styles.metricCard}>
+            <Text style={styles.metricCardLabel}>In Queue</Text>
+            <Text style={[styles.metricCardValue, { color: "#1D9BF0" }]}>
+              {metrics.inQueue}
+            </Text>
+            <Text style={styles.metricCardSub}>To watch</Text>
+          </View>
+
+          <View style={styles.metricCard}>
+            <Text style={styles.metricCardLabel}>Watched</Text>
+            <Text style={[styles.metricCardValue, { color: "#00BA7C" }]}>
+              {metrics.watched}
+            </Text>
+            <Text style={styles.metricCardSub}>Completed</Text>
+          </View>
+
+          <View style={styles.metricCard}>
+            <Text style={styles.metricCardLabel}>Watch Rate</Text>
+            <Text style={[styles.metricCardValue, { color: "#F91880" }]}>
+              {metrics.completionRate}%
+            </Text>
+            <Text style={styles.metricCardSub}>Completion</Text>
+          </View>
+        </ScrollView>
+
         {activeTab === "overview" ? (
           <>
-            {/* SECTION 1: PROFILE / VAULT */}
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionTitleWrap}>
-                <Text style={styles.sectionTitle}>Profile</Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={16}
-                  color={threadsTokens.colors.textSecondary}
-                  style={{ marginLeft: 4 }}
-                />
-              </View>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.rangeDropdownBtn}
-                onPress={() => {
-                  haptics.selection();
-                  setShowProfileMenu(true);
-                }}
-              >
-                <Text style={styles.rangeDropdownText}>
-                  {getRangeLabel(profileRange)}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={14}
-                  color={threadsTokens.colors.textSecondary}
-                  style={{ marginLeft: 4 }}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Horizontal Metric Cards Carousel (Screenshot 15-59-01 & 15-59-21) */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carouselContainer}
-            >
-              <View style={styles.metricCard}>
-                <Text style={styles.metricCardLabel}>Views</Text>
-                <Text style={styles.metricCardValue}>{profileMetrics.views}</Text>
-                <Text style={styles.metricCardDelta}>0.0%</Text>
-              </View>
-
-              <View style={styles.metricCard}>
-                <Text style={styles.metricCardLabel}>Viewers</Text>
-                <Text style={styles.metricCardValue}>{profileMetrics.viewers}</Text>
-                <Text style={styles.metricCardDelta}>0.0%</Text>
-              </View>
-
-              <View style={styles.metricCard}>
-                <Text style={styles.metricCardLabel}>Net followers</Text>
-                <Text style={styles.metricCardValue}>{profileMetrics.followers}</Text>
-                <Text style={styles.metricCardDelta}>0.0%</Text>
-              </View>
-
-              <View style={styles.metricCard}>
-                <Text style={styles.metricCardLabel}>Interactions</Text>
-                <Text style={styles.metricCardValue}>
-                  {profileMetrics.interactions}
-                </Text>
-                <Text style={styles.metricCardDelta}>0.0%</Text>
-              </View>
-            </ScrollView>
-
-            {/* Trend Line Chart with 1, 1, 0 gridlines */}
-            <InsightsTrendChart
+            {/* 1. Industry-Grade Dual Area Trend Chart */}
+            <SavedVsWatchedAreaChart
               data={trendData}
-              daysCount={getDaysCount(profileRange)}
+              timeRange={profileRange}
             />
 
-            {/* SECTION 2: POSTS / CLIPS */}
-            <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
-              <View style={styles.sectionTitleWrap}>
-                <Text style={styles.sectionTitle}>Posts</Text>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={16}
-                  color={threadsTokens.colors.textSecondary}
-                  style={{ marginLeft: 4 }}
-                />
-              </View>
+            {/* 2. Platform Distribution Donut Ring */}
+            <PlatformDonutChart
+              data={platformStats}
+              totalClips={videos.length}
+            />
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.rangeDropdownBtn}
-                onPress={() => {
-                  haptics.selection();
-                  setShowPostsMenu(true);
-                }}
-              >
-                <Text style={styles.rangeDropdownText}>
-                  {getRangeLabel(postsRange)}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={14}
-                  color={threadsTokens.colors.textSecondary}
-                  style={{ marginLeft: 4 }}
-                />
-              </TouchableOpacity>
+            {/* 3. Consistency Heatmap Matrix */}
+            <ActivityStreakGrid
+              videos={videos}
+              onSelectDate={(k) => onSelectDate(k)}
+            />
+
+            {/* 4. Clips Activity History */}
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Library Activity</Text>
+              <Text style={styles.clipsCountText}>
+                {filteredClips.length} Clips
+              </Text>
             </View>
 
-            {/* Filter Pills Bar */}
+            {/* Filter Pills */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filterPillsRow}
             >
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.filterPillIcon}
-                onPress={() => haptics.selection()}
-              >
-                <Ionicons name="reorder-two-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.filterPillText}>Threads</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterPill,
-                  clipFilter === "latest" && styles.filterPillActive,
-                ]}
-                onPress={() => {
-                  haptics.selection();
-                  setClipFilter("latest");
-                }}
-              >
-                <Text
+              {[
+                { id: "all", label: "All Clips" },
+                { id: "in_queue", label: "In Queue" },
+                { id: "watched", label: "Watched" },
+                { id: "favorites", label: "Favorites" },
+              ].map((tab) => (
+                <TouchableOpacity
+                  key={tab.id}
+                  activeOpacity={0.7}
                   style={[
-                    styles.filterPillText,
-                    clipFilter === "latest" && styles.filterPillTextActive,
+                    styles.filterPill,
+                    clipFilter === tab.id && styles.filterPillActive,
                   ]}
+                  onPress={() => {
+                    haptics.selection();
+                    setClipFilter(tab.id as ClipFilterOption);
+                  }}
                 >
-                  Latest
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterPill,
-                  clipFilter === "most_views" && styles.filterPillActive,
-                ]}
-                onPress={() => {
-                  haptics.selection();
-                  setClipFilter("most_views");
-                }}
-              >
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    clipFilter === "most_views" && styles.filterPillTextActive,
-                  ]}
-                >
-                  Most views
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterPill,
-                  clipFilter === "most_replies" && styles.filterPillActive,
-                ]}
-                onPress={() => {
-                  haptics.selection();
-                  setClipFilter("most_replies");
-                }}
-              >
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    clipFilter === "most_replies" && styles.filterPillTextActive,
-                  ]}
-                >
-                  Most replies
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={[
-                  styles.filterPill,
-                  clipFilter === "most_likes" && styles.filterPillActive,
-                ]}
-                onPress={() => {
-                  haptics.selection();
-                  setClipFilter("most_likes");
-                }}
-              >
-                <Text
-                  style={[
-                    styles.filterPillText,
-                    clipFilter === "most_likes" && styles.filterPillTextActive,
-                  ]}
-                >
-                  Most likes
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      clipFilter === tab.id && styles.filterPillTextActive,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
 
-            {/* Clips List Rows (Matching Screenshot 15-59-01) */}
+            {/* Clip List Rows */}
             <View style={styles.clipsList}>
               {filteredClips.length === 0 ? (
                 <View style={styles.emptyClipsBox}>
-                  <View style={styles.emptyIconSquircle}>
-                    <Ionicons name="document-text-outline" size={24} color="#FFFFFF" />
-                  </View>
-                  <View style={styles.emptyMeta}>
-                    <Text style={styles.emptyTimeText}>now</Text>
-                    <View style={styles.miniMetricsRow}>
-                      <Text style={styles.miniMetric}>♡ 0</Text>
-                      <Text style={styles.miniMetric}>💬 0</Text>
-                      <Text style={styles.miniMetric}>🔁 0</Text>
-                      <Text style={styles.miniMetric}>↗ 0</Text>
-                    </View>
-                  </View>
-                  <View style={styles.emptyRightCol}>
-                    <Text style={styles.emptyViewsNum}>0</Text>
-                    <Text style={styles.emptyViewsLabel}>Views</Text>
-                  </View>
+                  <Ionicons name="film-outline" size={28} color="#71767B" />
+                  <Text style={styles.emptyClipsText}>
+                    No clips found for this filter
+                  </Text>
                 </View>
               ) : (
-                filteredClips.map((item) => {
-                  const seed = item.id
-                    .split("")
-                    .reduce((acc, c) => acc + c.charCodeAt(0), 0);
-                  const likes = item.is_favorite ? (seed % 20) + 1 : seed % 5;
-                  const replies = item.user_notes ? 1 : 0;
-                  const reposts = item.status === "watched" ? 1 : 0;
-                  const views = (seed % 80) + 12;
-
+                filteredClips.slice(0, 15).map((item) => {
+                  const isWatched = item.status === "watched";
+                  const p = (item.platform || "youtube").toLowerCase();
                   return (
                     <TouchableOpacity
                       key={item.id}
@@ -530,7 +432,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                         if (onVideoPress) onVideoPress(item);
                       }}
                     >
-                      {/* Left Squircle Thumbnail / Icon */}
                       {item.thumbnail_url ? (
                         <Image
                           source={{ uri: item.thumbnail_url }}
@@ -538,37 +439,58 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                           resizeMode="cover"
                         />
                       ) : (
-                        <View style={styles.emptyIconSquircle}>
+                        <View style={styles.emptyThumbSquare}>
                           <Ionicons
-                            name="document-text-outline"
-                            size={22}
-                            color="#FFFFFF"
+                            name="videocam-outline"
+                            size={20}
+                            color="#71767B"
                           />
                         </View>
                       )}
 
-                      {/* Center Meta */}
                       <View style={styles.clipItemCenter}>
                         <Text style={styles.clipItemTitle} numberOfLines={1}>
                           {item.title || "Untitled Clip"}
                         </Text>
                         <View style={styles.clipSubRow}>
+                          <Text style={styles.clipPlatformText}>
+                            {item.platform || "Video"}
+                          </Text>
+                          <Text style={styles.clipDot}>•</Text>
                           <Text style={styles.clipTimeText}>
                             {getRelativeTime(item.created_at)}
                           </Text>
-                          <View style={styles.miniMetricsRow}>
-                            <Text style={styles.miniMetric}>♡ {likes}</Text>
-                            <Text style={styles.miniMetric}>💬 {replies}</Text>
-                            <Text style={styles.miniMetric}>🔁 {reposts}</Text>
-                            <Text style={styles.miniMetric}>↗ 0</Text>
-                          </View>
                         </View>
                       </View>
 
-                      {/* Right View Count */}
-                      <View style={styles.clipRightCol}>
-                        <Text style={styles.clipViewsNum}>{views}</Text>
-                        <Text style={styles.clipViewsLabel}>Views</Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          isWatched
+                            ? styles.statusBadgeWatched
+                            : styles.statusBadgeQueue,
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            isWatched
+                              ? "checkmark-circle"
+                              : "ellipse-outline"
+                          }
+                          size={11}
+                          color={isWatched ? "#00BA7C" : "#1D9BF0"}
+                          style={{ marginRight: 3 }}
+                        />
+                        <Text
+                          style={[
+                            styles.statusBadgeText,
+                            isWatched
+                              ? styles.statusBadgeTextWatched
+                              : styles.statusBadgeTextQueue,
+                          ]}
+                        >
+                          {isWatched ? "Watched" : "Queue"}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -577,47 +499,24 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             </View>
           </>
         ) : (
-          /* AUDIENCE / PLATFORMS TAB */
-          <View style={styles.audienceContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Platform Sources</Text>
-              <Text style={styles.rangeDropdownText}>
-                {platformStats.length} Platforms
-              </Text>
-            </View>
+          /* TAB 2: SOURCES & HEATMAP */
+          <View style={styles.sourcesContainer}>
+            {/* Donut Chart */}
+            <PlatformDonutChart
+              data={platformStats}
+              totalClips={videos.length}
+            />
 
-            {/* Platform Bars */}
-            <View style={styles.audienceCard}>
-              {platformStats.map((p) => (
-                <View key={p.key} style={styles.platformBarRow}>
-                  <View style={styles.platformNameCol}>
-                    <Ionicons
-                      name={p.icon}
-                      size={16}
-                      color={p.color}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={styles.platformLabel}>{p.label}</Text>
-                  </View>
+            {/* 12-Week Rolling Matrix */}
+            <ActivityStreakGrid
+              videos={videos}
+              onSelectDate={(k) => onSelectDate(k)}
+            />
 
-                  <View style={styles.progressTrack}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${p.pct}%`, backgroundColor: p.color },
-                      ]}
-                    />
-                  </View>
-
-                  <Text style={styles.platformPct}>{p.pct}%</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Monthly Calendar Heatmap */}
-            <View style={{ marginTop: 24 }}>
+            {/* Monthly Calendar View */}
+            <View style={{ marginTop: 8 }}>
               <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>
-                Activity Calendar
+                Monthly Activity Calendar
               </Text>
               <ActivityCalendar
                 videos={videos}
@@ -631,19 +530,12 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      {/* Floating Time Range Modals (Screenshot 15-59-34) */}
+      {/* Floating Time Range Modal */}
       <TimeRangeMenu
         visible={showProfileMenu}
         selectedRange={profileRange}
         onSelect={(r) => setProfileRange(r)}
         onClose={() => setShowProfileMenu(false)}
-      />
-
-      <TimeRangeMenu
-        visible={showPostsMenu}
-        selectedRange={postsRange}
-        onSelect={(r) => setPostsRange(r)}
-        onClose={() => setShowPostsMenu(false)}
       />
     </View>
   );
@@ -655,11 +547,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
   },
   headerBar: {
-    height: 48,
+    height: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#2F3336",
   },
   backBtn: {
     width: 36,
@@ -668,14 +562,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
     color: "#FFFFFF",
+    letterSpacing: -0.2,
+  },
+  rangeDropdownBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: "#16181C",
+    borderWidth: 1,
+    borderColor: "#2F3336",
+  },
+  rangeDropdownText: {
+    fontSize: 12.5,
+    color: "#E7E9EA",
+    fontWeight: "600",
   },
   segmentedTabsRow: {
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#1E1E1E",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#2F3336",
     paddingHorizontal: 16,
   },
   segmentTab: {
@@ -690,241 +600,188 @@ const styles = StyleSheet.create({
     borderBottomColor: "#FFFFFF",
   },
   segmentTabText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    color: threadsTokens.colors.textSecondary,
+    color: "#71767B",
   },
   segmentTabTextActive: {
     color: "#FFFFFF",
+    fontWeight: "700",
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
+  },
+  kpiContainer: {
+    gap: 10,
+    paddingBottom: 18,
+  },
+  metricCard: {
+    width: 124,
+    backgroundColor: "#16181C",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#2F3336",
+  },
+  metricCardLabel: {
+    fontSize: 12,
+    color: "#71767B",
+    fontWeight: "500",
+    marginBottom: 6,
+  },
+  metricCardValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginBottom: 2,
+  },
+  metricCardSub: {
+    fontSize: 11,
+    color: "#71767B",
+    fontWeight: "500",
   },
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 12,
-  },
-  sectionTitleWrap: {
-    flexDirection: "row",
-    alignItems: "center",
+    marginTop: 6,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
     color: "#FFFFFF",
+    letterSpacing: -0.2,
   },
-  rangeDropdownBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-  },
-  rangeDropdownText: {
-    fontSize: 14,
-    color: threadsTokens.colors.textSecondary,
-    fontWeight: "500",
-  },
-  carouselContainer: {
-    gap: 10,
-    paddingBottom: 16,
-  },
-  metricCard: {
-    width: 130,
-    backgroundColor: "#141414",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#222222",
-  },
-  metricCardLabel: {
-    fontSize: 13,
-    color: threadsTokens.colors.textSecondary,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  metricCardValue: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  metricCardDelta: {
+  clipsCountText: {
     fontSize: 12,
-    color: threadsTokens.colors.textSecondary,
+    color: "#71767B",
     fontWeight: "500",
   },
   filterPillsRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 16,
-  },
-  filterPillIcon: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#181818",
-    borderWidth: 1,
-    borderColor: "#282828",
+    marginBottom: 14,
   },
   filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#141414",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#16181C",
     borderWidth: 1,
-    borderColor: "#242424",
+    borderColor: "#2F3336",
   },
   filterPillActive: {
-    backgroundColor: "#222222",
-    borderColor: "#3E3E3E",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#FFFFFF",
   },
   filterPillText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#71767B",
   },
   filterPillTextActive: {
-    color: "#FFFFFF",
+    color: "#000000",
+    fontWeight: "700",
   },
   clipsList: {
-    gap: 12,
+    gap: 8,
   },
   emptyClipsBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  emptyIconSquircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "#1C1C1E",
-    borderWidth: 1,
-    borderColor: "#2A2A2E",
+    height: 100,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    backgroundColor: "#16181C",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2F3336",
+    gap: 6,
   },
-  emptyMeta: {
-    flex: 1,
-  },
-  emptyTimeText: {
+  emptyClipsText: {
+    color: "#71767B",
     fontSize: 13,
-    color: threadsTokens.colors.textSecondary,
-    marginBottom: 4,
-  },
-  miniMetricsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  miniMetric: {
-    fontSize: 12,
-    color: threadsTokens.colors.textSecondary,
-  },
-  emptyRightCol: {
-    alignItems: "flex-end",
-  },
-  emptyViewsNum: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  emptyViewsLabel: {
-    fontSize: 11,
-    color: threadsTokens.colors.textSecondary,
   },
   clipItemRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
+    padding: 10,
+    backgroundColor: "#16181C",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2F3336",
   },
   clipItemThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: "#1C1C1E",
-    marginRight: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#000000",
+    marginRight: 10,
+  },
+  emptyThumbSquare: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#202327",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
   },
   clipItemCenter: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
   clipItemTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: "600",
     color: "#FFFFFF",
-    marginBottom: 4,
+    marginBottom: 3,
   },
   clipSubRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+  },
+  clipPlatformText: {
+    fontSize: 11.5,
+    color: "#71767B",
+    textTransform: "capitalize",
+  },
+  clipDot: {
+    fontSize: 10,
+    color: "#71767B",
+    marginHorizontal: 4,
   },
   clipTimeText: {
-    fontSize: 12,
-    color: threadsTokens.colors.textSecondary,
+    fontSize: 11.5,
+    color: "#71767B",
   },
-  clipRightCol: {
-    alignItems: "flex-end",
-    minWidth: 40,
-  },
-  clipViewsNum: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  clipViewsLabel: {
-    fontSize: 11,
-    color: threadsTokens.colors.textSecondary,
-  },
-  audienceContainer: {
-    paddingTop: 8,
-  },
-  audienceCard: {
-    backgroundColor: "#141414",
-    borderRadius: 16,
-    padding: 16,
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#222222",
-    gap: 14,
   },
-  platformBarRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  statusBadgeQueue: {
+    backgroundColor: "rgba(29, 155, 240, 0.10)",
+    borderColor: "rgba(29, 155, 240, 0.28)",
   },
-  platformNameCol: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: 110,
+  statusBadgeWatched: {
+    backgroundColor: "rgba(0, 186, 124, 0.10)",
+    borderColor: "rgba(0, 186, 124, 0.28)",
   },
-  platformLabel: {
-    fontSize: 13,
+  statusBadgeText: {
+    fontSize: 10.5,
     fontWeight: "600",
-    color: "#FFFFFF",
   },
-  progressTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#222222",
-    overflow: "hidden",
-    marginHorizontal: 12,
+  statusBadgeTextQueue: {
+    color: "#1D9BF0",
   },
-  progressFill: {
-    height: "100%",
-    borderRadius: 3,
+  statusBadgeTextWatched: {
+    color: "#00BA7C",
   },
-  platformPct: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: threadsTokens.colors.textSecondary,
-    width: 36,
-    textAlign: "right",
+  sourcesContainer: {
+    paddingTop: 4,
   },
 });

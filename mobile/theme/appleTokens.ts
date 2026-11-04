@@ -4,18 +4,18 @@
  */
 
 export const appleColors = {
-  // Deep obsidian background hierarchy
-  canvas: "#070A13", // Root background
-  canvasElevated: "#0C1120", // Scroll / header blend
+  // Deep obsidian background hierarchy - Meta Threads calibrated (#101010)
+  canvas: "#101010", // Root Threads dark background
+  canvasElevated: "#161616", // Scroll / header blend
   surfaceGlass: "rgba(255, 255, 255, 0.04)", // Base frosted glass
   surfaceGlassStrong: "rgba(255, 255, 255, 0.08)", // Active/highlight glass
-  surfaceSecondary: "#0F1628", // Opaque card layer
-  surfaceTertiary: "#162038", // Inner chip / pressed layer
+  surfaceSecondary: "#181818", // Opaque card layer
+  surfaceTertiary: "#202020", // Inner chip / pressed layer
 
   // Specular lighting & borders
-  borderGlass: "rgba(255, 255, 255, 0.07)",
-  borderSpecularTop: "rgba(255, 255, 255, 0.14)", // Catches light from above
-  borderSubtle: "rgba(255, 255, 255, 0.05)",
+  borderGlass: "rgba(255, 255, 255, 0.08)",
+  borderSpecularTop: "rgba(255, 255, 255, 0.15)", // Catches light from above
+  borderSubtle: "rgba(255, 255, 255, 0.06)",
 
   // Primary brand accent (Electric Indigo / Apple Purple-Blue)
   accent: "#6366F1",
@@ -181,14 +181,14 @@ export const appleShadows = {
  */
 export const threadsTokens = {
   colors: {
-    canvas: "#000000",
+    canvas: "#101010",
     card: "#101010",
     surfaceElevated: "#141414",
     surfaceCard: "#181818",
     surfaceInput: "#161616",
-    border: "#1E1E1E",
-    borderSubtle: "#181818",
-    borderStrong: "#2A2A2A",
+    border: "#262626",
+    borderSubtle: "#1C1C1E",
+    borderStrong: "#333333",
     textPrimary: "#F3F5F7",
     textSecondary: "#777777",
     textTertiary: "#555555",
