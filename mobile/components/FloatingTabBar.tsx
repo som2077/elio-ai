@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Platform,
   Animated,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,8 +24,9 @@ interface FloatingTabBarProps {
 
 interface AnimatedTabItemProps {
   isActive: boolean;
-  activeIcon: keyof typeof Ionicons.glyphMap;
-  inactiveIcon: keyof typeof Ionicons.glyphMap;
+  activeIcon?: keyof typeof Ionicons.glyphMap;
+  inactiveIcon?: keyof typeof Ionicons.glyphMap;
+  customIconSource?: any;
   iconSize: number;
   onPress: () => void;
   showBadge?: boolean;
@@ -43,6 +45,7 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
   isActive,
   activeIcon,
   inactiveIcon,
+  customIconSource,
   iconSize,
   onPress,
   showBadge = false,
@@ -134,18 +137,28 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
         style={[
           styles.iconWrapper,
           {
-            transform: [
-              { scale },
-              ...(isCompose ? [{ rotate: spin }] : []),
-            ],
+            transform: [{ scale }, ...(isCompose ? [{ rotate: spin }] : [])],
           },
         ]}
       >
-        <Ionicons
-          name={isActive || isCompose ? activeIcon : inactiveIcon}
-          size={iconSize}
-          color={isActive || isCompose ? "#FFFFFF" : "#71767B"}
-        />
+        {customIconSource ? (
+          <Image
+            source={customIconSource}
+            style={{
+              width: iconSize,
+              height: iconSize,
+              tintColor: isActive ? "#FFFFFF" : "#71767B",
+              opacity: isActive ? 1 : 0.65,
+            }}
+            resizeMode="contain"
+          />
+        ) : (
+          <Ionicons
+            name={isActive || isCompose ? activeIcon! : inactiveIcon!}
+            size={iconSize}
+            color={isActive || isCompose ? "#FFFFFF" : "#71767B"}
+          />
+        )}
 
         <Animated.View
           style={[
@@ -211,9 +224,8 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {/* 1. Home / Watchlist Feed */}
         <AnimatedTabItem
           isActive={activeTab === "feed"}
-          activeIcon="home"
-          inactiveIcon="home-outline"
-          iconSize={24}
+          customIconSource={require("../assets/home.png")}
+          iconSize={28}
           onPress={() => {
             if (activeTab !== "feed") {
               onTabSelect("feed");
@@ -238,9 +250,8 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {/* 3. Insights & Analytics */}
         <AnimatedTabItem
           isActive={activeTab === "insights"}
-          activeIcon="stats-chart"
-          inactiveIcon="stats-chart-outline"
-          iconSize={22}
+          customIconSource={require("../assets/insight.png")}
+          iconSize={26}
           showBadge={Boolean(unreadCount && unreadCount > 0)}
           onPress={() => {
             if (activeTab !== "insights") {
@@ -252,9 +263,8 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {/* 4. Profile / Linked Devices */}
         <AnimatedTabItem
           isActive={activeTab === "devices"}
-          activeIcon="person"
-          inactiveIcon="person-outline"
-          iconSize={23}
+          customIconSource={require("../assets/profile.png")}
+          iconSize={27}
           onPress={() => {
             if (activeTab !== "devices") {
               onTabSelect("devices");

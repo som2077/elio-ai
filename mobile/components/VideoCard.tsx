@@ -6,18 +6,18 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SavedVideo } from "../types/video";
 import { appleColors, threadsTokens } from "../theme/appleTokens";
+import { PlatformIcon } from "./PlatformIcon";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
 interface VideoCardProps {
   video: SavedVideo;
   onPress: () => void;
-  onToggleStatus: () => void;
+  onToggleStatus?: () => void;
   onLongPress?: () => void;
   onDelete?: () => void;
 }
@@ -60,25 +60,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       damping: motionTokens.spring.bouncy.damping,
       stiffness: motionTokens.spring.bouncy.stiffness,
     }).start();
-  };
-
-  const handleToggle = () => {
-    if (!isWatched) {
-      haptics.success();
-    } else {
-      haptics.light();
-    }
-    onToggleStatus();
-  };
-
-  const handleShare = async () => {
-    try {
-      haptics.light();
-      await Share.share({
-        message: `${video.title || "Check this out"}: ${video.clean_url}`,
-        url: video.clean_url,
-      });
-    } catch {}
   };
 
   const getPlatformIcon = (p: string): keyof typeof Ionicons.glyphMap => {
@@ -154,8 +135,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             style={styles.avatarCircle}
             onPress={onPress}
           >
-            <Ionicons
-              name={getPlatformIcon(platform)}
+            <PlatformIcon
+              platform={platform}
               size={18}
               color={platformConfig.color}
             />
@@ -241,8 +222,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             />
           ) : (
             <View style={styles.fallbackThumbnail}>
-              <Ionicons
-                name={getPlatformIcon(platform)}
+              <PlatformIcon
+                platform={platform}
                 size={44}
                 color="#71767B"
               />
@@ -254,11 +235,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
           {/* Platform Badge (Top-Left) */}
           <View style={styles.platformBadge}>
-            <Ionicons
-              name={getPlatformIcon(platform)}
+            <PlatformIcon
+              platform={platform}
               size={12}
               color={platformConfig.color}
-              style={{ marginRight: 4 }}
+              style={{ marginRight: 5 }}
             />
             <Text style={styles.platformBadgeText}>{platformConfig.label}</Text>
           </View>
@@ -280,60 +261,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             />
           </View>
         </TouchableOpacity>
-
-        {/* 4. Footer Row: Watch Status Pill, Favorite, Share */}
-        <View style={styles.footerRow}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.statusPill,
-              isWatched ? styles.statusPillWatched : styles.statusPillUnread,
-            ]}
-            onPress={handleToggle}
-          >
-            <Ionicons
-              name={isWatched ? "checkmark-circle" : "ellipse-outline"}
-              size={13}
-              color={isWatched ? "#1D9BF0" : "#71767B"}
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              style={[
-                styles.statusPillText,
-                isWatched && styles.statusPillTextWatched,
-              ]}
-            >
-              {isWatched ? "Watched" : "In Queue"}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.actionsRight}>
-            {/* Favorite / Like Button */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.iconActionBtn}
-              onPress={() => {
-                haptics.selection();
-                if (onLongPress) onLongPress();
-              }}
-            >
-              <Ionicons
-                name={video.is_favorite ? "heart" : "heart-outline"}
-                size={18}
-                color={video.is_favorite ? "#F91880" : "#71767B"}
-              />
-            </TouchableOpacity>
-
-            {/* Share Button */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.iconActionBtn}
-              onPress={handleShare}
-            >
-              <Ionicons name="share-outline" size={18} color="#71767B" />
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
     </Animated.View>
   );
@@ -343,9 +270,8 @@ const styles = StyleSheet.create({
   cardContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255, 255, 255, 0.12)",
+    paddingBottom: 16,
+    borderBottomWidth: 0,
     backgroundColor: threadsTokens.colors.canvas,
   },
   authorRow: {
@@ -483,44 +409,5 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.3)",
     alignItems: "center",
     justifyContent: "center",
-  },
-  footerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  statusPillUnread: {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderColor: "#2F3336",
-  },
-  statusPillWatched: {
-    backgroundColor: "rgba(29, 155, 240, 0.12)",
-    borderColor: "rgba(29, 155, 240, 0.3)",
-  },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#71767B",
-  },
-  statusPillTextWatched: {
-    color: "#1D9BF0",
-    fontWeight: "600",
-  },
-  actionsRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  iconActionBtn: {
-    padding: 6,
   },
 });

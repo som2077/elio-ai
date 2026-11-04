@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { PlatformIcon } from "./PlatformIcon";
 import { haptics } from "../utils/haptics";
 import { IndustryBottomSheet } from "./IndustryBottomSheet";
 
@@ -191,8 +192,8 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
                     { backgroundColor: platform.bgColor },
                   ]}
                 >
-                  <Ionicons
-                    name={platform.icon}
+                  <PlatformIcon
+                    platform={platform.key}
                     size={20}
                     color={platform.color}
                   />

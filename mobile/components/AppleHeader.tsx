@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
+import { PlatformIcon } from "./PlatformIcon";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
@@ -386,6 +387,16 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
                   }}
                 >
                   <View style={styles.tabItemInner}>
+                    <PlatformIcon
+                      platform={platformKey}
+                      size={13}
+                      color={
+                        isActive
+                          ? PLATFORM_COLORS[platformKey] || "#FFFFFF"
+                          : "#71767B"
+                      }
+                      style={{ marginRight: 6 }}
+                    />
                     <Text
                       style={[
                         styles.tabItemText,
