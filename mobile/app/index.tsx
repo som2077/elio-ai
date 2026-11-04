@@ -67,7 +67,7 @@ export default function HomeScreen() {
   const [feedDrawerFilter, setFeedDrawerFilter] =
     useState<FeedFilterType>("for_you");
 
-  // Filter Bar state: Platforms & Content Type (All | Videos | Likes)
+  // Filter Bar state: Platforms
   const [pinnedPlatforms, setPinnedPlatforms] = useState<string[]>([
     "youtube",
     "instagram",
@@ -75,9 +75,6 @@ export default function HomeScreen() {
     "reddit",
   ]);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
-  const [selectedContentType, setSelectedContentType] = useState<
-    "all" | "video" | "liked"
-  >("all");
   const [showPlatformModal, setShowPlatformModal] = useState(false);
 
   // Tab states
@@ -469,7 +466,7 @@ export default function HomeScreen() {
     [videos],
   );
 
-  // Feed filtered videos (Platform Tabs + Videos/Likes Sub-filter + Feed Drawer)
+  // Feed filtered videos (Platform Tabs + Feed Drawer)
   const feedVideos = useMemo(() => {
     return videos.filter((v) => {
       // 1. Top platform horizontal tab filter
@@ -477,17 +474,7 @@ export default function HomeScreen() {
         return false;
       }
 
-      // 2. Content category sub-filter: all | video | liked
-      if (selectedContentType === "video") {
-        const cat = (v.category || "").toLowerCase();
-        const isVideo =
-          cat === "video" || cat === "short" || cat === "reel";
-        if (!isVideo) return false;
-      } else if (selectedContentType === "liked") {
-        if (!v.is_favorite) return false;
-      }
-
-      // 3. Feed drawer filter
+      // 2. Feed drawer filter
       if (feedDrawerFilter === "following") return v.status === "unread";
       if (
         feedDrawerFilter === "saved" ||
@@ -505,7 +492,7 @@ export default function HomeScreen() {
       }
       return true;
     });
-  }, [videos, feedDrawerFilter, selectedPlatform, selectedContentType]);
+  }, [videos, feedDrawerFilter, selectedPlatform]);
 
   // Search filtered videos
   const searchResults = useMemo(() => {
@@ -659,8 +646,6 @@ export default function HomeScreen() {
             translateY={headerTranslateY}
             selectedPlatform={selectedPlatform}
             onSelectPlatform={setSelectedPlatform}
-            selectedContentType={selectedContentType}
-            onSelectContentType={setSelectedContentType}
             pinnedPlatforms={pinnedPlatforms}
             onOpenPlatformModal={() => setShowPlatformModal(true)}
             onOpenScanner={() => setShowScanner(true)}

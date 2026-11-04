@@ -15,7 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
 
-export const HEADER_COLLAPSIBLE_HEIGHT = 122;
+export const HEADER_COLLAPSIBLE_HEIGHT = 88;
 
 const PLATFORM_LABELS: Record<string, string> = {
   all: "All",
@@ -40,8 +40,6 @@ interface AppleHeaderProps {
   // Filter props
   selectedPlatform: string;
   onSelectPlatform: (platform: string) => void;
-  selectedContentType: "all" | "video" | "liked";
-  onSelectContentType: (type: "all" | "video" | "liked") => void;
   pinnedPlatforms: string[];
   onOpenPlatformModal: () => void;
 }
@@ -56,8 +54,6 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   translateY,
   selectedPlatform,
   onSelectPlatform,
-  selectedContentType,
-  onSelectContentType,
   pinnedPlatforms,
   onOpenPlatformModal,
 }) => {
@@ -86,7 +82,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   // Header container slides up and smoothly fades out on scroll
   const barOpacity = translateY
     ? translateY.interpolate({
-        inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -24, 0],
+        inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -20, 0],
         outputRange: [0, 0.7, 1],
         extrapolate: "clamp",
       })
@@ -95,7 +91,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   // Subtle status bar blur fades in as the header bar collapses ("littel littel blur" like Twitter)
   const statusBarBlurOpacity = translateY
     ? translateY.interpolate({
-        inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -24, 0],
+        inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -20, 0],
         outputRange: [1, 0.3, 0],
         extrapolate: "clamp",
       })
@@ -128,7 +124,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         />
       </Animated.View>
 
-      {/* 2. Full Unified Header Container (Status bar + Top bar + Filter tabs + Sub-filters) */}
+      {/* 2. Full Unified Header Container (Status bar + Top bar + Platform tabs) */}
       <Animated.View
         style={[
           styles.headerContainer,
@@ -206,40 +202,35 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           </View>
         </View>
 
-        {/* Row 2: Twitter-style Horizontal Tabs Bar */}
+        {/* Row 2: Twitter-style Clean Horizontal Tabs Bar (No pill containers) */}
         <View style={styles.tabsRow}>
-          {/* "Platforms" Trigger Button (Opens Bottom Sheet) */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.platformsTriggerBtn}
-            onPress={() => {
-              haptics.selection();
-              onOpenPlatformModal();
-            }}
-          >
-            <Ionicons
-              name="options-outline"
-              size={14}
-              color="#1D9BF0"
-              style={{ marginRight: 4 }}
-            />
-            <Text style={styles.platformsTriggerText}>Platforms</Text>
-            <Ionicons
-              name="chevron-down"
-              size={11}
-              color="#71767B"
-              style={{ marginLeft: 3 }}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.tabsDivider} />
-
-          {/* Horizontally Scrollable Platform Tabs */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tabsScrollContent}
           >
+            {/* "Platforms" Trigger Tab (Opens Bottom Sheet Modal) - Clean text tab like Twitter */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.tabItem}
+              onPress={() => {
+                haptics.selection();
+                onOpenPlatformModal();
+              }}
+            >
+              <View style={styles.tabItemInner}>
+                <Text style={styles.platformsTabText}>Platforms</Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={12}
+                  color="#71767B"
+                  style={{ marginLeft: 3 }}
+                />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.tabsDivider} />
+
             {/* "All" Platform Tab */}
             <TouchableOpacity
               activeOpacity={0.7}
@@ -289,84 +280,6 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
               );
             })}
           </ScrollView>
-        </View>
-
-        {/* Row 3: Sub-filter Micro-Pills (All | Videos | Likes) */}
-        <View style={styles.subFilterRow}>
-          <TouchableOpacity
-            activeOpacity={0.75}
-            style={[
-              styles.subFilterPill,
-              selectedContentType === "all" && styles.subFilterPillActive,
-            ]}
-            onPress={() => {
-              haptics.selection();
-              onSelectContentType("all");
-            }}
-          >
-            <Text
-              style={[
-                styles.subFilterText,
-                selectedContentType === "all" && styles.subFilterTextActive,
-              ]}
-            >
-              All
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.75}
-            style={[
-              styles.subFilterPill,
-              selectedContentType === "video" && styles.subFilterPillActive,
-            ]}
-            onPress={() => {
-              haptics.selection();
-              onSelectContentType("video");
-            }}
-          >
-            <Ionicons
-              name="play-circle-outline"
-              size={13}
-              color={selectedContentType === "video" ? "#1D9BF0" : "#71767B"}
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              style={[
-                styles.subFilterText,
-                selectedContentType === "video" && styles.subFilterTextActive,
-              ]}
-            >
-              Videos
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.75}
-            style={[
-              styles.subFilterPill,
-              selectedContentType === "liked" && styles.subFilterPillActive,
-            ]}
-            onPress={() => {
-              haptics.selection();
-              onSelectContentType("liked");
-            }}
-          >
-            <Ionicons
-              name="heart"
-              size={12}
-              color={selectedContentType === "liked" ? "#F91880" : "#71767B"}
-              style={{ marginRight: 4 }}
-            />
-            <Text
-              style={[
-                styles.subFilterText,
-                selectedContentType === "liked" && styles.subFilterTextActive,
-              ]}
-            >
-              Likes
-            </Text>
-          </TouchableOpacity>
         </View>
       </Animated.View>
     </>
@@ -423,43 +336,36 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tabsRow: {
-    height: 38,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 12,
-  },
-  platformsTriggerBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-  },
-  platformsTriggerText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  tabsDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-    marginHorizontal: 8,
   },
   tabsScrollContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingRight: 16,
+    paddingHorizontal: 12,
   },
   tabItem: {
     paddingHorizontal: 12,
-    height: 38,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+  },
+  tabItemInner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  platformsTabText: {
+    color: "#E7E9EA",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  tabsDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    marginHorizontal: 4,
   },
   tabItemText: {
     color: "#71767B",
@@ -478,35 +384,5 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: "#1D9BF0",
-  },
-  subFilterRow: {
-    height: 34,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    gap: 8,
-  },
-  subFilterPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 14,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-  },
-  subFilterPillActive: {
-    backgroundColor: "rgba(29, 155, 240, 0.18)",
-    borderColor: "rgba(29, 155, 240, 0.45)",
-  },
-  subFilterText: {
-    color: "#71767B",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  subFilterTextActive: {
-    color: "#1D9BF0",
-    fontWeight: "700",
   },
 });
