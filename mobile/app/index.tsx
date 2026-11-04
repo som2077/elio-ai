@@ -32,12 +32,14 @@ import { DevicesView } from "../components/DevicesView";
 import { SkeletonCard } from "../components/SkeletonCard";
 import { GridSkeletonCard } from "../components/GridSkeletonCard";
 import { VideoDetailSheet } from "../components/VideoDetailSheet";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ToastHUD, ToastConfig } from "../components/ToastHUD";
 import { openVideoDirectly } from "../services/deepLink";
 import { AuthScreen } from "../components/AuthScreen";
 import { QRScannerModal } from "../components/QRScannerModal";
 import { LinkedDevicesModal } from "../components/LinkedDevicesModal";
-import { AppleHeader } from "../components/AppleHeader";
+import { AppleHeader, HEADER_COLLAPSIBLE_HEIGHT } from "../components/AppleHeader";
+import { PlatformFilterModal } from "../components/PlatformFilterModal";
 import { EmptyState } from "../components/EmptyState";
 import { FeedsDrawer, FeedFilterType } from "../components/FeedsDrawer";
 import { CreateFeedModal } from "../components/CreateFeedModal";
@@ -52,7 +54,7 @@ import {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const headerHeight = insets.top + 48;
+  const headerHeight = insets.top + HEADER_COLLAPSIBLE_HEIGHT;
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
@@ -64,6 +66,19 @@ export default function HomeScreen() {
   const [showQuickClipModal, setShowQuickClipModal] = useState(false);
   const [feedDrawerFilter, setFeedDrawerFilter] =
     useState<FeedFilterType>("for_you");
+
+  // Filter Bar state: Platforms & Content Type (All | Videos | Likes)
+  const [pinnedPlatforms, setPinnedPlatforms] = useState<string[]>([
+    "youtube",
+    "instagram",
+    "twitter",
+    "reddit",
+  ]);
+  const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
+  const [selectedContentType, setSelectedContentType] = useState<
+    "all" | "video" | "liked"
+  >("all");
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
 
   // Tab states
   const [activeTab, setActiveTab] = useState<TabKey>("feed");
@@ -77,20 +92,20 @@ export default function HomeScreen() {
 
   // TabBar slides down out of view when header hides
   const tabBarTranslateY = headerTranslateY.interpolate({
-    inputRange: [-48, 0],
+    inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, 0],
     outputRange: [110, 0],
     extrapolate: "clamp",
   });
 
   // Floating "Scroll to Top" button pops in at bottom-right when navbar is hidden
   const scrollToTopOpacity = headerTranslateY.interpolate({
-    inputRange: [-48, -20, 0],
+    inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -30, 0],
     outputRange: [1, 0.4, 0],
     extrapolate: "clamp",
   });
 
   const scrollToTopScale = headerTranslateY.interpolate({
-    inputRange: [-48, -20, 0],
+    inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -30, 0],
     outputRange: [1, 0.6, 0],
     extrapolate: "clamp",
   });
@@ -130,7 +145,7 @@ export default function HomeScreen() {
         isHeaderVisible.current = false;
         setIsHeaderVisibleState(false);
         Animated.timing(headerTranslateY, {
-          toValue: -48,
+          toValue: -HEADER_COLLAPSIBLE_HEIGHT,
           duration: 200,
           useNativeDriver: true,
         }).start();
@@ -148,6 +163,38 @@ export default function HomeScreen() {
       }
     }
     lastScrollY.current = currentY;
+  };
+
+  // Load pinned platforms from AsyncStorage on startup
+  useEffect(() => {
+    AsyncStorage.getItem("@clipper_pinned_platforms").then((val) => {
+      if (val) {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setPinnedPlatforms(parsed);
+          }
+        } catch (e) {
+          console.warn("Failed to load pinned platforms:", e);
+        }
+      }
+    });
+  }, []);
+
+  const togglePinnedPlatform = (key: string) => {
+    setPinnedPlatforms((prev) => {
+      let next: string[];
+      if (prev.includes(key)) {
+        next = prev.filter((p) => p !== key);
+        if (selectedPlatform === key) {
+          setSelectedPlatform("all");
+        }
+      } else {
+        next = [...prev, key];
+      }
+      AsyncStorage.setItem("@clipper_pinned_platforms", JSON.stringify(next));
+      return next;
+    });
   };
 
   // Search state
@@ -422,10 +469,25 @@ export default function HomeScreen() {
     [videos],
   );
 
-  // Feed filtered videos
+  // Feed filtered videos (Platform Tabs + Videos/Likes Sub-filter + Feed Drawer)
   const feedVideos = useMemo(() => {
     return videos.filter((v) => {
-      // Feed drawer filter
+      // 1. Top platform horizontal tab filter
+      if (selectedPlatform !== "all" && v.platform !== selectedPlatform) {
+        return false;
+      }
+
+      // 2. Content category sub-filter: all | video | liked
+      if (selectedContentType === "video") {
+        const cat = (v.category || "").toLowerCase();
+        const isVideo =
+          cat === "video" || cat === "short" || cat === "reel";
+        if (!isVideo) return false;
+      } else if (selectedContentType === "liked") {
+        if (!v.is_favorite) return false;
+      }
+
+      // 3. Feed drawer filter
       if (feedDrawerFilter === "following") return v.status === "unread";
       if (
         feedDrawerFilter === "saved" ||
@@ -443,7 +505,7 @@ export default function HomeScreen() {
       }
       return true;
     });
-  }, [videos, feedDrawerFilter]);
+  }, [videos, feedDrawerFilter, selectedPlatform, selectedContentType]);
 
   // Search filtered videos
   const searchResults = useMemo(() => {
@@ -595,6 +657,12 @@ export default function HomeScreen() {
             totalCount={videos.length}
             unreadCount={unreadCount}
             translateY={headerTranslateY}
+            selectedPlatform={selectedPlatform}
+            onSelectPlatform={setSelectedPlatform}
+            selectedContentType={selectedContentType}
+            onSelectContentType={setSelectedContentType}
+            pinnedPlatforms={pinnedPlatforms}
+            onOpenPlatformModal={() => setShowPlatformModal(true)}
             onOpenScanner={() => setShowScanner(true)}
             onOpenSearch={() => {
               triggerLayoutMotion();
@@ -831,6 +899,14 @@ export default function HomeScreen() {
       {/* Dynamic Island Floating Toast HUD */}
       <ToastHUD toast={toast} onDismiss={() => setToast(null)} />
 
+      {/* Platform Filter Bottom Sheet Modal */}
+      <PlatformFilterModal
+        visible={showPlatformModal}
+        pinnedPlatforms={pinnedPlatforms}
+        onTogglePlatform={togglePinnedPlatform}
+        onClose={() => setShowPlatformModal(false)}
+      />
+
       {/* Interactive Video Detail & Action Sheet */}
       <VideoDetailSheet
         video={detailVideo}
@@ -936,19 +1012,20 @@ const styles = StyleSheet.create({
   scrollToTopBtnContainer: {
     position: "absolute",
     right: 20,
-    zIndex: 99,
+    zIndex: 999,
+    elevation: 20,
   },
   scrollToTopBtn: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "rgba(22, 24, 28, 0.92)",
+    backgroundColor: "rgba(22, 24, 28, 0.95)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.16)",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    elevation: 8,
+    elevation: 20,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -18,6 +19,45 @@ import { motionTokens } from "../utils/motion";
 
 // Safe dynamic helper
 const getRedirectUri = () => "elio-ai://auth";
+
+// Supported platforms with authentic high-res official app icons
+const SOCIAL_PLATFORMS = [
+  {
+    name: "Instagram",
+    image: require("../assets/social-icons/instagram.png"),
+    glowColor: "#E1306C",
+  },
+  {
+    name: "YouTube",
+    image: require("../assets/social-icons/youtube.png"),
+    glowColor: "#FF0000",
+  },
+  {
+    name: "TikTok",
+    image: require("../assets/social-icons/tiktok.png"),
+    glowColor: "#00F2FE",
+  },
+  {
+    name: "X",
+    image: require("../assets/social-icons/twitter.png"),
+    glowColor: "#FFFFFF",
+  },
+  {
+    name: "Reddit",
+    image: require("../assets/social-icons/reddit.png"),
+    glowColor: "#FF4500",
+  },
+  {
+    name: "LinkedIn",
+    image: require("../assets/social-icons/linkedin.png"),
+    glowColor: "#0A66C2",
+  },
+  {
+    name: "Pinterest",
+    image: require("../assets/social-icons/pinterest.png"),
+    glowColor: "#E60023",
+  },
+];
 
 // Safe dynamic import to prevent native module crashes on older APK builds
 let WebBrowser: any = null;
@@ -42,6 +82,51 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
   // Micro-interaction animated scale
   const googleBtnScale = useRef(new Animated.Value(1)).current;
+
+  // Rotating Social Platform Badge Loop
+  const [platformIndex, setPlatformIndex] = useState(0);
+  const badgeOpacity = useRef(new Animated.Value(1)).current;
+  const badgeScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 1. Smooth exit animation (scale down & fade out)
+      Animated.parallel([
+        Animated.timing(badgeOpacity, {
+          toValue: 0,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgeScale, {
+          toValue: 0.72,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // 2. Next platform in loop
+        setPlatformIndex((prev) => (prev + 1) % SOCIAL_PLATFORMS.length);
+
+        // 3. Smooth entrance with spring pop
+        Animated.parallel([
+          Animated.timing(badgeOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.spring(badgeScale, {
+            toValue: 1,
+            friction: 5,
+            tension: 90,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    }, 2200);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentPlatform = SOCIAL_PLATFORMS[platformIndex];
 
   // Auto-listen to auth state changes (e.g. When Google deep link redirects back)
   useEffect(() => {
@@ -209,10 +294,31 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           { paddingBottom: Math.max(insets.bottom, 16) + 16 },
         ]}
       >
-        {/* USP Message customized for Elio Video Recall Vault */}
-        <Text style={styles.uspHeadline}>
-          Find what you{"\n"}saved twice{"\n"}as fast.
-        </Text>
+        {/* Screenshot Inspired Signature Headline: Save from / every [Social Logo Badge] app / in seconds */}
+        <View style={styles.headlineSection}>
+          <Text style={styles.uspLineMuted}>Save from</Text>
+          <View style={styles.uspLineMiddleRow}>
+            <Text style={styles.uspLineBold}>every</Text>
+            <Animated.View
+              style={[
+                styles.platformBadge,
+                {
+                  opacity: badgeOpacity,
+                  transform: [{ scale: badgeScale }],
+                  shadowColor: currentPlatform.glowColor,
+                },
+              ]}
+            >
+              <Image
+                source={currentPlatform.image}
+                style={styles.platformIconImage}
+                resizeMode="cover"
+              />
+            </Animated.View>
+            <Text style={styles.uspLineBold}>app</Text>
+          </View>
+          <Text style={styles.uspLineMuted}>in seconds</Text>
+        </View>
 
         <Animated.View
           style={{ width: "100%", transform: [{ scale: googleBtnScale }] }}
@@ -298,14 +404,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: "center",
   },
-  uspHeadline: {
+  headlineSection: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginBottom: 26,
+    paddingLeft: 4,
+  },
+  uspLineMuted: {
     fontSize: 32,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    textAlign: "center",
+    fontWeight: "500",
+    color: "#8E8E93",
     letterSpacing: -0.6,
     lineHeight: 38,
-    marginBottom: 24,
+  },
+  uspLineMiddleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 1,
+  },
+  uspLineBold: {
+    fontSize: 34,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: -0.8,
+    lineHeight: 40,
+  },
+  platformBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginHorizontal: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 6,
+    backgroundColor: "#16181C",
+  },
+  platformIconImage: {
+    width: "100%",
+    height: "100%",
   },
   primaryPillBtn: {
     width: "100%",
