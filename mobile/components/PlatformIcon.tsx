@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleProp, TextStyle } from "react-native";
-import { FontAwesome6, Ionicons } from "@expo/vector-icons";
+import { FontAwesome6 } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 
 export interface PlatformIconProps {
   platform: string;
@@ -117,7 +118,7 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({
       );
     default:
       return (
-        <Ionicons
+        <PikaIcon
           name="play-circle-outline"
           size={size}
           color={iconColor}

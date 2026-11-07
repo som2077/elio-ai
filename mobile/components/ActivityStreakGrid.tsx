@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import {
   toDateKey,
@@ -48,7 +48,9 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
     const currentDayOfWeek = (today.getDay() + 6) % 7; // 0=Mon, 6=Sun
     const totalDays = WEEKS_COUNT * 7;
     const startDate = new Date(today);
-    startDate.setDate(today.getDate() - currentDayOfWeek - (WEEKS_COUNT - 1) * 7);
+    startDate.setDate(
+      today.getDate() - currentDayOfWeek - (WEEKS_COUNT - 1) * 7,
+    );
 
     let iter = new Date(startDate);
     for (let w = 0; w < WEEKS_COUNT; w++) {
@@ -184,10 +186,16 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
         <Text style={styles.legendLabel}>Less</Text>
         <View style={[styles.legendBox, { backgroundColor: "#202327" }]} />
         <View
-          style={[styles.legendBox, { backgroundColor: "rgba(29, 155, 240, 0.42)" }]}
+          style={[
+            styles.legendBox,
+            { backgroundColor: "rgba(29, 155, 240, 0.42)" },
+          ]}
         />
         <View
-          style={[styles.legendBox, { backgroundColor: "rgba(29, 155, 240, 0.75)" }]}
+          style={[
+            styles.legendBox,
+            { backgroundColor: "rgba(29, 155, 240, 0.75)" },
+          ]}
         />
         <View style={[styles.legendBox, { backgroundColor: "#1D9BF0" }]} />
         <Text style={styles.legendLabel}>More</Text>

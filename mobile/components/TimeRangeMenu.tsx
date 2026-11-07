@@ -7,7 +7,7 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
@@ -77,7 +77,7 @@ export const TimeRangeMenu: React.FC<TimeRangeMenuProps> = ({
                       {opt.label}
                     </Text>
                     {isSelected && (
-                      <Ionicons
+                      <PikaIcon
                         name="checkmark"
                         size={18}
                         color="#FFFFFF"

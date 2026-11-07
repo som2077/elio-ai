@@ -1,3 +1,5 @@
+import type { VideoAIMetadata } from './ai';
+
 export type PlatformType =
   | 'youtube'
   | 'instagram'
@@ -33,6 +35,7 @@ export interface SavedVideo {
   source_device_name?: string;
   remind_at?: string;
   watched_at?: string;
+  ai_metadata?: VideoAIMetadata;
   created_at: string;
   updated_at: string;
 }

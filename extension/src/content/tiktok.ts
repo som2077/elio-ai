@@ -24,7 +24,8 @@ function scrapeTikTokVideo(targetEl: HTMLElement): SavedVideoPayload | null {
 
   // Description / Title
   const titleEl = container.querySelector('h1[data-e2e="browse-video-desc"], div[data-e2e="video-desc"], [data-e2e="search-card-video-caption"]');
-  const title = titleEl?.textContent?.trim() || `TikTok Video by ${creator}`;
+  const fullDesc = titleEl?.textContent?.trim() || '';
+  const title = fullDesc || `TikTok Video by ${creator}`;
 
   // Video or Thumbnail
   const video = container.querySelector('video') as HTMLVideoElement | null;
@@ -40,6 +41,7 @@ function scrapeTikTokVideo(targetEl: HTMLElement): SavedVideoPayload | null {
     title: title.slice(0, 150),
     creator_name: creator,
     thumbnail_url: thumbnail,
+    user_notes: fullDesc || undefined,
     source_client: 'browser_extension',
   };
 }

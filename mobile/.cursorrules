@@ -1,0 +1,20 @@
+# Clipper Mobile Agent Guidelines
+
+This project uses modern Agent Skills and Rules located in `.cursor/skills/` and `.cursor/rules/`.
+
+## Key Working Guidelines:
+
+1. **Design System & UI (`using-ui-stack` & `react-native-patterns`)**:
+   - Obsidian dark mode theme (`#000000` canvas, `#161616` cards, `#2F3336` borders, `#1D9BF0` accent).
+   - Use centralized `PikaIcon` (`components/PikaIcon.tsx`) for all UI vector icons.
+   - Maintain 8px spatial grid and minimum 44x44 touch targets.
+
+2. **Self-Healing Code Loop (`grinding-until-pass`)**:
+   - Always run `npx tsc --noEmit` after significant code modifications.
+   - Autonomously iterate on build and type errors until 100% green.
+
+3. **Git & Commit Hygiene (`writing-commit-messages`)**:
+   - Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `style:`, `docs:`).
+
+4. **Available Skills**:
+   - For complete workflows, refer to `.cursor/skills/` directory.

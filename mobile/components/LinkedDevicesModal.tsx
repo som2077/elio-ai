@@ -8,7 +8,7 @@ import {
   FlatList,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { supabase } from "../services/supabase";
 import { LinkedDevice } from "../types/video";
 import { appleColors, appleRadii, appleTypography } from "../theme/appleTokens";
@@ -59,7 +59,9 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
         // 2. Seamless Fallback: Derive active devices from approved qr_auth_sessions
         const { data: qrSessions } = await supabase
           .from("qr_auth_sessions")
-          .select("id, qr_token, user_id, status, created_at, expires_at, device_metadata")
+          .select(
+            "id, qr_token, user_id, status, created_at, expires_at, device_metadata",
+          )
           .eq("user_id", session.user.id)
           .order("created_at", { ascending: false })
           .limit(15);
@@ -111,7 +113,8 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
                 id: "active-sync-session",
                 user_id: session.user.id,
                 device_id: latestVideo.device_id || "browser-ext-sync",
-                device_name: latestVideo.source_device_name || "Chrome Extension",
+                device_name:
+                  latestVideo.source_device_name || "Chrome Extension",
                 browser_type: "Chrome",
                 os_name: "Linux",
                 last_active_at: latestVideo.created_at,
@@ -164,8 +167,8 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
                 prev.map((d) =>
                   d.device_id === device.device_id
                     ? { ...d, is_revoked: true }
-                    : d
-                )
+                    : d,
+                ),
               );
             } catch (err: any) {
               Alert.alert("Error", err.message || "Failed to revoke device.");
@@ -174,7 +177,7 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -260,7 +263,7 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
             onClose();
           }}
         >
-          <Ionicons name="close" size={18} color={appleColors.textSecondary} />
+          <PikaIcon name="close" size={18} color={appleColors.textSecondary} />
         </TouchableOpacity>
       }
     >
@@ -281,9 +284,8 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
               <Text style={styles.emptyIcon}>💻</Text>
               <Text style={styles.emptyTitle}>No Browsers Linked Yet</Text>
               <Text style={styles.emptyDesc}>
-                Install the Elio AI extension on Chrome, Brave, or Edge and
-                scan its QR code to sync liked videos across all your
-                devices.
+                Install the Elio AI extension on Chrome, Brave, or Edge and scan
+                its QR code to sync liked videos across all your devices.
               </Text>
             </View>
           }

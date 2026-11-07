@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { appleColors, appleRadii, appleShadows } from '../theme/appleTokens';
+import React, { useEffect, useRef } from "react";
+import { View, Text, StyleSheet, Animated } from "react-native";
+import { PikaIcon } from "./PikaIcon";
+import { appleColors, appleRadii, appleShadows } from "../theme/appleTokens";
 
 export interface ToastConfig {
   message: string;
-  type?: 'success' | 'info' | 'delete' | 'link';
+  type?: "success" | "info" | "delete" | "link";
 }
 
 interface ToastHUDProps {
@@ -63,14 +63,22 @@ export const ToastHUD: React.FC<ToastHUDProps> = ({ toast, onDismiss }) => {
 
   const getIcon = () => {
     switch (toast.type) {
-      case 'success':
-        return <Ionicons name="checkmark-circle" size={17} color="#30D158" />;
-      case 'delete':
-        return <Ionicons name="trash-outline" size={16} color="#FF453A" />;
-      case 'link':
-        return <Ionicons name="link-outline" size={16} color={appleColors.accentLight} />;
+      case "success":
+        return <PikaIcon name="checkmark-circle" size={17} color="#30D158" />;
+      case "delete":
+        return <PikaIcon name="trash-outline" size={16} color="#FF453A" />;
+      case "link":
+        return (
+          <PikaIcon
+            name="link-outline"
+            size={16}
+            color={appleColors.accentLight}
+          />
+        );
       default:
-        return <Ionicons name="sparkles" size={16} color={appleColors.accentLight} />;
+        return (
+          <PikaIcon name="sparkles" size={16} color={appleColors.accentLight} />
+        );
     }
   };
 
@@ -97,34 +105,34 @@ export const ToastHUD: React.FC<ToastHUDProps> = ({ toast, onDismiss }) => {
 
 const styles = StyleSheet.create({
   toastWrapper: {
-    position: 'absolute',
+    position: "absolute",
     top: 52,
     left: 0,
     right: 0,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 9999,
   },
   hudPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 21, 36, 0.96)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(16, 21, 36, 0.96)",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: appleRadii.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: "rgba(255, 255, 255, 0.16)",
     gap: 8,
     ...appleShadows.card,
-    maxWidth: '90%',
+    maxWidth: "90%",
   },
   iconContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   messageText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: -0.2,
   },
 });

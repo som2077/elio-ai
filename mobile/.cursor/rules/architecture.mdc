@@ -1,0 +1,24 @@
+---
+description: Database design, Supabase schemas, and architecture decision recording
+globs: services/**/*, types/**/*
+alwaysApply: false
+---
+
+# Architecture & Backend Rules
+
+When modifying data structures, Supabase client services, or application contracts:
+
+## 1. Database & Schema Modeling (`database-design`)
+
+- Always declare strict TypeScript types in `types/` for all Supabase table rows and payloads.
+- Ensure foreign keys, unique constraints (e.g. canonical URLs), and indexes for queried columns (`user_id`, `clean_url`, `created_at`).
+- Keep Row Level Security (RLS) policies in mind for user-scoped data.
+
+## 2. Decision Records (`architecture-decision-records`)
+
+- Document high-impact architectural changes (e.g. AI engine integrations, caching layers, native bridges) in `docs/adr/`.
+- Structure: Status, Context, Decision, Consequences.
+
+## 3. Persistent Knowledge (`saving-workspace-context`)
+
+- Store long-term knowledge, research findings, and API specifications in workspace documentation so context is preserved across AI sessions.

@@ -8,7 +8,7 @@ import {
   Switch,
   Dimensions,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { PlatformIcon } from "./PlatformIcon";
 import { haptics } from "../utils/haptics";
 import { IndustryBottomSheet } from "./IndustryBottomSheet";
@@ -16,7 +16,7 @@ import { IndustryBottomSheet } from "./IndustryBottomSheet";
 export interface PlatformConfig {
   key: string;
   label: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   color: string;
   bgColor: string;
 }
@@ -141,7 +141,7 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
                 { backgroundColor: "rgba(29, 155, 240, 0.15)" },
               ]}
             >
-              <Ionicons name="layers-outline" size={20} color="#1D9BF0" />
+              <PikaIcon name="layers-outline" size={20} color="#1D9BF0" />
             </View>
             <View style={styles.textContainer}>
               <View style={styles.labelRow}>

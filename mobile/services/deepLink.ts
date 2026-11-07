@@ -2,15 +2,41 @@ import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 
 /**
+ * Validates that the URL uses an allowed HTTP/HTTPS scheme to prevent intent hijacking or XSS
+ */
+function isSafeUrl(rawUrl: string | undefined): boolean {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  const trimmed = rawUrl.trim().toLowerCase();
+  return trimmed.startsWith('https://') || trimmed.startsWith('http://');
+}
+
+/**
  * Intelligently opens YouTube or Instagram apps via deep-links with fallback to browser
  */
-export async function openVideoDirectly(url: string, platform: 'youtube' | 'instagram', videoId?: string) {
+export async function openVideoDirectly(
+  url: string,
+  platform: 'youtube' | 'instagram' | string,
+  videoId?: string,
+  startSeconds?: number
+) {
+  // Security guard: Reject non-http(s) URLs
+  if (!isSafeUrl(url)) {
+    console.warn('[Elio AI Security] Rejected unsafe URL scheme in openVideoDirectly:', url);
+    return;
+  }
   try {
+    let targetUrl = url;
+    if (startSeconds && startSeconds > 0) {
+      const sep = targetUrl.includes('?') ? '&' : '?';
+      targetUrl = `${targetUrl}${sep}t=${Math.floor(startSeconds)}s`;
+    }
+
     if (platform === 'youtube' && videoId) {
+      const timeParam = startSeconds ? `&t=${Math.floor(startSeconds)}s` : '';
       const appUrl = Platform.select({
-        ios: `youtube://watch?v=${videoId}`,
-        android: `vnd.youtube:${videoId}`,
-        default: url,
+        ios: `youtube://watch?v=${videoId}${timeParam}`,
+        android: `vnd.youtube:${videoId}${timeParam}`,
+        default: targetUrl,
       });
 
       const canOpen = await Linking.canOpenURL(appUrl);
@@ -28,9 +54,11 @@ export async function openVideoDirectly(url: string, platform: 'youtube' | 'inst
     }
 
     // Fallback: Open URL in default browser
-    await Linking.openURL(url);
+    await Linking.openURL(targetUrl);
   } catch (error) {
     console.error('Failed to open deep-link, opening standard URL:', error);
-    await Linking.openURL(url);
+    if (isSafeUrl(url)) {
+      await Linking.openURL(url);
+    }
   }
 }

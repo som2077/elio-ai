@@ -185,6 +185,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  function isSafeHttpUrl(url: string | undefined): boolean {
+    if (!url || typeof url !== "string") return false;
+    const trimmed = url.trim().toLowerCase();
+    return trimmed.startsWith("https://") || trimmed.startsWith("http://");
+  }
+
   /**
    * Renders recent saves list with platform badges
    */
@@ -196,8 +202,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!Array.isArray(recentSaves) || recentSaves.length === 0) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.innerHTML =
-        "No clips captured yet.<br />Like any video on YouTube, X, Instagram, TikTok, FB, or Reddit.";
+      empty.textContent =
+        "No clips captured yet. Like any video on YouTube, X, Instagram, TikTok, FB, or Reddit.";
       recentList.appendChild(empty);
       return;
     }
@@ -205,7 +211,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     recentSaves.forEach((item: any) => {
       const a = document.createElement("a");
       a.className = "video-item";
-      a.href = item.clean_url || "#";
+      // Security: Only allow safe http(s) links to prevent extension privilege escalation
+      a.href = isSafeHttpUrl(item.clean_url) ? item.clean_url : "#";
       a.target = "_blank";
       a.rel = "noopener noreferrer";
 
@@ -223,7 +230,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       const img = document.createElement("img");
       img.className = "thumbnail";
       img.src =
-        item.thumbnail_url || "https://via.placeholder.com/50x36?text=Clip";
+        isSafeHttpUrl(item.thumbnail_url)
+          ? item.thumbnail_url
+          : "https://via.placeholder.com/50x36?text=Clip";
       img.alt = "";
       img.onerror = () => {
         img.src = "https://via.placeholder.com/50x36?text=Clip";

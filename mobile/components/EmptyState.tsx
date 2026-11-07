@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
@@ -16,7 +16,7 @@ const PLATFORM_META: Record<
   string,
   {
     label: string;
-    icon: keyof typeof Ionicons.glyphMap;
+    icon: string;
     color: string;
     bgColor: string;
   }
@@ -89,9 +89,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     <View style={styles.container}>
       {platformMeta && (
         <View
-          style={[styles.platformIconCircle, { backgroundColor: platformMeta.bgColor }]}
+          style={[
+            styles.platformIconCircle,
+            { backgroundColor: platformMeta.bgColor },
+          ]}
         >
-          <Ionicons
+          <PikaIcon
             name={platformMeta.icon}
             size={30}
             color={platformMeta.color}
@@ -121,7 +124,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             onLinkPress();
           }}
         >
-          <Ionicons name="qr-code-outline" size={16} color="#FFFFFF" />
+          <PikaIcon name="qr-code-outline" size={16} color="#FFFFFF" />
           <Text style={styles.linkBtnText}>Link Desktop Extension</Text>
         </TouchableOpacity>
 

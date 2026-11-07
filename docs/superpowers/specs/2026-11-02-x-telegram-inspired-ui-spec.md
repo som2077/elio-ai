@@ -1,4 +1,5 @@
 # Twitter (X) & Telegram-Inspired Mobile UI Specification
+
 **Date:** 2026-11-02  
 **Inspiration:** Twitter / X ("Lights Out" dark feed, Tweet card anatomy, action engagement row) & Telegram iOS (Folder tabs, double-check status indicators, fluid micro-haptics, shared media grid).
 
@@ -7,6 +8,7 @@
 ## 1. Executive Summary
 
 This specification transforms Elio AI's mobile UI by fusing the two most beloved, high-speed mobile interfaces in modern engineering:
+
 1. **Twitter / X Post Architecture (`VideoCard.tsx`):**
    - Circular creator avatar with platform badge.
    - Display name, `@creator` handle, middle dot (`·`), relative timestamp, and options menu.
@@ -31,6 +33,7 @@ This specification transforms Elio AI's mobile UI by fusing the two most beloved
 ## 2. Component Blueprint
 
 ### 2.1 `VideoCard.tsx` (Twitter/X Post Card)
+
 - **Structure:**
   ```text
   [Avatar]  [Creator Name] [@handle] · [Time]        [...]
@@ -46,12 +49,14 @@ This specification transforms Elio AI's mobile UI by fusing the two most beloved
   - Active Retweet/Status color: `#00BA7C` (X Green)
 
 ### 2.2 `AppleFilterPills.tsx` (Telegram Folder Tabs)
+
 - **Structure:**
   - Horizontal scroll of capsule buttons.
   - Active button: Telegram Cyan (`#2AABEE`) border and text, or filled pill with unread count badge.
   - Numeric badge: Telegram bubble pill with active contrast.
 
 ### 2.3 `VideoGridCard.tsx` (Telegram Shared Media Grid)
+
 - **Structure:**
   - 4:5 poster card.
   - Top-left: Platform glyph with translucent dark scrim.
@@ -62,6 +67,7 @@ This specification transforms Elio AI's mobile UI by fusing the two most beloved
 ---
 
 ## 3. Interaction Mechanics & Verification
+
 - 100% strict TypeScript checks (`npx tsc --noEmit`).
 - Extension build passes (`npm run build`).
 - Tactile haptic feedback on all interactions.

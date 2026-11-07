@@ -13,7 +13,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Video, ResizeMode } from "expo-av";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { appleColors } from "../theme/appleTokens";
 import { supabase } from "../services/supabase";
 import { motionTokens } from "../utils/motion";
@@ -339,7 +339,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               </View>
             ) : (
               <View style={styles.pillContentRow}>
-                <Ionicons name="logo-google" size={19} color="#000000" />
+                <PikaIcon name="logo-google" size={19} color="#000000" />
                 <Text style={styles.pillBtnText}>Continue with Google</Text>
               </View>
             )}

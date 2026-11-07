@@ -8,7 +8,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import { appleColors } from "../theme/appleTokens";
 import { motionTokens } from "../utils/motion";
@@ -146,8 +146,7 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
     !video.thumbnail_url?.includes(".m3u8");
 
   const creatorInitial = (
-    video.creator_name?.trim()?.charAt(0) ||
-    platformInfo.name.charAt(0)
+    video.creator_name?.trim()?.charAt(0) || platformInfo.name.charAt(0)
   ).toUpperCase();
 
   return (
@@ -186,7 +185,7 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
                   { borderColor: `${platformInfo.color}40` },
                 ]}
               >
-                <Ionicons
+                <PikaIcon
                   name={platformInfo.icon}
                   size={32}
                   color={platformInfo.color}
@@ -200,13 +199,20 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
           <View style={styles.thumbnailTopRow}>
             {/* Platform Badge */}
             <View style={styles.platformBadge}>
-              <Ionicons
+              <PikaIcon
                 name={platformInfo.icon}
                 size={11}
                 color={platformInfo.color}
               />
               <Text style={styles.platformText}>{platformInfo.name}</Text>
             </View>
+
+            {/* AI Digest Sparkle Pill */}
+            {video.ai_metadata?.tldw && (
+              <View style={styles.aiSparkleBadge}>
+                <PikaIcon name="sparkles" size={10} color="#C4B5FD" />
+              </View>
+            )}
 
             {/* Status Quick Toggle */}
             <TouchableOpacity
@@ -220,7 +226,7 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
                 onToggleStatus();
               }}
             >
-              <Ionicons
+              <PikaIcon
                 name={!isUnread ? "checkmark-done" : "bookmark"}
                 size={11}
                 color={!isUnread ? "#070A11" : "#FFFFFF"}
@@ -232,7 +238,7 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
           <View style={styles.bottomOverlayRow}>
             {durationText ? (
               <View style={styles.durationBadge}>
-                <Ionicons
+                <PikaIcon
                   name="play"
                   size={8}
                   color="#FFFFFF"
@@ -242,7 +248,7 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
               </View>
             ) : (
               <View style={styles.playFab}>
-                <Ionicons
+                <PikaIcon
                   name="play"
                   size={11}
                   color="#FFFFFF"
@@ -288,7 +294,7 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
                   onLongPress!();
                 }}
               >
-                <Ionicons
+                <PikaIcon
                   name="ellipsis-horizontal"
                   size={14}
                   color="#8E8E93"
@@ -376,6 +382,16 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: "700",
     letterSpacing: 0.2,
+  },
+  aiSparkleBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(167, 139, 250, 0.25)",
+    borderWidth: 0.5,
+    borderColor: "rgba(167, 139, 250, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   statusPill: {
     width: 24,

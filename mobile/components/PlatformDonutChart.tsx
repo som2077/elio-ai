@@ -1,13 +1,13 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 
 interface PlatformStatItem {
   key: string;
   label: string;
   count: number;
   pct: number;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   color: string;
 }
 
@@ -31,7 +31,7 @@ export const PlatformDonutChart: React.FC<PlatformDonutChartProps> = ({
   if (!data || data.length === 0 || totalClips === 0) {
     return (
       <View style={styles.emptyCard}>
-        <Ionicons name="pie-chart-outline" size={28} color="#71767B" />
+        <PikaIcon name="pie-chart-outline" size={28} color="#71767B" />
         <Text style={styles.emptyText}>No platform data available</Text>
       </View>
     );
@@ -78,7 +78,7 @@ export const PlatformDonutChart: React.FC<PlatformDonutChartProps> = ({
                   { backgroundColor: `${item.color}20` },
                 ]}
               >
-                <Ionicons name={item.icon} size={15} color={item.color} />
+                <PikaIcon name={item.icon} size={15} color={item.color} />
               </View>
               <View>
                 <Text style={styles.platformName} numberOfLines={1}>
@@ -91,10 +91,7 @@ export const PlatformDonutChart: React.FC<PlatformDonutChartProps> = ({
             </View>
 
             <View
-              style={[
-                styles.pctPill,
-                { backgroundColor: `${item.color}1C` },
-              ]}
+              style={[styles.pctPill, { backgroundColor: `${item.color}1C` }]}
             >
               <Text style={[styles.pctText, { color: item.color }]}>
                 {item.pct}%

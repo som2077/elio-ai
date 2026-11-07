@@ -12,11 +12,15 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { threadsTokens, appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { supabase } from "../services/supabase";
-import { cleanShareUrl, analyzeSharedUrl, processSharedContent } from "../services/shareHandler";
+import {
+  cleanShareUrl,
+  analyzeSharedUrl,
+  processSharedContent,
+} from "../services/shareHandler";
 
 interface QuickClipModalProps {
   visible: boolean;
@@ -37,7 +41,9 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
 
   const username = userEmail ? userEmail.split("@")[0] : "clipper";
 
-  const detectedAnalysis = url.trim() ? analyzeSharedUrl(cleanShareUrl(url.trim())) : null;
+  const detectedAnalysis = url.trim()
+    ? analyzeSharedUrl(cleanShareUrl(url.trim()))
+    : null;
   const detected = detectedAnalysis ? detectedAnalysis.platform : "other";
 
   const handleSave = async () => {
@@ -106,10 +112,7 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
 
             <TouchableOpacity
               activeOpacity={0.75}
-              style={[
-                styles.postPill,
-                !url.trim() && styles.postPillDisabled,
-              ]}
+              style={[styles.postPill, !url.trim() && styles.postPillDisabled]}
               disabled={!url.trim() || loading}
               onPress={handleSave}
             >
@@ -137,7 +140,7 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
                   {username.charAt(0).toUpperCase()}
                 </Text>
                 <View style={styles.plusBadge}>
-                  <Ionicons name="add" size={9} color="#FFFFFF" />
+                  <PikaIcon name="add" size={9} color="#FFFFFF" />
                 </View>
               </View>
               <View style={styles.threadConnector} />
@@ -169,17 +172,17 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
               {/* Detected Platform Tag */}
               {Boolean(url.trim()) && (
                 <View style={styles.detectedPlatformRow}>
-                  <Ionicons
+                  <PikaIcon
                     name={
                       detected === "youtube"
                         ? "logo-youtube"
                         : detected === "instagram"
-                        ? "logo-instagram"
-                        : detected === "twitter"
-                        ? "logo-twitter"
-                        : detected === "tiktok"
-                        ? "musical-notes"
-                        : "link-outline"
+                          ? "logo-instagram"
+                          : detected === "twitter"
+                            ? "logo-twitter"
+                            : detected === "tiktok"
+                              ? "musical-notes"
+                              : "link-outline"
                     }
                     size={15}
                     color="#0095F6"

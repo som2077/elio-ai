@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Linking from "expo-linking";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "../components/PikaIcon";
 import { supabase } from "../services/supabase";
 import { processSharedContent } from "../services/shareHandler";
 import { haptics } from "../utils/haptics";
@@ -21,7 +21,9 @@ export default function FastSharePillScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ text?: string }>();
 
-  const [status, setStatus] = useState<"saving" | "success" | "duplicate" | "error">("saving");
+  const [status, setStatus] = useState<
+    "saving" | "success" | "duplicate" | "error"
+  >("saving");
   const [platformName, setPlatformName] = useState<string>("App");
 
   const translateY = useRef(new Animated.Value(-80)).current;
@@ -146,7 +148,11 @@ export default function FastSharePillScreen() {
 
   return (
     <View style={styles.overlay}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
       {/* Tapping anywhere dismisses immediately */}
       <TouchableOpacity
@@ -165,7 +171,11 @@ export default function FastSharePillScreen() {
         >
           {status === "saving" && (
             <>
-              <ActivityIndicator size="small" color="#FFFFFF" style={styles.icon} />
+              <ActivityIndicator
+                size="small"
+                color="#FFFFFF"
+                style={styles.icon}
+              />
               <Text style={styles.pillText}>Saving clip...</Text>
             </>
           )}
@@ -173,7 +183,7 @@ export default function FastSharePillScreen() {
           {status === "success" && (
             <>
               <View style={[styles.circleDot, { backgroundColor: "#30D158" }]}>
-                <Ionicons name="checkmark" size={13} color="#FFFFFF" />
+                <PikaIcon name="checkmark" size={13} color="#FFFFFF" />
               </View>
               <Text style={styles.pillText}>Saved from {platformName} ⚡</Text>
             </>
@@ -182,7 +192,7 @@ export default function FastSharePillScreen() {
           {status === "duplicate" && (
             <>
               <View style={[styles.circleDot, { backgroundColor: "#FF9F0A" }]}>
-                <Ionicons name="bookmark" size={12} color="#FFFFFF" />
+                <PikaIcon name="bookmark" size={12} color="#FFFFFF" />
               </View>
               <Text style={styles.pillText}>Already saved 📌</Text>
             </>
@@ -191,7 +201,7 @@ export default function FastSharePillScreen() {
           {status === "error" && (
             <>
               <View style={[styles.circleDot, { backgroundColor: "#FF453A" }]}>
-                <Ionicons name="alert" size={12} color="#FFFFFF" />
+                <PikaIcon name="alert" size={12} color="#FFFFFF" />
               </View>
               <Text style={styles.pillText}>Could not save</Text>
             </>

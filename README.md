@@ -52,6 +52,12 @@ elio-ai/
 - **🌐 Cross-Platform Browser Extension:** Automatically captures YouTube, Instagram, X (Twitter), Facebook, Reddit, LinkedIn, Pinterest, and TikTok saves/likes without manual copy-paste.
 - **📅 Activity Calendar & Like Heatmap:** Visual monthly heatmap showing dates with the highest save activity (Peak Days 🔥, Streaks, and 1-tap Date Filtering).
 - **⚡ Instant Realtime Sync:** Syncs within seconds via Supabase Realtime & FCM push notifications.
+- **🧠 OpenAI-Native AI Engine (`gpt-4o-mini` + `pgvector`):**
+  - **30-Second Video Digest:** 1-sentence TL;DW & 3 bullet takeaways on every card.
+  - **Inside-Video Semantic Search:** Search spoken concepts and jump directly to exact timestamps (`▶ 04:12`).
+  - **"Ask Elio" Chat Assistant:** Conversational RAG agent answering questions using only your saved video clips with video citations.
+  - **One-Tap Action Items:** Extracted GitHub repos, tools, websites, and recipe checklists.
+  - **Auto-Categories & Tags:** Zero-effort auto-tagging.
 - **🎬 Fluid UI Motion System:** Micro-interactions on video cards, tactile feedback, accordion calendar expand/collapse, and pulse skeleton loading.
 - **🚀 Native Deep Linking:** Opens saved videos directly in native mobile apps (`vnd.youtube:`, Instagram app).
 
@@ -67,11 +73,16 @@ elio-ai/
 4. Select the folder: `extension/` (or compiled `extension/dist`).
 5. Open YouTube, Instagram, Twitter, etc., click **Like** or **Bookmark/Save** on any video. The extension will automatically capture the metadata and sync it.
 
-### 2. Setup Backend (Supabase)
+### 2. Setup Backend (Supabase & AI Engine)
 
 1. Create a free project on [Supabase.com](https://supabase.com).
 2. Go to **SQL Editor** in Supabase and paste the contents of `backend/schema.sql`.
-3. Copy your `Project URL` and `anon key` into the extension popup or mobile `.env`.
+3. Paste the contents of `backend/schema_ai.sql` to enable `pgvector` and the vector recall engine.
+4. Set the following Supabase Edge Function Secrets:
+   ```env
+   OPENAI_API_KEY="your_openai_api_key_here"
+   ```
+5. Copy your `Project URL` and `anon key` into the extension popup or mobile `.env`.
 
 ### 3. Run Mobile App
 

@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { SavedVideo } from '../types/video';
-import { appleColors, appleRadii, appleTypography } from '../theme/appleTokens';
-import { haptics } from '../utils/haptics';
+import React, { useMemo } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { PikaIcon } from "./PikaIcon";
+import { SavedVideo } from "../types/video";
+import { appleColors, appleRadii, appleTypography } from "../theme/appleTokens";
+import { haptics } from "../utils/haptics";
 
 interface BentoStatsStripProps {
   totalCount: number;
@@ -22,14 +22,14 @@ export const BentoStatsStrip: React.FC<BentoStatsStripProps> = ({
 
   // Compute dominant platform
   const { topPlatform, topPercentage } = useMemo(() => {
-    if (videos.length === 0) return { topPlatform: 'None', topPercentage: 0 };
+    if (videos.length === 0) return { topPlatform: "None", topPercentage: 0 };
     const counts: Record<string, number> = {};
     videos.forEach((v) => {
-      const p = v.platform || 'other';
+      const p = v.platform || "other";
       counts[p] = (counts[p] || 0) + 1;
     });
 
-    let topP = 'other';
+    let topP = "other";
     let maxC = 0;
     Object.entries(counts).forEach(([p, c]) => {
       if (c > maxC) {
@@ -48,7 +48,11 @@ export const BentoStatsStrip: React.FC<BentoStatsStripProps> = ({
       {/* Bento Block 1: Total Saved */}
       <View style={styles.bentoBlock}>
         <View style={styles.blockHeader}>
-          <Ionicons name="film-outline" size={13} color={appleColors.accentLight} />
+          <PikaIcon
+            name="film-outline"
+            size={13}
+            color={appleColors.accentLight}
+          />
           <Text style={styles.blockLabel}>Vault</Text>
         </View>
         <Text style={styles.metricNumber}>{totalCount}</Text>
@@ -70,23 +74,31 @@ export const BentoStatsStrip: React.FC<BentoStatsStripProps> = ({
           <View
             style={[
               styles.pulseDot,
-              { backgroundColor: unreadCount > 0 ? '#30D158' : appleColors.textTertiary },
+              {
+                backgroundColor:
+                  unreadCount > 0 ? "#30D158" : appleColors.textTertiary,
+              },
             ]}
           />
           <Text style={styles.blockLabel}>In Queue</Text>
         </View>
-        <Text style={[styles.metricNumber, unreadCount > 0 && styles.metricNumberActive]}>
+        <Text
+          style={[
+            styles.metricNumber,
+            unreadCount > 0 && styles.metricNumberActive,
+          ]}
+        >
           {unreadCount}
         </Text>
         <Text style={styles.metricSub}>
-          {unreadCount > 0 ? 'Ready to play' : 'All caught up'}
+          {unreadCount > 0 ? "Ready to play" : "All caught up"}
         </Text>
       </TouchableOpacity>
 
       {/* Bento Block 3: Top Source */}
       <View style={styles.bentoBlock}>
         <View style={styles.blockHeader}>
-          <Ionicons name="sparkles-outline" size={13} color="#FF9F0A" />
+          <PikaIcon name="sparkles-outline" size={13} color="#FF9F0A" />
           <Text style={styles.blockLabel}>Top Source</Text>
         </View>
         <Text style={styles.metricPlatform} numberOfLines={1}>
@@ -100,7 +112,7 @@ export const BentoStatsStrip: React.FC<BentoStatsStripProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 16,
     gap: 8,
     marginBottom: 10,
@@ -108,21 +120,21 @@ const styles = StyleSheet.create({
   },
   bentoBlock: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: "rgba(255, 255, 255, 0.08)",
     paddingHorizontal: 11,
     paddingVertical: 9,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   bentoBlockActive: {
-    borderColor: 'rgba(48, 209, 88, 0.3)',
-    backgroundColor: 'rgba(48, 209, 88, 0.05)',
+    borderColor: "rgba(48, 209, 88, 0.3)",
+    backgroundColor: "rgba(48, 209, 88, 0.05)",
   },
   blockHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     marginBottom: 4,
   },
@@ -134,28 +146,28 @@ const styles = StyleSheet.create({
   blockLabel: {
     color: appleColors.textSecondary,
     fontSize: 10.5,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    textTransform: "uppercase",
     letterSpacing: 0.3,
   },
   metricNumber: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     ...appleTypography.tabularNums,
   },
   metricNumberActive: {
-    color: '#30D158',
+    color: "#30D158",
   },
   metricPlatform: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   metricSub: {
     color: appleColors.textTertiary,
     fontSize: 10,
-    fontWeight: '500',
+    fontWeight: "500",
     marginTop: 2,
   },
 });

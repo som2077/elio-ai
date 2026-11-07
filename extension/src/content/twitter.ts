@@ -52,6 +52,7 @@ function scrapeTweet(targetEl: HTMLElement): SavedVideoPayload | null {
     title: tweetText.slice(0, 150),
     creator_name: creator.slice(0, 50),
     thumbnail_url: thumbnail,
+    user_notes: tweetText,
     source_client: 'browser_extension',
   };
 }

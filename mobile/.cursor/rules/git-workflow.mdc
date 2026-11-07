@@ -1,0 +1,29 @@
+---
+description: Git commits, pull requests, and automated review standards
+globs: *
+alwaysApply: false
+---
+
+# Git & PR Lifecycle Rules
+
+Follow standard workflows for commits, branches, and code reviews:
+
+## 1. Commit Messages (`writing-commit-messages`)
+
+- Use Conventional Commits standard:
+  - `feat: <description>` for new user-facing functionality
+  - `fix: <description>` for bug fixes and error resolutions
+  - `refactor: <description>` for structural improvements without behavior change
+  - `style: <description>` for formatting, tokens, or UI cleanup
+  - `docs: <description>` for documentation updates
+
+## 2. Pull Request Generation (`creating-pr`)
+
+- Inspect git status and diff before opening PRs.
+- Provide clear Summary, Changes, and Verification sections.
+- Reference linked issues and test outcomes.
+
+## 3. Parallel Review & Triage (`parallel-code-review` & `babysitting-pr`)
+
+- For large changes, run multi-perspective review across Security, Performance, Types, and Architecture.
+- Monitor CI checks and resolve any conflicting files promptly.

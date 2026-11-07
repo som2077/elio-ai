@@ -26,7 +26,8 @@ function scrapeFacebookPost(targetEl: HTMLElement): SavedVideoPayload | null {
 
   // Post description / Text
   const messageEl = container.querySelector('div[data-ad-preview="message"], div[dir="auto"]');
-  const title = messageEl?.textContent?.trim() || `Facebook Reel by ${creator}`;
+  const postText = messageEl?.textContent?.trim() || '';
+  const title = postText || `Facebook Reel by ${creator}`;
 
   const isReel = postUrl.includes('/reel/');
 
@@ -39,6 +40,7 @@ function scrapeFacebookPost(targetEl: HTMLElement): SavedVideoPayload | null {
     title: title.slice(0, 150),
     creator_name: creator,
     thumbnail_url: thumbnail,
+    user_notes: postText || undefined,
     source_client: 'browser_extension',
   };
 }

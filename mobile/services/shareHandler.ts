@@ -261,6 +261,9 @@ export async function processSharedContent(
       };
     }
 
+    // Extract any accompanying text/caption sent along with the link
+    const surroundingText = rawText.replace(extractedUrl, "").trim();
+
     // Insert new clip into saved_videos
     const newRecord = {
       user_id: userId,
@@ -271,6 +274,7 @@ export async function processSharedContent(
       platform_video_id: metadata.platformVideoId || null,
       title: metadata.title,
       thumbnail_url: metadata.thumbnailUrl,
+      user_notes: surroundingText.length > 5 ? surroundingText : null,
       status: "unread",
       source_client: "mobile_share_sheet",
       created_at: new Date().toISOString(),

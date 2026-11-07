@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { supabase } from "../services/supabase";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
@@ -87,14 +87,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 Alert.alert("Error", error.message);
               } else {
                 haptics.success();
-                setDevices((prev) => prev.filter((d) => d.device_id !== deviceId));
+                setDevices((prev) =>
+                  prev.filter((d) => d.device_id !== deviceId),
+                );
               }
             } catch (err: any) {
               Alert.alert("Error", err.message);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -121,7 +123,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               onOpenScanner();
             }}
           >
-            <Ionicons name="qr-code-outline" size={17} color="#000000" />
+            <PikaIcon name="qr-code-outline" size={17} color="#000000" />
             <Text style={styles.scanHeaderBtnText}>Scan QR</Text>
           </TouchableOpacity>
         </View>
@@ -151,7 +153,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             onLogout();
           }}
         >
-          <Ionicons name="log-out-outline" size={15} color="#FF453A" />
+          <PikaIcon name="log-out-outline" size={15} color="#FF453A" />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
@@ -166,15 +168,20 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         }}
       >
         <View style={styles.heroIconBox}>
-          <Ionicons name="qr-code-outline" size={24} color="#070A11" />
+          <PikaIcon name="qr-code-outline" size={24} color="#070A11" />
         </View>
         <View style={styles.heroTextBox}>
           <Text style={styles.heroTitle}>Link New Computer</Text>
           <Text style={styles.heroSubtitle}>
-            Scan the QR code in your desktop Chrome, Brave, or Edge extension to pair instantly.
+            Scan the QR code in your desktop Chrome, Brave, or Edge extension to
+            pair instantly.
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={appleColors.accentLight} />
+        <PikaIcon
+          name="chevron-forward"
+          size={18}
+          color={appleColors.accentLight}
+        />
       </TouchableOpacity>
 
       {/* Connected Devices Section */}
@@ -187,25 +194,42 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               fetchDevices();
             }}
           >
-            <Ionicons name="refresh" size={16} color={appleColors.textSecondary} />
+            <PikaIcon
+              name="refresh"
+              size={16}
+              color={appleColors.textSecondary}
+            />
           </TouchableOpacity>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="small" color={appleColors.accentLight} style={{ marginVertical: 20 }} />
+          <ActivityIndicator
+            size="small"
+            color={appleColors.accentLight}
+            style={{ marginVertical: 20 }}
+          />
         ) : devices.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="laptop-outline" size={32} color={appleColors.textTertiary} />
+            <PikaIcon
+              name="laptop-outline"
+              size={32}
+              color={appleColors.textTertiary}
+            />
             <Text style={styles.emptyTitle}>No browsers linked yet</Text>
             <Text style={styles.emptySubtitle}>
-              Install the Elio AI Chrome Extension on your PC, click its icon, and scan the QR code above.
+              Install the Elio AI Chrome Extension on your PC, click its icon,
+              and scan the QR code above.
             </Text>
           </View>
         ) : (
           devices.map((device) => (
             <View key={device.device_id} style={styles.deviceCard}>
               <View style={styles.deviceIcon}>
-                <Ionicons name="desktop-outline" size={20} color={appleColors.accentLight} />
+                <PikaIcon
+                  name="desktop-outline"
+                  size={20}
+                  color={appleColors.accentLight}
+                />
               </View>
 
               <View style={styles.deviceDetails}>
@@ -217,16 +241,19 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                   </View>
                 </View>
                 <Text style={styles.deviceMeta}>
-                  {device.browser_type || "Browser"} • {device.os_name || "Desktop"}
+                  {device.browser_type || "Browser"} •{" "}
+                  {device.os_name || "Desktop"}
                 </Text>
               </View>
 
               <TouchableOpacity
                 activeOpacity={0.7}
                 style={styles.revokeBtn}
-                onPress={() => handleRevoke(device.device_id, device.device_name)}
+                onPress={() =>
+                  handleRevoke(device.device_id, device.device_name)
+                }
               >
-                <Ionicons name="trash-outline" size={16} color="#FF453A" />
+                <PikaIcon name="trash-outline" size={16} color="#FF453A" />
               </TouchableOpacity>
             </View>
           ))

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { PlatformIcon } from "./PlatformIcon";
@@ -78,6 +79,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   onOpenPlatformModal,
 }) => {
   const insets = useSafeAreaInsets();
+  const [isSearchPressed, setIsSearchPressed] = useState(false);
   const searchScale = useRef(new Animated.Value(1)).current;
 
   // Sliding indicator refs
@@ -277,14 +279,24 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
               <TouchableOpacity
                 activeOpacity={0.75}
                 style={styles.iconBtn}
-                onPressIn={() => animatePressIn(searchScale)}
-                onPressOut={() => animatePressOut(searchScale)}
+                onPressIn={() => {
+                  setIsSearchPressed(true);
+                  animatePressIn(searchScale);
+                }}
+                onPressOut={() => {
+                  setIsSearchPressed(false);
+                  animatePressOut(searchScale);
+                }}
                 onPress={() => {
                   haptics.selection();
                   if (onOpenSearch) onOpenSearch();
                 }}
               >
-                <Ionicons name="search-outline" size={22} color="#FFFFFF" />
+                <PikaIcon
+                  name={isSearchPressed ? "SearchSolidIcon" : "SearchIcon"}
+                  size={21}
+                  color="#FFFFFF"
+                />
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -296,6 +308,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
             ref={tabsScrollViewRef}
             horizontal
             showsHorizontalScrollIndicator={false}
+            nestedScrollEnabled={true}
             contentContainerStyle={styles.tabsScrollContent}
           >
             {/* "Platforms" Trigger Tab (Opens Bottom Sheet Modal) */}

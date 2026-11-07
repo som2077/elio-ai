@@ -7,15 +7,17 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
 interface SearchBarProps {
   query: string;
   selectedPlatform: string;
+  searchMode?: "title" | "inside_video";
   onChangeQuery: (text: string) => void;
   onSelectPlatform: (platform: string) => void;
+  onToggleSearchMode?: (mode: "title" | "inside_video") => void;
   onClear: () => void;
   onBack?: () => void;
 }
@@ -23,18 +25,45 @@ interface SearchBarProps {
 export const SearchBar: React.FC<SearchBarProps> = ({
   query,
   selectedPlatform,
+  searchMode = "title",
   onChangeQuery,
   onSelectPlatform,
+  onToggleSearchMode,
   onClear,
   onBack,
 }) => {
   const platforms = [
     { key: "all", label: "All Clips", icon: "sparkles" as const },
-    { key: "youtube", label: "YouTube", icon: "logo-youtube" as const, color: "#FF0033" },
-    { key: "instagram", label: "Instagram", icon: "logo-instagram" as const, color: "#E1306C" },
-    { key: "twitter", label: "𝕏", icon: "logo-twitter" as const, color: "#1DA1F2" },
-    { key: "tiktok", label: "TikTok", icon: "videocam-outline" as const, color: "#00F2FE" },
-    { key: "reddit", label: "Reddit", icon: "logo-reddit" as const, color: "#FF4500" },
+    {
+      key: "youtube",
+      label: "YouTube",
+      icon: "logo-youtube" as const,
+      color: "#FF0033",
+    },
+    {
+      key: "instagram",
+      label: "Instagram",
+      icon: "logo-instagram" as const,
+      color: "#E1306C",
+    },
+    {
+      key: "twitter",
+      label: "𝕏",
+      icon: "logo-twitter" as const,
+      color: "#1DA1F2",
+    },
+    {
+      key: "tiktok",
+      label: "TikTok",
+      icon: "videocam-outline" as const,
+      color: "#00F2FE",
+    },
+    {
+      key: "reddit",
+      label: "Reddit",
+      icon: "logo-reddit" as const,
+      color: "#FF4500",
+    },
   ];
 
   return (
@@ -50,15 +79,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             }}
             style={styles.backBtn}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <PikaIcon name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         )}
         <View style={styles.inputBox}>
-          <Ionicons name="search" size={17} color={appleColors.textTertiary} />
+          <PikaIcon
+            name={searchMode === "inside_video" ? "sparkles" : "search"}
+            size={17}
+            color={searchMode === "inside_video" ? "#A78BFA" : appleColors.textTertiary}
+          />
           <TextInput
             value={query}
             onChangeText={onChangeQuery}
-            placeholder="Search clips, creators, topics..."
+            placeholder={
+              searchMode === "inside_video"
+                ? "Search what was spoken inside videos..."
+                : "Search clips, creators, topics..."
+            }
             placeholderTextColor={appleColors.textTertiary}
             style={styles.textInput}
             autoCapitalize="none"
@@ -75,11 +112,65 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               }}
               style={styles.clearBtn}
             >
-              <Ionicons name="close-circle" size={16} color={appleColors.textTertiary} />
+              <PikaIcon
+                name="close-circle"
+                size={16}
+                color={appleColors.textTertiary}
+              />
             </TouchableOpacity>
           )}
         </View>
       </View>
+
+      {/* Mode Switcher: Titles vs Inside-Video ✦ */}
+      {onToggleSearchMode && (
+        <View style={styles.modeSwitcherRow}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.modeTab, searchMode === "title" && styles.modeTabActive]}
+            onPress={() => {
+              haptics.selection();
+              onToggleSearchMode("title");
+            }}
+          >
+            <Text
+              style={[
+                styles.modeTabText,
+                searchMode === "title" && styles.modeTabTextActive,
+              ]}
+            >
+              Titles & Tags
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[
+              styles.modeTab,
+              searchMode === "inside_video" && styles.modeTabActiveAi,
+            ]}
+            onPress={() => {
+              haptics.selection();
+              onToggleSearchMode("inside_video");
+            }}
+          >
+            <PikaIcon
+              name="sparkles"
+              size={12}
+              color={searchMode === "inside_video" ? "#A78BFA" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.modeTabText,
+                searchMode === "inside_video" && styles.modeTabTextActiveAi,
+              ]}
+            >
+              ✦ Inside Video (Spoken)
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Platform Quick Filter Pills */}
       <ScrollView
@@ -93,19 +184,20 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <TouchableOpacity
               key={p.key}
               activeOpacity={0.8}
-              style={[styles.platformPill, isSelected && styles.platformPillActive]}
+              style={[
+                styles.platformPill,
+                isSelected && styles.platformPillActive,
+              ]}
               onPress={() => {
                 haptics.selection();
                 onSelectPlatform(p.key);
               }}
             >
-              <Ionicons
+              <PikaIcon
                 name={p.icon}
                 size={12}
                 color={
-                  isSelected
-                    ? "#070A11"
-                    : p.color || appleColors.textSecondary
+                  isSelected ? "#070A11" : p.color || appleColors.textSecondary
                 }
               />
               <Text
@@ -163,6 +255,41 @@ const styles = StyleSheet.create({
   },
   clearBtn: {
     padding: 4,
+  },
+  modeSwitcherRow: {
+    flexDirection: "row",
+    marginTop: 8,
+    marginBottom: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 10,
+    padding: 2.5,
+  },
+  modeTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 5.5,
+    borderRadius: 8,
+  },
+  modeTabActive: {
+    backgroundColor: "#1C1C1E",
+  },
+  modeTabActiveAi: {
+    backgroundColor: "rgba(167, 139, 250, 0.16)",
+    borderWidth: 0.5,
+    borderColor: "rgba(167, 139, 250, 0.4)",
+  },
+  modeTabText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#71767B",
+  },
+  modeTabTextActive: {
+    color: "#FFFFFF",
+  },
+  modeTabTextActiveAi: {
+    color: "#C4B5FD",
   },
   platformScroll: {
     flexDirection: "row",

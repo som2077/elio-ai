@@ -10,13 +10,18 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
-export type FeedFilterType = "for_you" | "following" | "saved" | "favorites" | string;
+export type FeedFilterType =
+  | "for_you"
+  | "following"
+  | "saved"
+  | "favorites"
+  | string;
 
 interface FeedsDrawerProps {
   visible: boolean;
@@ -158,14 +163,14 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
                   onCreateFeedPress();
                 }}
               >
-                <Ionicons name="add" size={24} color="#FFFFFF" />
+                <PikaIcon name="add" size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.7}
                 style={styles.headerIconBtn}
                 onPress={() => haptics.light()}
               >
-                <Ionicons name="pencil-outline" size={20} color="#FFFFFF" />
+                <PikaIcon name="pencil-outline" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -184,10 +189,14 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
                 onClose();
               }}
             >
-              <Ionicons
+              <PikaIcon
                 name={activeFeed === "favorites" ? "heart" : "heart-outline"}
                 size={22}
-                color={activeFeed === "favorites" ? threadsTokens.colors.likeRed : "#FFFFFF"}
+                color={
+                  activeFeed === "favorites"
+                    ? threadsTokens.colors.likeRed
+                    : "#FFFFFF"
+                }
               />
             </TouchableOpacity>
 
@@ -203,7 +212,7 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
                 onClose();
               }}
             >
-              <Ionicons
+              <PikaIcon
                 name={activeFeed === "saved" ? "bookmark" : "bookmark-outline"}
                 size={22}
                 color="#FFFFFF"
@@ -283,13 +292,14 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
                   <Text
                     style={[
                       styles.feedItemTitle,
-                      activeFeed === "ghost_posts" && styles.feedItemTitleActive,
+                      activeFeed === "ghost_posts" &&
+                        styles.feedItemTitleActive,
                     ]}
                   >
                     Ghost posts
                   </Text>
                 </View>
-                <Ionicons
+                <PikaIcon
                   name="chatbubble-ellipses-outline"
                   size={18}
                   color={threadsTokens.colors.textSecondary}
@@ -300,7 +310,10 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
             {/* Popular Communities Section */}
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Popular communities</Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => haptics.light()}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => haptics.light()}
+              >
                 <Text style={styles.seeAllText}>See all</Text>
               </TouchableOpacity>
             </View>
@@ -337,7 +350,11 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
                           { backgroundColor: comm.iconColor },
                         ]}
                       >
-                        <Ionicons name={comm.icon as any} size={14} color="#FFFFFF" />
+                        <PikaIcon
+                          name={comm.icon as any}
+                          size={14}
+                          color="#FFFFFF"
+                        />
                       </View>
                       <View
                         style={[
@@ -346,7 +363,11 @@ export const FeedsDrawer: React.FC<FeedsDrawerProps> = ({
                           { backgroundColor: "#333333" },
                         ]}
                       >
-                        <Ionicons name="videocam-outline" size={12} color="#FFFFFF" />
+                        <PikaIcon
+                          name="videocam-outline"
+                          size={12}
+                          color="#FFFFFF"
+                        />
                       </View>
                     </View>
                   </TouchableOpacity>

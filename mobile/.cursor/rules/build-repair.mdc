@@ -1,0 +1,24 @@
+---
+description: Autonomous error recovery, type checking, and test grinding loop
+globs: **/*.ts, **/*.tsx
+alwaysApply: false
+---
+
+# Build & Code Quality Rules
+
+When errors, test failures, or build issues occur, follow autonomous agent healing workflows:
+
+## 1. Grind Until Pass (`grinding-until-pass`)
+
+- Run a tight autonomous loop: _Identify failure -> Apply minimal fix -> Re-execute verification -> Repeat_.
+- Maximum 10 autonomous iterations before requesting human intervention.
+- Never refactor unrelated code when fixing a compiler or test break.
+
+## 2. Continuous Type Checking (`auto-type-checking`)
+
+- After editing TypeScript files, run `npx tsc --noEmit` to ensure zero compilation regressions.
+- Resolve missing props, nullability checks, and type imports immediately before proceeding.
+
+## 3. Port & Dev Server Management (`detecting-port-conflicts`)
+
+- If Metro or Expo reports `EADDRINUSE` (port 8081 or 19000), identify the blocking process and clear the conflict cleanly.

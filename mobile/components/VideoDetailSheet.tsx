@@ -1,16 +1,21 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ScrollView,
+  ActivityIndicator,
+  Linking,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { IndustryBottomSheet } from "./IndustryBottomSheet";
+import { fetchVideoAIMetadata, generateVideoAIOnDemand } from "../services/aiService";
+import type { VideoAIMetadata, ActionItem } from "../types/ai";
 
 interface VideoDetailSheetProps {
   video: SavedVideo | null;
@@ -22,14 +27,6 @@ interface VideoDetailSheetProps {
   onDelete: (video: SavedVideo) => void;
 }
 
-/**
- * Authentic Instagram Threads / Twitter Action Sheet
- * Powered by IndustryBottomSheet:
- * - 60fps gesture drag-to-dismiss (PanResponder)
- * - Velocity flick detection
- * - Specular highlight top border
- * - Haptic feedback
- */
 export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   video,
   visible,
@@ -39,6 +36,32 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   onCopyLink,
   onDelete,
 }) => {
+  const [activeTab, setActiveTab] = useState<"digest" | "actions">("digest");
+  const [aiMeta, setAiMeta] = useState<VideoAIMetadata | null>(null);
+  const [isLoadingMeta, setIsLoadingMeta] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copiedTakeaways, setCopiedTakeaways] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (visible && video) {
+      if (video.ai_metadata) {
+        setAiMeta(video.ai_metadata);
+      } else {
+        setIsLoadingMeta(true);
+        fetchVideoAIMetadata(video.id).then((meta) => {
+          if (isMounted) {
+            setAiMeta(meta);
+            setIsLoadingMeta(false);
+          }
+        });
+      }
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [visible, video?.id, video?.ai_metadata]);
+
   if (!video) return null;
 
   const isWatched = video.status === "watched";
@@ -82,125 +105,473 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     );
   };
 
+  const handleGenerateAI = async () => {
+    haptics.selection();
+    setIsGenerating(true);
+    const res = await generateVideoAIOnDemand(video);
+    setIsGenerating(false);
+
+    if (res.success && res.data) {
+      setAiMeta(res.data);
+      haptics.success();
+    } else {
+      Alert.alert("AI Engine Notice", res.error || "Could not generate digest right now.");
+    }
+  };
+
+  const handleCopyTakeaways = () => {
+    if (!aiMeta) return;
+    haptics.light();
+    const textToCopy = `📌 ${aiMeta.tldw}\n\nKey Takeaways:\n${aiMeta.key_takeaways.map((k) => `• ${k}`).join("\n")}`;
+    if (onCopyLink) {
+      onCopyLink(textToCopy);
+    }
+    setCopiedTakeaways(true);
+    setTimeout(() => setCopiedTakeaways(false), 2000);
+  };
+
+  const handleOpenResource = (item: ActionItem) => {
+    haptics.light();
+    if (item.url && (item.url.startsWith("https://") || item.url.startsWith("http://"))) {
+      Linking.openURL(item.url).catch(() => {
+        Alert.alert("Unable to Open Link", item.url);
+      });
+    } else if (onCopyLink) {
+      onCopyLink(item.title);
+      Alert.alert("Copied to Clipboard", item.title);
+    }
+  };
+
+  const renderActionIcon = (type: ActionItem["type"]) => {
+    switch (type) {
+      case "repo":
+        return "code-slash-outline";
+      case "recipe":
+        return "restaurant-outline";
+      case "book":
+        return "book-outline";
+      case "tool":
+        return "construct-outline";
+      default:
+        return "link-outline";
+    }
+  };
+
   return (
     <IndustryBottomSheet
       visible={visible}
       onClose={onClose}
-      maxHeightRatio={0.75}
+      maxHeightRatio={0.82}
     >
-      {/* Action List Section 1 */}
-      <View style={styles.actionGroup}>
+      {/* 1. Header Segmented Toggle */}
+      <View style={styles.segmentContainer}>
         <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={handleCopy}
-        >
-          <Text style={styles.actionLabel}>Copy link</Text>
-          <Ionicons name="link-outline" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={handleSaveToggle}
-        >
-          <Text style={styles.actionLabel}>
-            {isWatched ? "Move back to Queue" : "Save"}
-          </Text>
-          <Ionicons
-            name={isWatched ? "bookmark" : "bookmark-outline"}
-            size={22}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={handleOpenPlay}
-        >
-          <Text style={styles.actionLabel}>Open in App</Text>
-          <Ionicons name="open-outline" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
+          activeOpacity={0.8}
+          style={[styles.segmentBtn, activeTab === "digest" && styles.segmentBtnActive]}
           onPress={() => {
-            haptics.light();
-            onClose();
+            haptics.selection();
+            setActiveTab("digest");
           }}
         >
-          <Text style={styles.actionLabel}>Not interested</Text>
-          <Ionicons name="eye-off-outline" size={22} color="#FFFFFF" />
+          <PikaIcon
+            name="sparkles"
+            size={13}
+            color={activeTab === "digest" ? "#A78BFA" : "#71767B"}
+            style={{ marginRight: 5 }}
+          />
+          <Text
+            style={[
+              styles.segmentBtnText,
+              activeTab === "digest" && styles.segmentBtnTextActive,
+            ]}
+          >
+            ✦ AI Digest
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.segmentBtn, activeTab === "actions" && styles.segmentBtnActive]}
+          onPress={() => {
+            haptics.selection();
+            setActiveTab("actions");
+          }}
+        >
+          <Text
+            style={[
+              styles.segmentBtnText,
+              activeTab === "actions" && styles.segmentBtnTextActive,
+            ]}
+          >
+            Actions & Options
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Section Divider */}
-      <View style={styles.divider} />
-
-      {/* Action List Section 2 */}
-      <View style={styles.actionGroup}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={() => {
-            haptics.light();
-            onClose();
-          }}
+      {/* 2. TAB: AI DIGEST */}
+      {activeTab === "digest" && (
+        <ScrollView
+          style={styles.digestScroll}
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.actionLabel}>Mute</Text>
-          <Ionicons name="volume-mute-outline" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
+          {isLoadingMeta || isGenerating ? (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator color="#A78BFA" size="large" />
+              <Text style={styles.loaderText}>
+                {isGenerating
+                  ? "OpenAI is analyzing video transcript..."
+                  : "Retrieving AI digest..."}
+              </Text>
+            </View>
+          ) : aiMeta ? (
+            <View>
+              {/* TL;DW Capsule */}
+              <View style={styles.tldwCard}>
+                <View style={styles.tldwHeaderRow}>
+                  <View style={styles.badgeRow}>
+                    <PikaIcon name="flash" size={13} color="#FBBF24" />
+                    <Text style={styles.tldwBadgeLabel}>30-SEC TL;DW</Text>
+                  </View>
+                  <Text style={styles.readTimeText}>{aiMeta.read_time_seconds}s read</Text>
+                </View>
+                <Text style={styles.tldwBodyText}>{aiMeta.tldw}</Text>
+              </View>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={() => {
-            haptics.light();
-            onClose();
-          }}
-        >
-          <Text style={styles.actionLabel}>Restrict</Text>
-          <Ionicons name="person-remove-outline" size={22} color="#FFFFFF" />
-        </TouchableOpacity>
+              {/* Key Takeaways */}
+              {aiMeta.key_takeaways && aiMeta.key_takeaways.length > 0 && (
+                <View style={styles.takeawaysSection}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Key Takeaways</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={styles.copyBtn}
+                      onPress={handleCopyTakeaways}
+                    >
+                      <PikaIcon
+                        name={copiedTakeaways ? "checkmark" : "copy-outline"}
+                        size={13}
+                        color={copiedTakeaways ? "#10B981" : "#A78BFA"}
+                      />
+                      <Text
+                        style={[
+                          styles.copyBtnText,
+                          copiedTakeaways && { color: "#10B981" },
+                        ]}
+                      >
+                        {copiedTakeaways ? "Copied" : "Copy"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={handleDeletePrompt}
-        >
-          <Text style={[styles.actionLabel, styles.dangerText]}>
-            Remove clip
-          </Text>
-          <Ionicons
-            name="trash-outline"
-            size={22}
-            color={threadsTokens.colors.destructive}
-          />
-        </TouchableOpacity>
+                  {aiMeta.key_takeaways.map((takeaway, idx) => (
+                    <View key={idx} style={styles.takeawayItem}>
+                      <View style={styles.bulletDot} />
+                      <Text style={styles.takeawayText}>{takeaway}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.actionRow}
-          onPress={() => {
-            haptics.warning();
-            onClose();
-          }}
-        >
-          <Text style={[styles.actionLabel, styles.dangerText]}>Report</Text>
-          <Ionicons
-            name="alert-circle-outline"
-            size={22}
-            color={threadsTokens.colors.destructive}
-          />
-        </TouchableOpacity>
-      </View>
+              {/* Action Items / Extracted Resources */}
+              {aiMeta.action_items && aiMeta.action_items.length > 0 && (
+                <View style={styles.actionsSection}>
+                  <Text style={styles.sectionTitle}>Mentioned Resources & Actions</Text>
+                  <View style={styles.actionChipsContainer}>
+                    {aiMeta.action_items.map((item, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        activeOpacity={0.75}
+                        style={styles.actionChip}
+                        onPress={() => handleOpenResource(item)}
+                      >
+                        <PikaIcon
+                          name={renderActionIcon(item.type)}
+                          size={14}
+                          color="#A78BFA"
+                          style={{ marginRight: 6 }}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.actionChipTitle} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          {item.subtitle && (
+                            <Text style={styles.actionChipSubtitle} numberOfLines={1}>
+                              {item.subtitle}
+                            </Text>
+                          )}
+                        </View>
+                        <PikaIcon name="open-outline" size={13} color="#71767B" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.emptyAiBox}>
+              <View style={styles.emptyAiIconRing}>
+                <PikaIcon name="sparkles" size={26} color="#A78BFA" />
+              </View>
+              <Text style={styles.emptyAiTitle}>No Digest Generated Yet</Text>
+              <Text style={styles.emptyAiSubtitle}>
+                Extract transcripts, 3-bullet takeaways, and clickable resources using OpenAI in seconds.
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.generateBtn}
+                onPress={handleGenerateAI}
+              >
+                <PikaIcon name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.generateBtnText}>Generate 30-Sec Digest</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      {/* 3. TAB: ACTIONS */}
+      {activeTab === "actions" && (
+        <View>
+          <View style={styles.actionGroup}>
+            <TouchableOpacity activeOpacity={0.7} style={styles.actionRow} onPress={handleCopy}>
+              <Text style={styles.actionLabel}>Copy link</Text>
+              <PikaIcon name="link-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.actionRow}
+              onPress={handleSaveToggle}
+            >
+              <Text style={styles.actionLabel}>
+                {isWatched ? "Move back to Queue" : "Mark as Watched"}
+              </Text>
+              <PikaIcon
+                name={isWatched ? "bookmark" : "checkmark-done-outline"}
+                size={22}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity activeOpacity={0.7} style={styles.actionRow} onPress={handleOpenPlay}>
+              <Text style={styles.actionLabel}>Open in Native App</Text>
+              <PikaIcon name="open-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.actionRow}
+              onPress={handleDeletePrompt}
+            >
+              <Text style={[styles.actionLabel, styles.dangerText]}>Remove clip</Text>
+              <PikaIcon
+                name="trash-outline"
+                size={22}
+                color={threadsTokens.colors.destructive}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </IndustryBottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
+  segmentContainer: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 16,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderRadius: 9,
+  },
+  segmentBtnActive: {
+    backgroundColor: "#1E1E22",
+  },
+  segmentBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#71767B",
+  },
+  segmentBtnTextActive: {
+    color: "#FFFFFF",
+  },
+  digestScroll: {
+    maxHeight: 380,
+  },
+  loaderContainer: {
+    paddingVertical: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loaderText: {
+    color: "#94A3B8",
+    fontSize: 13,
+    marginTop: 12,
+    fontWeight: "500",
+  },
+  tldwCard: {
+    backgroundColor: "rgba(167, 139, 250, 0.09)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.25)",
+    padding: 14,
+    marginBottom: 14,
+  },
+  tldwHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  tldwBadgeLabel: {
+    color: "#FBBF24",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    marginLeft: 4,
+  },
+  readTimeText: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  tldwBodyText: {
+    color: "#F1F5F9",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
+  },
+  takeawaysSection: {
+    marginBottom: 14,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  copyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "rgba(167, 139, 250, 0.12)",
+  },
+  copyBtnText: {
+    color: "#A78BFA",
+    fontSize: 11,
+    fontWeight: "600",
+    marginLeft: 4,
+  },
+  takeawayItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  bulletDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#A78BFA",
+    marginTop: 7,
+    marginRight: 9,
+  },
+  takeawayText: {
+    flex: 1,
+    color: "#E2E8F0",
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontWeight: "400",
+  },
+  actionsSection: {
+    marginTop: 6,
+  },
+  actionChipsContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  actionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#161618",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  actionChipTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  actionChipSubtitle: {
+    color: "#71767B",
+    fontSize: 11,
+    marginTop: 1,
+  },
+  emptyAiBox: {
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  emptyAiIconRing: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "rgba(167, 139, 250, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  emptyAiTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  emptyAiSubtitle: {
+    color: "#71767B",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
+    marginBottom: 18,
+  },
+  generateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7C3AED",
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 20,
+  },
+  generateBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    fontWeight: "700",
+  },
   actionGroup: {
     paddingVertical: 2,
   },
@@ -218,10 +589,5 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     color: threadsTokens.colors.destructive,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    marginVertical: 4,
   },
 });

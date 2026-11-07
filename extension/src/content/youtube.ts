@@ -17,19 +17,48 @@ function showElioToast(title: string, message: string, isSuccess: boolean = true
       document.body.appendChild(toast);
     }
 
-    toast.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 28px; height: 28px; border-radius: 8px; background: ${
-          isSuccess ? 'rgba(48, 209, 88, 0.2)' : 'rgba(255, 159, 10, 0.2)'
-        }; display: flex; align-items: center; justify-content: center; font-size: 15px; color: ${
-          isSuccess ? '#30d158' : '#ff9f0a'
-        };">✦</div>
-        <div>
-          <div style="font-weight: 600; font-size: 13px; color: #ffffff; letter-spacing: -0.2px;">${title}</div>
-          <div style="font-size: 11px; color: #a1a1aa; margin-top: 2px;">${message}</div>
-        </div>
-      </div>
-    `;
+    // Security: Clear existing nodes safely without innerHTML
+    while (toast.firstChild) {
+      toast.removeChild(toast.firstChild);
+    }
+
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.gap = '12px';
+
+    const iconBox = document.createElement('div');
+    iconBox.style.width = '28px';
+    iconBox.style.height = '28px';
+    iconBox.style.borderRadius = '8px';
+    iconBox.style.background = isSuccess ? 'rgba(48, 209, 88, 0.2)' : 'rgba(255, 159, 10, 0.2)';
+    iconBox.style.display = 'flex';
+    iconBox.style.alignItems = 'center';
+    iconBox.style.justifyContent = 'center';
+    iconBox.style.fontSize = '15px';
+    iconBox.style.color = isSuccess ? '#30d158' : '#ff9f0a';
+    iconBox.textContent = '✦';
+
+    const textBox = document.createElement('div');
+
+    const titleEl = document.createElement('div');
+    titleEl.style.fontWeight = '600';
+    titleEl.style.fontSize = '13px';
+    titleEl.style.color = '#ffffff';
+    titleEl.style.letterSpacing = '-0.2px';
+    titleEl.textContent = title;
+
+    const msgEl = document.createElement('div');
+    msgEl.style.fontSize = '11px';
+    msgEl.style.color = '#a1a1aa';
+    msgEl.style.marginTop = '2px';
+    msgEl.textContent = message;
+
+    textBox.appendChild(titleEl);
+    textBox.appendChild(msgEl);
+    container.appendChild(iconBox);
+    container.appendChild(textBox);
+    toast.appendChild(container);
 
     Object.assign(toast.style, {
       position: 'fixed',
@@ -268,3 +297,62 @@ observer.observe(document.body, {
   subtree: true,
   attributeFilter: ['aria-pressed', 'class'],
 });
+
+/**
+ * Injects a clean in-page button under YouTube videos: "✦ Elio AI Summary"
+ */
+function injectElioSummaryButton() {
+  if (document.getElementById('elio-youtube-summary-btn')) return;
+
+  const buttonContainer =
+    document.querySelector('#top-level-buttons-computed') ||
+    document.querySelector('ytd-menu-renderer #top-level-buttons-computed') ||
+    document.querySelector('#actions-inner #top-level-buttons-computed');
+
+  if (!buttonContainer) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'elio-youtube-summary-btn';
+  btn.innerText = '✦ Elio Summary';
+  Object.assign(btn.style, {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    backgroundColor: 'rgba(167, 139, 250, 0.15)',
+    color: '#C4B5FD',
+    border: '1px solid rgba(167, 139, 250, 0.35)',
+    borderRadius: '18px',
+    padding: '0 16px',
+    height: '36px',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginRight: '8px',
+    fontFamily: 'inherit',
+    transition: 'all 0.2s ease',
+  });
+
+  btn.addEventListener('mouseenter', () => {
+    btn.style.backgroundColor = 'rgba(167, 139, 250, 0.25)';
+    btn.style.borderColor = 'rgba(167, 139, 250, 0.6)';
+  });
+  btn.addEventListener('mouseleave', () => {
+    btn.style.backgroundColor = 'rgba(167, 139, 250, 0.15)';
+    btn.style.borderColor = 'rgba(167, 139, 250, 0.35)';
+  });
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const payload = scrapeYouTubeDetails();
+    if (payload) {
+      sendSync(payload);
+      showElioToast('AI Digest Triggered', '30-sec digest syncing to your phone...', true);
+    }
+  });
+
+  buttonContainer.prepend(btn);
+}
+
+// Keep checking for YouTube video change / page navigation
+setInterval(injectElioSummaryButton, 2000);

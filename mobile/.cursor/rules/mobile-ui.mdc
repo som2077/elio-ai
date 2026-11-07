@@ -1,0 +1,28 @@
+---
+description: Mobile UI and React Native/Expo engineering rules and design system enforcement
+globs: components/**/*.tsx, app/**/*.tsx
+alwaysApply: false
+---
+
+# Mobile UI & Design System Rules
+
+When building or modifying UI screens and components in this project, adhere strictly to the installed skills:
+
+## 1. Design System & Spacing (`using-ui-stack`)
+
+- Use the **8px spatial grid** for margins, paddings, and layout gaps (`8, 12, 16, 20, 24, 32`).
+- Support **5-state interactions** on interactive elements: Default, Pressed/Active, Focused, Disabled, Loading.
+- Ensure minimum tap target of **44x44 pt** for all Touchable / Button components.
+
+## 2. React Native & Expo Patterns (`react-native-patterns`)
+
+- Use `SafeAreaView` from `react-native-safe-area-context` and `useSafeAreaInsets` for notches and home bars.
+- Use `useNativeDriver: true` for transform and opacity animations.
+- Prevent unmounted state updates and clean up listeners/timers in `useEffect`.
+- Use the project's centralized `PikaIcon` component (`components/PikaIcon.tsx`) for all vector icons.
+
+## 3. Dark Mode & Contrast (`dark-mode-testing`)
+
+- Default canvas is obsidian black (`#000000` / `#101010`) with `#161616` cards and `#2F3336` borders.
+- Text hierarchy: `#FFFFFF` (Primary), `#71767B` (Secondary), `#E7E9EA` (Titles).
+- Always verify contrast against dark backdrops before finalizing layout edits.

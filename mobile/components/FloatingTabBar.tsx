@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   TouchableOpacity,
@@ -8,29 +8,32 @@ import {
   Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { BlurView } from "expo-blur";
 import { haptics } from "../utils/haptics";
 
-export type TabKey = "feed" | "search" | "insights" | "devices";
+export type TabKey = "feed" | "ai" | "search" | "insights" | "devices";
 
 interface FloatingTabBarProps {
   activeTab: TabKey;
+  isAIActive?: boolean;
   unreadCount?: number;
   onTabSelect: (tab: TabKey) => void;
   onComposePress?: () => void;
+  onOpenAskElio?: () => void;
   translateY?: Animated.Value | Animated.AnimatedInterpolation<number>;
 }
 
 interface AnimatedTabItemProps {
   isActive: boolean;
-  activeIcon?: keyof typeof Ionicons.glyphMap;
-  inactiveIcon?: keyof typeof Ionicons.glyphMap;
+  activeIcon?: string;
+  inactiveIcon?: string;
   customIconSource?: any;
   iconSize: number;
   onPress: () => void;
   showBadge?: boolean;
   isCompose?: boolean;
+  iconColor?: string;
 }
 
 /**
@@ -49,98 +52,31 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
   iconSize,
   onPress,
   showBadge = false,
-  isCompose = false,
+  iconColor,
 }) => {
-  const scale = useRef(new Animated.Value(1)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
   const badgeScale = useRef(new Animated.Value(showBadge ? 1 : 0)).current;
-
-  // Twitter / Threads signature spring pop when tab becomes active
-  useEffect(() => {
-    if (isActive) {
-      scale.setValue(0.8);
-      Animated.spring(scale, {
-        toValue: 1,
-        damping: 10,
-        stiffness: 280,
-        mass: 0.6,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isActive]);
 
   // Spring animation for notification badge
   useEffect(() => {
     Animated.spring(badgeScale, {
       toValue: showBadge ? 1 : 0,
-      damping: 12,
+      damping: 16,
       stiffness: 280,
       mass: 0.6,
       useNativeDriver: true,
     }).start();
   }, [showBadge]);
 
-  const handlePressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.82,
-      damping: 18,
-      stiffness: 320,
-      useNativeDriver: true,
-    }).start();
-
-    if (isCompose) {
-      Animated.spring(rotate, {
-        toValue: 1,
-        damping: 12,
-        stiffness: 240,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      damping: 10,
-      stiffness: 280,
-      mass: 0.6,
-      useNativeDriver: true,
-    }).start();
-
-    if (isCompose) {
-      Animated.spring(rotate, {
-        toValue: 0,
-        damping: 12,
-        stiffness: 220,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  const spin = rotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "45deg"],
-  });
-
   return (
     <TouchableOpacity
-      activeOpacity={1}
+      activeOpacity={0.7}
       style={styles.tabItem}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       onPress={() => {
         haptics.selection();
         onPress();
       }}
     >
-      <Animated.View
-        style={[
-          styles.iconWrapper,
-          {
-            transform: [{ scale }, ...(isCompose ? [{ rotate: spin }] : [])],
-          },
-        ]}
-      >
+      <View style={styles.iconWrapper}>
         {customIconSource ? (
           <Image
             source={customIconSource}
@@ -153,10 +89,10 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
             resizeMode="contain"
           />
         ) : (
-          <Ionicons
-            name={isActive || isCompose ? activeIcon! : inactiveIcon!}
+          <PikaIcon
+            name={isActive ? activeIcon! : inactiveIcon!}
             size={iconSize}
-            color={isActive || isCompose ? "#FFFFFF" : "#71767B"}
+            color={iconColor ? iconColor : isActive ? "#FFFFFF" : "#71767B"}
           />
         )}
 
@@ -170,7 +106,7 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
           ]}
           pointerEvents="none"
         />
-      </Animated.View>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -185,9 +121,11 @@ const AnimatedTabItem: React.FC<AnimatedTabItemProps> = ({
  */
 export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   activeTab,
+  isAIActive = false,
   unreadCount = 0,
   onTabSelect,
   onComposePress,
+  onOpenAskElio,
   translateY,
 }) => {
   const insets = useSafeAreaInsets();
@@ -224,8 +162,9 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {/* 1. Home / Watchlist Feed */}
         <AnimatedTabItem
           isActive={activeTab === "feed"}
-          customIconSource={require("../assets/home.png")}
-          iconSize={28}
+          activeIcon="HomeSimpleSolidIcon"
+          inactiveIcon="HomeSimpleContrastIcon"
+          iconSize={26}
           onPress={() => {
             if (activeTab !== "feed") {
               onTabSelect("feed");
@@ -233,16 +172,15 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           }}
         />
 
-        {/* 2. Fast Clip (+) Button */}
+        {/* 2. Ask Elio (AI) Tab */}
         <AnimatedTabItem
-          isActive={false}
-          activeIcon="add-outline"
-          inactiveIcon="add-outline"
-          iconSize={28}
-          isCompose={true}
+          isActive={activeTab === "ai" || isAIActive}
+          activeIcon="LightningThunderElectricOnSolidIcon"
+          inactiveIcon="LightningThunderElectricOnIcon"
+          iconSize={26}
           onPress={() => {
-            if (onComposePress) {
-              onComposePress();
+            if (activeTab !== "ai") {
+              onTabSelect("ai");
             }
           }}
         />
@@ -250,7 +188,8 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {/* 3. Insights & Analytics */}
         <AnimatedTabItem
           isActive={activeTab === "insights"}
-          customIconSource={require("../assets/insight.png")}
+          activeIcon="bar-chart-solid"
+          inactiveIcon="bar-chart-outline"
           iconSize={26}
           showBadge={Boolean(unreadCount && unreadCount > 0)}
           onPress={() => {
@@ -263,8 +202,9 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {/* 4. Profile / Linked Devices */}
         <AnimatedTabItem
           isActive={activeTab === "devices"}
-          customIconSource={require("../assets/profile.png")}
-          iconSize={27}
+          activeIcon="UserSolidIcon"
+          inactiveIcon="UserContrastIcon"
+          iconSize={26}
           onPress={() => {
             if (activeTab !== "devices") {
               onTabSelect("devices");

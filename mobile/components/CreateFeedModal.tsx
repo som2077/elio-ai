@@ -10,7 +10,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
@@ -85,7 +85,9 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
   const toggleProfile = (handle: string) => {
     haptics.selection();
     setAddedProfiles((prev) =>
-      prev.includes(handle) ? prev.filter((h) => h !== handle) : [...prev, handle]
+      prev.includes(handle)
+        ? prev.filter((h) => h !== handle)
+        : [...prev, handle],
     );
   };
 
@@ -119,7 +121,7 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
               onClose();
             }}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <PikaIcon name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Create feed</Text>
           <View style={{ width: 36 }} />
@@ -154,8 +156,8 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
               <View style={styles.switchTextCol}>
                 <Text style={styles.switchTitle}>Public feed</Text>
                 <Text style={styles.switchSubtext}>
-                  When this is on, anyone can see and share this feed. The feed and its
-                  profiles may be suggested for others to follow.
+                  When this is on, anyone can see and share this feed. The feed
+                  and its profiles may be suggested for others to follow.
                 </Text>
               </View>
               <Switch
@@ -177,12 +179,19 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
             style={styles.addTopicBtn}
             onPress={() => haptics.light()}
           >
-            <Ionicons name="add" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <PikaIcon
+              name="add"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.addTopicBtnText}>Add profiles or topics</Text>
           </TouchableOpacity>
 
           {/* Suggested Profiles Section */}
-          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>Suggested profiles</Text>
+          <Text style={[styles.sectionHeader, { marginTop: 24 }]}>
+            Suggested profiles
+          </Text>
           <View style={styles.profilesCard}>
             {SUGGESTED_PROFILES.map((p, idx) => {
               const isAdded = addedProfiles.includes(p.handle);
@@ -191,10 +200,13 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
                   key={p.handle}
                   style={[
                     styles.profileRow,
-                    idx < SUGGESTED_PROFILES.length - 1 && styles.profileRowBorder,
+                    idx < SUGGESTED_PROFILES.length - 1 &&
+                      styles.profileRowBorder,
                   ]}
                 >
-                  <View style={[styles.profileAvatar, { backgroundColor: p.color }]}>
+                  <View
+                    style={[styles.profileAvatar, { backgroundColor: p.color }]}
+                  >
                     <Text style={styles.avatarInitial}>{p.initial}</Text>
                   </View>
 
@@ -202,7 +214,7 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
                     <View style={styles.profileHandleRow}>
                       <Text style={styles.profileHandle}>{p.handle}</Text>
                       {p.verified && (
-                        <Ionicons
+                        <PikaIcon
                           name="checkmark-circle"
                           size={14}
                           color={threadsTokens.colors.verifiedBlue}
@@ -215,7 +227,10 @@ export const CreateFeedModal: React.FC<CreateFeedModalProps> = ({
 
                   <TouchableOpacity
                     activeOpacity={0.75}
-                    style={[styles.addProfileBtn, isAdded && styles.addProfileBtnAdded]}
+                    style={[
+                      styles.addProfileBtn,
+                      isAdded && styles.addProfileBtnAdded,
+                    ]}
                     onPress={() => toggleProfile(p.handle)}
                   >
                     <Text

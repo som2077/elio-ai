@@ -7,20 +7,14 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import { ActivityCalendar } from "./ActivityCalendar";
 import { TimeRangeMenu, TimeRange } from "./TimeRangeMenu";
-import {
-  SavedVsWatchedAreaChart,
-  DailyPoint,
-} from "./SavedVsWatchedAreaChart";
+import { SavedVsWatchedAreaChart, DailyPoint } from "./SavedVsWatchedAreaChart";
 import { PlatformDonutChart } from "./PlatformDonutChart";
 import { ActivityStreakGrid } from "./ActivityStreakGrid";
-import {
-  toDateKey,
-  formatDisplayDate,
-} from "../services/dateAnalytics";
+import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
 import { haptics } from "../utils/haptics";
 
 export type InsightsTab = "overview" | "sources";
@@ -128,8 +122,18 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       // Compact display date: "4 Nov" or "Wed" for 7d
       const dayNum = d.getDate();
       const monthNames = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
       ];
       const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const displayDate =
@@ -163,16 +167,22 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       if (counts[p] !== undefined) counts[p]++;
     }
 
-    const meta: Record<
-      string,
-      { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }
-    > = {
-      youtube: { label: "YouTube", icon: "logo-youtube", color: "#FF0033" },
-      instagram: { label: "Instagram", icon: "logo-instagram", color: "#E1306C" },
-      twitter: { label: "X / Twitter", icon: "logo-twitter", color: "#1D9BF0" },
-      tiktok: { label: "TikTok", icon: "musical-notes", color: "#00F2FE" },
-      reddit: { label: "Reddit", icon: "logo-reddit", color: "#FF4500" },
-    };
+    const meta: Record<string, { label: string; icon: string; color: string }> =
+      {
+        youtube: { label: "YouTube", icon: "logo-youtube", color: "#FF0033" },
+        instagram: {
+          label: "Instagram",
+          icon: "logo-instagram",
+          color: "#E1306C",
+        },
+        twitter: {
+          label: "X / Twitter",
+          icon: "logo-twitter",
+          color: "#1D9BF0",
+        },
+        tiktok: { label: "TikTok", icon: "musical-notes", color: "#00F2FE" },
+        reddit: { label: "Reddit", icon: "logo-reddit", color: "#FF4500" },
+      };
 
     const total = videos.length;
     return Object.entries(counts)
@@ -182,7 +192,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         pct: total > 0 ? Math.round((count / total) * 100) : 0,
         ...(meta[key] || {
           label: key,
-          icon: "film-outline" as keyof typeof Ionicons.glyphMap,
+          icon: "film-outline" as string,
           color: "#8E8E93",
         }),
       }))
@@ -201,7 +211,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       list = list.filter((v) => v.is_favorite);
     }
     return list.sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
   }, [videos, clipFilter]);
 
@@ -233,7 +244,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             if (onBack) onBack();
           }}
         >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          <PikaIcon name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>Analytics & Insights</Text>
@@ -249,7 +260,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           <Text style={styles.rangeDropdownText}>
             {getRangeLabel(profileRange)}
           </Text>
-          <Ionicons
+          <PikaIcon
             name="chevron-down"
             size={14}
             color="#71767B"
@@ -317,7 +328,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           <View style={styles.metricCard}>
             <Text style={styles.metricCardLabel}>Saved</Text>
             <Text style={styles.metricCardValue}>{metrics.totalSaved}</Text>
-            <Text style={styles.metricCardSub}>In {getRangeLabel(profileRange)}</Text>
+            <Text style={styles.metricCardSub}>
+              In {getRangeLabel(profileRange)}
+            </Text>
           </View>
 
           <View style={styles.metricCard}>
@@ -413,7 +426,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             <View style={styles.clipsList}>
               {filteredClips.length === 0 ? (
                 <View style={styles.emptyClipsBox}>
-                  <Ionicons name="film-outline" size={28} color="#71767B" />
+                  <PikaIcon name="film-outline" size={28} color="#71767B" />
                   <Text style={styles.emptyClipsText}>
                     No clips found for this filter
                   </Text>
@@ -440,7 +453,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                         />
                       ) : (
                         <View style={styles.emptyThumbSquare}>
-                          <Ionicons
+                          <PikaIcon
                             name="videocam-outline"
                             size={20}
                             color="#71767B"
@@ -471,11 +484,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                             : styles.statusBadgeQueue,
                         ]}
                       >
-                        <Ionicons
+                        <PikaIcon
                           name={
-                            isWatched
-                              ? "checkmark-circle"
-                              : "ellipse-outline"
+                            isWatched ? "checkmark-circle" : "ellipse-outline"
                           }
                           size={11}
                           color={isWatched ? "#00BA7C" : "#1D9BF0"}

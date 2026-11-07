@@ -8,7 +8,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import { appleColors, appleRadii } from "../theme/appleTokens";
 import { motionTokens } from "../utils/motion";
@@ -95,7 +95,11 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
             />
           ) : (
             <View style={styles.fallbackMedia}>
-              <Ionicons name={platform.icon} size={44} color={platform.color || appleColors.textTertiary} />
+              <PikaIcon
+                name={platform.icon}
+                size={44}
+                color={platform.color || appleColors.textTertiary}
+              />
             </View>
           )}
 
@@ -117,14 +121,23 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
                 }}
                 style={styles.dismissBtn}
               >
-                <Ionicons name="close" size={16} color="rgba(255, 255, 255, 0.6)" />
+                <PikaIcon
+                  name="close"
+                  size={16}
+                  color="rgba(255, 255, 255, 0.6)"
+                />
               </TouchableOpacity>
             )}
           </View>
 
           {/* Center Play Button Floating Ring */}
           <View style={styles.playCenterRing}>
-            <Ionicons name="play" size={20} color="#FFFFFF" style={{ marginLeft: 3 }} />
+            <PikaIcon
+              name="play"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginLeft: 3 }}
+            />
           </View>
         </View>
 
@@ -132,7 +145,7 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
         <View style={styles.contentFooter}>
           <View style={styles.metaRow}>
             <View style={styles.platformCapsule}>
-              <Ionicons name={platform.icon} size={12} color={platform.color} />
+              <PikaIcon name={platform.icon} size={12} color={platform.color} />
               <Text style={styles.platformName}>
                 {video.platform ? video.platform.toUpperCase() : "VIDEO"}
               </Text>
@@ -152,7 +165,7 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
           {/* 1-Tap Watch Action Bar */}
           <View style={styles.actionRow}>
             <View style={styles.watchNowBtn}>
-              <Ionicons name="play-circle" size={15} color="#070A11" />
+              <PikaIcon name="play-circle" size={15} color="#070A11" />
               <Text style={styles.watchNowText}>Watch Now</Text>
             </View>
             <Text style={styles.tapPrompt}>Opens native app</Text>

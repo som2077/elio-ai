@@ -21,15 +21,31 @@ export interface SavedVideoPayload {
   source_client: 'browser_extension' | 'mobile_share';
   device_id?: string;
   source_device_name?: string;
+  user_notes?: string;
 }
 
 /**
  * Strips tracking query parameters across all platforms
  */
 export function cleanVideoUrl(rawUrl: string, platform: SocialPlatform): { cleanUrl: string; videoId?: string } {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return { cleanUrl: '' };
+  }
+
+  const trimmed = rawUrl.trim();
+  // Security guard: Reject non-http(s) schemes like javascript:, data:, file:
+  if (!trimmed.startsWith('https://') && !trimmed.startsWith('http://') && !trimmed.startsWith('/')) {
+    return { cleanUrl: '' };
+  }
+
   try {
     const base = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://www.instagram.com';
     const url = new URL(rawUrl, base);
+
+    // Reject dangerous protocols
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { cleanUrl: '' };
+    }
 
     if (platform === 'youtube') {
       if (url.pathname.includes('/watch')) {
@@ -138,6 +154,6 @@ export function cleanVideoUrl(rawUrl: string, platform: SocialPlatform): { clean
 
     return { cleanUrl: url.toString() };
   } catch {
-    return { cleanUrl: rawUrl };
+    return { cleanUrl: trimmed.startsWith("http") ? trimmed : "" };
   }
 }

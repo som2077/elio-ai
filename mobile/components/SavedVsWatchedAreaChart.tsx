@@ -7,7 +7,7 @@ import {
   Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { TimeRange } from "./TimeRangeMenu";
 import { haptics } from "../utils/haptics";
 
@@ -34,26 +34,22 @@ interface SavedVsWatchedAreaChartProps {
  * - High-Precision Gridlines and Y-axis scaling
  * - Twitter Lights-Out Dark Mode Palette (#16181C, #2F3336)
  */
-export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = ({
-  data,
-  timeRange,
-}) => {
+export const SavedVsWatchedAreaChart: React.FC<
+  SavedVsWatchedAreaChartProps
+> = ({ data, timeRange }) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   if (!data || data.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="bar-chart-outline" size={32} color="#71767B" />
+        <PikaIcon name="bar-chart-outline" size={32} color="#71767B" />
         <Text style={styles.emptyText}>No activity in this time period</Text>
       </View>
     );
   }
 
   // Maximum value for scaling (at least 3 to maintain baseline)
-  const maxVal = Math.max(
-    ...data.map((d) => Math.max(d.saved, d.watched)),
-    3
-  );
+  const maxVal = Math.max(...data.map((d) => Math.max(d.saved, d.watched)), 3);
   const midVal = Math.ceil(maxVal / 2);
 
   const totalSaved = data.reduce((acc, d) => acc + d.saved, 0);
@@ -64,10 +60,10 @@ export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = (
     timeRange === "7d"
       ? 1
       : timeRange === "14d"
-      ? 2
-      : timeRange === "30d"
-      ? 5
-      : 14;
+        ? 2
+        : timeRange === "30d"
+          ? 5
+          : 14;
 
   const activePoint =
     selectedIndex !== null && selectedIndex >= 0 && selectedIndex < data.length
@@ -139,8 +135,7 @@ export const SavedVsWatchedAreaChart: React.FC<SavedVsWatchedAreaChartProps> = (
             const isSelected = selectedIndex === index;
             const savedHeightPct = Math.max((item.saved / maxVal) * 100, 0);
             const watchedHeightPct = Math.max((item.watched / maxVal) * 100, 0);
-            const showLabel =
-              index % step === 0 || index === data.length - 1;
+            const showLabel = index % step === 0 || index === data.length - 1;
 
             return (
               <TouchableOpacity

@@ -7,7 +7,8 @@
 ---
 
 ## 1. Intent & The "Why"
-The current mobile app UI presents all features on a single flat scrolling view, with utility actions (QR scanner, device management, activity calendar, logout) compressed into a single top header bar. 
+
+The current mobile app UI presents all features on a single flat scrolling view, with utility actions (QR scanner, device management, activity calendar, logout) compressed into a single top header bar.
 
 This redesign transforms Elio AI into a world-class, media-first video watchlist and recall tool inspired by Mobbin's top curation and productivity apps. It separates concerns across clear views, introduces a floating frosted glass bottom dock, provides a Cosmos-style dual layout (Visual 2-Column Poster Grid vs Editorial List), cinematic spotlight hero card, and real-time instant search.
 
@@ -16,6 +17,7 @@ This redesign transforms Elio AI into a world-class, media-first video watchlist
 ## 2. Goals & Non-Goals
 
 ### Goals
+
 - **Floating Glass Capsule Dock (Bottom Tab Bar):** Detached, elevated bottom navigation (`Watchlist`, `Search`, `Activity / Insights`, `Devices & Sync`).
 - **Dual Feed Layout Switcher:** Instant 1-tap toggle between **2-Column Media Poster Grid** (Cosmos-style) and **Editorial List View** (detailed metadata card).
 - **Cinematic Spotlight Card:** Prominent "Up Next" hero card featuring the latest unread saved video with ambient backplate and 1-tap "Watch Now" action.
@@ -24,10 +26,12 @@ This redesign transforms Elio AI into a world-class, media-first video watchlist
 - **Tactile Multimodal Haptics:** Polished haptic feedback on tab changes, card taps, status toggles, and layout switches.
 
 ### Non-Goals
+
 - Changing backend Supabase schemas or video sync data contracts.
 - Altering Chrome extension sync worker logic.
 
 ### Anti-Goals
+
 - Generic, boxy SaaS templates with identical borders and washed-out gray backgrounds.
 - Cluttered headers with 5+ competing icon buttons.
 - Slow render performance or layout jumpiness during tab switches.

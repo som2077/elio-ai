@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Animated,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import { appleColors, threadsTokens } from "../theme/appleTokens";
 import { PlatformIcon } from "./PlatformIcon";
 import { haptics } from "../utils/haptics";
 import { motionTokens } from "../utils/motion";
+import { fetchVideoAIMetadata } from "../services/aiService";
+import type { VideoAIMetadata } from "../types/ai";
 
 interface VideoCardProps {
   video: SavedVideo;
@@ -42,7 +44,25 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     appleColors.platforms.youtube;
 
   const [imageError, setImageError] = useState(false);
+  const [aiMeta, setAiMeta] = useState<VideoAIMetadata | null>(video.ai_metadata || null);
+  const [showAiDigest, setShowAiDigest] = useState(false);
   const cardScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    let isMounted = true;
+    if (video.ai_metadata) {
+      setAiMeta(video.ai_metadata);
+    } else {
+      fetchVideoAIMetadata(video.id).then((meta) => {
+        if (isMounted && meta) {
+          setAiMeta(meta);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [video.id, video.ai_metadata]);
 
   const handleCardPressIn = () => {
     Animated.spring(cardScale, {
@@ -62,7 +82,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }).start();
   };
 
-  const getPlatformIcon = (p: string): keyof typeof Ionicons.glyphMap => {
+  const getPlatformIcon = (p: string): string => {
     switch (p) {
       case "youtube":
         return "logo-youtube";
@@ -119,7 +139,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     !video.thumbnail_url?.includes(".mp4") &&
     !video.thumbnail_url?.includes(".m3u8");
 
-  const creatorDisplay = video.creator_name || `${platformConfig.label} Creator`;
+  const creatorDisplay =
+    video.creator_name || `${platformConfig.label} Creator`;
   const cleanHandle = (video.creator_name || platform)
     .replace(/\s+/g, "")
     .toLowerCase();
@@ -148,7 +169,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               <Text style={styles.authorName} numberOfLines={1}>
                 {creatorDisplay}
               </Text>
-              <Ionicons
+              <PikaIcon
                 name="checkmark-circle"
                 size={14}
                 color="#1D9BF0"
@@ -158,7 +179,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 @{cleanHandle}
               </Text>
               <Text style={styles.dotSeparator}>·</Text>
-              <Text style={styles.timeText}>{getRelativeTime(video.created_at)}</Text>
+              <Text style={styles.timeText}>
+                {getRelativeTime(video.created_at)}
+              </Text>
             </View>
           </View>
 
@@ -171,7 +194,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               if (onLongPress) onLongPress();
             }}
           >
-            <Ionicons name="ellipsis-horizontal" size={17} color="#71767B" />
+            <PikaIcon name="ellipsis-horizontal" size={17} color="#71767B" />
           </TouchableOpacity>
         </View>
 
@@ -198,6 +221,34 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </Text>
         </TouchableOpacity>
 
+        {/* 2.1 AI Digest Teaser Pill & Snippet */}
+        {aiMeta?.tldw && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.aiDigestContainer}
+            onPress={() => {
+              haptics.selection();
+              setShowAiDigest(!showAiDigest);
+            }}
+          >
+            <View style={styles.aiDigestHeader}>
+              <View style={styles.aiSparkleBadge}>
+                <PikaIcon name="sparkles" size={12} color="#A78BFA" />
+                <Text style={styles.aiBadgeText}>30s Digest</Text>
+              </View>
+              <Text style={styles.aiExpandHint}>
+                {showAiDigest ? "hide" : "tap to expand"}
+              </Text>
+            </View>
+            <Text
+              style={styles.aiTldwText}
+              numberOfLines={showAiDigest ? 8 : 2}
+            >
+              {aiMeta.tldw}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* 3. Media Preview ("nechay jha per video hota ha") */}
         <TouchableOpacity
           activeOpacity={0.92}
@@ -222,11 +273,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             />
           ) : (
             <View style={styles.fallbackThumbnail}>
-              <PlatformIcon
-                platform={platform}
-                size={44}
-                color="#71767B"
-              />
+              <PlatformIcon platform={platform} size={44} color="#71767B" />
             </View>
           )}
 
@@ -253,7 +300,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
           {/* Frosted Play Button Circle */}
           <View style={styles.playButtonCircle}>
-            <Ionicons
+            <PikaIcon
               name="play"
               size={18}
               color="#FFFFFF"
@@ -409,5 +456,42 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.3)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  aiDigestContainer: {
+    marginTop: 4,
+    marginBottom: 10,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(167, 139, 250, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.22)",
+  },
+  aiDigestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  aiSparkleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  aiBadgeText: {
+    color: "#C4B5FD",
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: 4,
+    letterSpacing: -0.2,
+  },
+  aiExpandHint: {
+    color: "#71767B",
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  aiTldwText: {
+    color: "#E2E8F0",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "400",
   },
 });

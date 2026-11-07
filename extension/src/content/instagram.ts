@@ -56,19 +56,48 @@ function showElioToast(title: string, message: string, isSuccess: boolean = true
       document.body.appendChild(toast);
     }
 
-    toast.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 28px; height: 28px; border-radius: 8px; background: ${
-          isSuccess ? 'rgba(48, 209, 88, 0.2)' : 'rgba(255, 159, 10, 0.2)'
-        }; display: flex; align-items: center; justify-content: center; font-size: 15px; color: ${
-          isSuccess ? '#30d158' : '#ff9f0a'
-        };">✦</div>
-        <div>
-          <div style="font-weight: 600; font-size: 13px; color: #ffffff; letter-spacing: -0.2px;">${title}</div>
-          <div style="font-size: 11px; color: #a1a1aa; margin-top: 2px;">${message}</div>
-        </div>
-      </div>
-    `;
+    // Security: Clear existing nodes safely without innerHTML
+    while (toast.firstChild) {
+      toast.removeChild(toast.firstChild);
+    }
+
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.gap = '12px';
+
+    const iconBox = document.createElement('div');
+    iconBox.style.width = '28px';
+    iconBox.style.height = '28px';
+    iconBox.style.borderRadius = '8px';
+    iconBox.style.background = isSuccess ? 'rgba(48, 209, 88, 0.2)' : 'rgba(255, 159, 10, 0.2)';
+    iconBox.style.display = 'flex';
+    iconBox.style.alignItems = 'center';
+    iconBox.style.justifyContent = 'center';
+    iconBox.style.fontSize = '15px';
+    iconBox.style.color = isSuccess ? '#30d158' : '#ff9f0a';
+    iconBox.textContent = '✦';
+
+    const textBox = document.createElement('div');
+
+    const titleEl = document.createElement('div');
+    titleEl.style.fontWeight = '600';
+    titleEl.style.fontSize = '13px';
+    titleEl.style.color = '#ffffff';
+    titleEl.style.letterSpacing = '-0.2px';
+    titleEl.textContent = title;
+
+    const msgEl = document.createElement('div');
+    msgEl.style.fontSize = '11px';
+    msgEl.style.color = '#a1a1aa';
+    msgEl.style.marginTop = '2px';
+    msgEl.textContent = message;
+
+    textBox.appendChild(titleEl);
+    textBox.appendChild(msgEl);
+    container.appendChild(iconBox);
+    container.appendChild(textBox);
+    toast.appendChild(container);
 
     Object.assign(toast.style, {
       position: 'fixed',
@@ -498,6 +527,32 @@ function extractInstagramTitle(container: HTMLElement, creator: string, isReel: 
 }
 
 /**
+ * Extracts full, un-truncated caption text for AI digest synthesis
+ */
+function extractInstagramCaption(container: HTMLElement, creator: string): string {
+  try {
+    const rawCreator = creator.replace(/^@/, '').toLowerCase().trim();
+    const dirSpans = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'h1, div[class*="caption"] span, span._aacl._aaco._aacu._aacx, span[dir="auto"], div[dir="auto"]'
+      )
+    );
+
+    for (const el of dirSpans) {
+      if (el.closest('a[href*="/audio/"], a[href*="/reels/audio/"], div[role="marquee"], button, [role="button"]')) {
+        continue;
+      }
+      const raw = (el.textContent || '').trim();
+      const cleaned = cleanCaption(raw, creator);
+      if (cleaned.length > 10 && !isGarbageTitle(cleaned)) {
+        return cleaned;
+      }
+    }
+  } catch {}
+  return '';
+}
+
+/**
  * Builds normalized Instagram post or reel URL
  */
 function buildInstagramUrl(type: string, code: string): string {
@@ -692,6 +747,7 @@ function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | nu
   const isReel = finalCleanUrl.includes('/reel') || Boolean(videoEl);
 
   // Extract rich real title & real thumbnail
+  const caption = extractInstagramCaption(container, creator);
   const title = extractInstagramTitle(container, creator, isReel);
   const thumbnail = findInstagramMediaThumbnail(container);
 
@@ -704,6 +760,7 @@ function scrapeInstagramPost(actionElement: HTMLElement): SavedVideoPayload | nu
     title: title,
     creator_name: creator,
     thumbnail_url: thumbnail,
+    user_notes: caption || undefined,
     source_client: 'browser_extension',
   };
 }

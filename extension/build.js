@@ -22,7 +22,8 @@ if (fs.existsSync(envPath)) {
 }
 
 const supabaseUrl = envVars.SUPABASE_URL || process.env.SUPABASE_URL || "";
-const supabaseAnonKey = envVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+const supabaseAnonKey =
+  envVars.SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
 
 const entries = [
   {
@@ -119,7 +120,10 @@ async function run() {
   if (fs.existsSync(srcIcons)) {
     fs.mkdirSync(distIcons, { recursive: true });
     for (const iconFile of fs.readdirSync(srcIcons)) {
-      fs.copyFileSync(resolve(srcIcons, iconFile), resolve(distIcons, iconFile));
+      fs.copyFileSync(
+        resolve(srcIcons, iconFile),
+        resolve(distIcons, iconFile),
+      );
     }
   }
 
@@ -130,7 +134,9 @@ async function run() {
     fs.copyFileSync(distPopupJs, srcPopupJs);
   }
 
-  console.log("✓ Elio AI Extension built successfully with environment variables injected.");
+  console.log(
+    "✓ Elio AI Extension built successfully with environment variables injected.",
+  );
 }
 
 run();

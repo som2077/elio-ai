@@ -54,3 +54,13 @@ mobile/WhatsApp Unknown*/
 mobile/assets/video_4k_upscaled.json
 mobile/assets/video_8k_uhd_final.mp4
 mobile/assets/gemini_generated_video_b2132d12.mp4
+
+# Cursor & Agent Skills
+.cursor/skills/
+*/.cursor/skills/
+.agent/skills/
+*/.agent/skills/
+.agents/skills/
+*/.agents/skills/
+.agent/
+*/.agent/
