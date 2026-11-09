@@ -1,15 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet } from "react-native";
 import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { appleColors } from "../theme/appleTokens";
 import { StartupVideoSplash } from "../components/StartupVideoSplash";
+import { analytics } from "../services/analytics";
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
   const pathname = usePathname();
   const isShareScreen = pathname === "/share";
+
+  useEffect(() => {
+    // Initialize Mixpanel analytics on app startup
+    analytics.init();
+  }, []);
 
   return (
     <SafeAreaProvider style={styles.container}>

@@ -9,6 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { PikaIcon } from "./PikaIcon";
+import { PlatformIcon } from "./PlatformIcon";
 import { SavedVideo } from "../types/video";
 import { appleColors, appleRadii } from "../theme/appleTokens";
 import { motionTokens } from "../utils/motion";
@@ -145,7 +146,11 @@ export const HeroSpotlightCard: React.FC<HeroSpotlightCardProps> = ({
         <View style={styles.contentFooter}>
           <View style={styles.metaRow}>
             <View style={styles.platformCapsule}>
-              <PikaIcon name={platform.icon} size={12} color={platform.color} />
+              <PlatformIcon
+                platform={video.platform}
+                size={13}
+                style={{ marginRight: 5 }}
+              />
               <Text style={styles.platformName}>
                 {video.platform ? video.platform.toUpperCase() : "VIDEO"}
               </Text>

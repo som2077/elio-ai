@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { PikaIcon } from "./PikaIcon";
+import { PlatformIcon } from "./PlatformIcon";
 import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
@@ -80,40 +81,37 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   subtitle,
   platform,
-  onResetPlatform,
+  onResetPlatform: _onResetPlatform,
 }) => {
-  const isPlatformFilter = platform && platform !== "all";
-  const platformMeta = isPlatformFilter ? PLATFORM_META[platform] : null;
+  const isPlatformFilter = Boolean(platform && platform !== "all");
+  const platformMeta = isPlatformFilter ? PLATFORM_META[platform!] : null;
+
+  const displayTitle =
+    title ||
+    (platformMeta
+      ? `No ${platformMeta.label} clips yet`
+      : "No saved clips yet");
+
+  const displaySubtitle =
+    subtitle ||
+    (platformMeta
+      ? `Clips you save from ${platformMeta.label} will appear here.`
+      : "Posts that you save will appear here.");
 
   return (
     <View style={styles.container}>
-      {platformMeta && (
-        <View
-          style={[
-            styles.platformIconCircle,
-            { backgroundColor: platformMeta.bgColor },
-          ]}
-        >
-          <PikaIcon
-            name={platformMeta.icon}
-            size={30}
-            color={platformMeta.color}
-          />
-        </View>
-      )}
+      {/* Clean Icon (No circle behind) */}
+      <View style={styles.platformIconWrapper}>
+        <PlatformIcon
+          platform={isPlatformFilter ? (platform || "") : "all"}
+          size={isPlatformFilter ? 48 : 36}
+          color="#FFFFFF"
+        />
+      </View>
 
-      {platformMeta && (
-        <Text style={styles.platformTitle}>
-          {title || `No ${platformMeta.label} clips yet`}
-        </Text>
-      )}
+      <Text style={styles.platformTitle}>{displayTitle}</Text>
 
-      <Text style={styles.messageText}>
-        {subtitle ||
-          (platformMeta
-            ? `Clips you save from ${platformMeta.label} will appear here.`
-            : "Posts that you save will appear here.")}
-      </Text>
+      <Text style={styles.messageText}>{displaySubtitle}</Text>
 
       <View style={styles.actionsRow}>
         <TouchableOpacity
@@ -127,19 +125,6 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           <PikaIcon name="qr-code-outline" size={16} color="#FFFFFF" />
           <Text style={styles.linkBtnText}>Link Desktop Extension</Text>
         </TouchableOpacity>
-
-        {isPlatformFilter && onResetPlatform && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.resetBtn}
-            onPress={() => {
-              haptics.selection();
-              onResetPlatform();
-            }}
-          >
-            <Text style={styles.resetBtnText}>View Queue</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -152,10 +137,7 @@ const styles = StyleSheet.create({
     paddingVertical: 90,
     paddingHorizontal: 32,
   },
-  platformIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  platformIconWrapper: {
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
@@ -196,14 +178,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
-  },
-  resetBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  resetBtnText: {
-    fontSize: 13.5,
-    fontWeight: "600",
-    color: "#1D9BF0",
   },
 });

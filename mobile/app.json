@@ -7,15 +7,15 @@
     "icon": "./assets/icon.png",
     "scheme": "elio-ai",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#070A13",
+    "backgroundColor": "#000000",
     "androidStatusBar": {
       "barStyle": "light-content",
-      "backgroundColor": "#070A13",
-      "translucent": false
+      "backgroundColor": "#000000",
+      "translucent": true
     },
     "splash": {
       "image": "./assets/splash.png",
-      "backgroundColor": "#0A0F1D"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,

@@ -5,11 +5,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Switch,
   Dimensions,
 } from "react-native";
-import { PikaIcon } from "./PikaIcon";
 import { PlatformIcon } from "./PlatformIcon";
+import { AppleSwitch } from "./AppleSwitch";
+import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { IndustryBottomSheet } from "./IndustryBottomSheet";
 
@@ -116,97 +116,34 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
       title="Platforms"
       subtitle="Tap platform to view clips, or toggle to pin to top bar"
       maxHeightRatio={0.88}
+      showHandle={true}
     >
       {/* Scrollable Platforms List */}
       <ScrollView
         style={styles.scrollList}
         contentContainerStyle={styles.scrollListContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* "Queue (All)" Row */}
-        <View
-          style={[
-            styles.platformRow,
-            selectedPlatform === "all" && styles.platformRowActive,
-          ]}
-        >
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.platformInfo}
-            onPress={() => handleSelect("all")}
-          >
-            <View
-              style={[
-                styles.iconCircle,
-                { backgroundColor: "rgba(29, 155, 240, 0.15)" },
-              ]}
-            >
-              <PikaIcon name="layers-outline" size={20} color="#1D9BF0" />
-            </View>
-            <View style={styles.textContainer}>
-              <View style={styles.labelRow}>
-                <Text style={styles.platformLabel}>Queue (All)</Text>
-                {selectedPlatform === "all" && (
-                  <View style={styles.activeTag}>
-                    <Text style={styles.activeTagText}>Active</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.pinnedStatus}>
-                {platformCounts?.all ?? 0} saved clips
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <Switch
-            value={true}
-            disabled={true}
-            trackColor={{ false: "#2F3336", true: "rgba(29, 155, 240, 0.55)" }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-
         {/* Individual Platforms */}
         {ALL_AVAILABLE_PLATFORMS.map((platform) => {
           const isPinned = pinnedPlatforms.includes(platform.key);
-          const isSelected = selectedPlatform === platform.key;
           const count = platformCounts ? platformCounts[platform.key] || 0 : 0;
 
           return (
-            <View
-              key={platform.key}
-              style={[
-                styles.platformRow,
-                isSelected && styles.platformRowActive,
-              ]}
-            >
+            <View key={platform.key} style={styles.platformRow}>
               {/* Tappable Left Area (Switches feed to this platform) */}
               <TouchableOpacity
                 activeOpacity={0.7}
+                delayPressIn={0}
                 style={styles.platformInfo}
                 onPress={() => handleSelect(platform.key)}
               >
-                <View
-                  style={[
-                    styles.iconCircle,
-                    { backgroundColor: platform.bgColor },
-                  ]}
-                >
-                  <PlatformIcon
-                    platform={platform.key}
-                    size={20}
-                    color={platform.color}
-                  />
+                <View style={styles.iconBox}>
+                  <PlatformIcon platform={platform.key} size={24} />
                 </View>
                 <View style={styles.textContainer}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.platformLabel}>{platform.label}</Text>
-                    {isSelected && (
-                      <View style={styles.activeTag}>
-                        <Text style={styles.activeTagText}>Active</Text>
-                      </View>
-                    )}
-                  </View>
+                  <Text style={styles.platformLabel}>{platform.label}</Text>
                   <Text style={styles.pinnedStatus}>
                     {count > 0
                       ? `${count} saved clip${count === 1 ? "" : "s"}`
@@ -215,15 +152,16 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
                 </View>
               </TouchableOpacity>
 
-              {/* Right Switch (Toggles pinned state on top bar) */}
-              <Switch
+              {/* Right Apple Switch (Toggles pinned state on top bar) */}
+              <AppleSwitch
                 value={isPinned}
+                activeColor="#FFFFFF"
+                activeThumbColor="#000000"
+                inactiveColor="rgba(255, 255, 255, 0.16)"
+                inactiveThumbColor="#FFFFFF"
                 onValueChange={() => {
-                  haptics.selection();
                   onTogglePlatform(platform.key);
                 }}
-                trackColor={{ false: "#2F3336", true: "#1D9BF0" }}
-                thumbColor="#FFFFFF"
               />
             </View>
           );
@@ -231,40 +169,41 @@ export const PlatformFilterModal: React.FC<PlatformFilterModalProps> = ({
       </ScrollView>
 
       {/* Bottom "Done" Action Button */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.doneButton}
-        onPress={() => {
-          haptics.medium();
-          onClose();
-        }}
-      >
-        <Text style={styles.doneButtonText}>Done</Text>
-      </TouchableOpacity>
+      <View style={styles.bottomActionZone}>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          delayPressIn={0}
+          style={styles.doneButton}
+          onPress={() => {
+            haptics.medium();
+            onClose();
+          }}
+        >
+          <Text style={styles.doneButtonText}>Done</Text>
+        </TouchableOpacity>
+      </View>
     </IndustryBottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
   scrollList: {
-    maxHeight: Math.min(SCREEN_HEIGHT * 0.54, 490),
+    maxHeight: Math.min(SCREEN_HEIGHT * 0.52, 450),
     marginTop: 6,
   },
   scrollListContent: {
-    paddingBottom: 10,
+    paddingBottom: 16,
   },
   platformRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 11,
-    paddingHorizontal: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255, 255, 255, 0.05)",
-    borderRadius: 12,
-  },
-  platformRowActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: 14,
+    marginVertical: 1.5,
   },
   platformInfo: {
     flexDirection: "row",
@@ -272,10 +211,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  iconBox: {
+    width: 34,
+    height: 34,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -283,52 +221,38 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
   },
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   platformLabel: {
-    color: "#FFFFFF",
+    color: "#F3F5F7",
     fontSize: 15.5,
     fontWeight: "600",
     letterSpacing: -0.2,
   },
-  activeTag: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: "rgba(29, 155, 240, 0.2)",
-    borderWidth: 1,
-    borderColor: "rgba(29, 155, 240, 0.35)",
-  },
-  activeTagText: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    color: "#1D9BF0",
-  },
   pinnedStatus: {
-    color: "#71767B",
+    color: "#777777",
     fontSize: 12,
     marginTop: 2,
   },
+  bottomActionZone: {
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: "transparent",
+  },
   doneButton: {
-    backgroundColor: "#FFFFFF",
+    width: "100%",
     height: 48,
     borderRadius: 24,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 14,
-    marginBottom: 4,
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 10,
+    elevation: 4,
   },
   doneButtonText: {
     color: "#000000",
-    fontSize: 15.5,
+    fontSize: 16,
     fontWeight: "700",
     letterSpacing: -0.2,
   },

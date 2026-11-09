@@ -41,6 +41,8 @@ import { ToastHUD, ToastConfig } from "../components/ToastHUD";
 import { openVideoDirectly } from "../services/deepLink";
 import { AuthScreen } from "../components/AuthScreen";
 import { QRScannerModal } from "../components/QRScannerModal";
+import { FirstTimeScanPromptModal } from "../components/FirstTimeScanPromptModal";
+import { onSplashCompleted } from "../components/StartupVideoSplash";
 import { LinkedDevicesModal } from "../components/LinkedDevicesModal";
 import {
   AppleHeader,
@@ -63,6 +65,14 @@ import {
 } from "../services/shareHandler";
 import { syncWidgetsData } from "../services/widgetSync";
 import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
+import * as Notifications from "expo-notifications";
+import {
+  scheduleLikedVideoReminder,
+  cancelLikedVideoReminder,
+  registerForPushNotificationsAsync,
+  sendTestNotificationNow,
+} from "../services/notifications";
+import { analytics } from "../services/analytics";
 
 interface ScrollToTopButtonProps {
   onPress: () => void;
@@ -125,6 +135,7 @@ export default function HomeScreen() {
   const [session, setSession] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
+  const [showFirstTimeScanModal, setShowFirstTimeScanModal] = useState(false);
   const [showDevicesModal, setShowDevicesModal] = useState(false);
 
   // Threads modals & drawers
@@ -159,6 +170,9 @@ export default function HomeScreen() {
   const lastScrollY = useRef(0);
   const accumulatedDelta = useRef(0);
   const flatListRef = useRef<FlatList<SavedVideo>>(null);
+
+  // Meta Threads / Instagram real-time pull-to-refresh
+  const pullDistanceAnim = useRef(new Animated.Value(0)).current;
 
   // TabBar slides down out of view when header hides
   const tabBarTranslateY = headerTranslateY.interpolate({
@@ -198,6 +212,7 @@ export default function HomeScreen() {
       showPlatformModal ||
       showAskElioModal ||
       showScanner ||
+      showFirstTimeScanModal ||
       showQuickClipModal ||
       showDevicesModal,
   );
@@ -299,6 +314,13 @@ export default function HomeScreen() {
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const currentY = event.nativeEvent.contentOffset.y;
+
+    // iOS rubber-band bounce pull-to-refresh real-time tracking
+    if (Platform.OS === "ios" && currentY < 0 && !refreshing) {
+      const pullDist = Math.min(68, Math.abs(currentY) * 0.72);
+      pullDistanceAnim.setValue(pullDist);
+    }
+
     const diff = currentY - lastScrollY.current;
 
     // 1. Top of feed / bounce protection: always show header & navbar immediately
@@ -329,6 +351,28 @@ export default function HomeScreen() {
     }
 
     lastScrollY.current = currentY;
+  };
+
+  const handleRefresh = async () => {
+    haptics.medium();
+    setRefreshing(true);
+    Animated.spring(pullDistanceAnim, {
+      toValue: 46,
+      friction: 7,
+      tension: 70,
+      useNativeDriver: true,
+    }).start();
+    try {
+      await fetchVideos();
+    } finally {
+      Animated.spring(pullDistanceAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 85,
+        useNativeDriver: true,
+      }).start();
+      setRefreshing(false);
+    }
   };
 
   // Always keep header & tab bar visible when navigating to AI, Insights, or Devices
@@ -399,6 +443,18 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Spring pullDistanceAnim back to 0 when refreshing completes
+  useEffect(() => {
+    if (!refreshing) {
+      Animated.spring(pullDistanceAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 85,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [refreshing]);
 
   // Dynamic Island Toast HUD & Detail Modal states
   const [toast, setToast] = useState<ToastConfig | null>(null);
@@ -487,6 +543,66 @@ export default function HomeScreen() {
     };
   }, [session?.user?.id]);
 
+  // Check if first-time authenticated user should be prompted for desktop camera scan
+  const checkFirstTimeScanPrompt = async (userId: string) => {
+    try {
+      const storageKey = `@elio_first_time_login_scan_shown_${userId}`;
+      const hasSeen = await AsyncStorage.getItem(storageKey);
+      if (hasSeen === "true") {
+        return;
+      }
+
+      // Check if user already has any linked desktop devices in Supabase
+      const { data: linked } = await supabase
+        .from("linked_devices")
+        .select("id")
+        .eq("user_id", userId)
+        .limit(1);
+
+      if (linked && linked.length > 0) {
+        await AsyncStorage.setItem(storageKey, "true");
+        return;
+      }
+
+      // Trigger prompt smoothly after startup video splash completes
+      onSplashCompleted(() => {
+        setTimeout(() => {
+          setShowFirstTimeScanModal(true);
+        }, 500);
+      });
+    } catch (e) {
+      console.warn("[Elio AI] Check first-time scan error:", e);
+    }
+  };
+
+  const handleFirstTimeScanPress = async () => {
+    if (session?.user?.id) {
+      await AsyncStorage.setItem(
+        `@elio_first_time_login_scan_shown_${session.user.id}`,
+        "true",
+      );
+    }
+    setShowFirstTimeScanModal(false);
+    // Smooth transition into camera QR scanner
+    setTimeout(() => {
+      setShowScanner(true);
+    }, 200);
+  };
+
+  const handleFirstTimeSkipPress = async () => {
+    if (session?.user?.id) {
+      await AsyncStorage.setItem(
+        `@elio_first_time_login_scan_shown_${session.user.id}`,
+        "true",
+      );
+    }
+    setShowFirstTimeScanModal(false);
+    setToast({
+      message: "You can link your browser anytime from the Devices tab! 💻✨",
+      type: "info",
+    });
+  };
+
   // Auth session listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
@@ -494,6 +610,9 @@ export default function HomeScreen() {
       setAuthLoading(false);
       if (currentSession) {
         fetchVideos(currentSession.user.id);
+        checkFirstTimeScanPrompt(currentSession.user.id);
+        registerForPushNotificationsAsync(currentSession.user.id);
+        analytics.identify(currentSession.user.id, { email: currentSession.user.email });
         // Sync any pending clips shared while unauthenticated
         flushPendingShares(currentSession.user.id).then((synced) => {
           if (synced > 0) {
@@ -514,8 +633,12 @@ export default function HomeScreen() {
       if (newSession) {
         fetchVideos(newSession.user.id);
         flushPendingShares(newSession.user.id);
+        checkFirstTimeScanPrompt(newSession.user.id);
+        registerForPushNotificationsAsync(newSession.user.id);
+        analytics.identify(newSession.user.id, { email: newSession.user.email });
       } else {
         setVideos([]);
+        analytics.reset();
       }
     });
 
@@ -582,6 +705,52 @@ export default function HomeScreen() {
     }
   }, [session?.user?.id]);
 
+  // Helper to open a video detail sheet by its ID (e.g. from notification click)
+  const openVideoById = async (videoId: string) => {
+    let target = videos.find((v) => v.id === videoId);
+    if (!target) {
+      const { data } = await supabase
+        .from("saved_videos")
+        .select("*")
+        .eq("id", videoId)
+        .maybeSingle();
+      if (data) {
+        target = data as SavedVideo;
+      }
+    }
+    if (target) {
+      setDetailVideo(target);
+      setShowDetailSheet(true);
+    }
+  };
+
+  // Notification tap listener (handles 'liked but not watched' reminders)
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response?.notification?.request?.content?.data;
+        if (data?.videoId && data?.type === "liked_not_watched") {
+          analytics.trackNotificationClicked(data.videoId, data.slot);
+          openVideoById(data.videoId);
+        }
+      }
+    );
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response?.notification?.request?.content?.data;
+        if (data?.videoId && data?.type === "liked_not_watched") {
+          analytics.trackNotificationClicked(data.videoId, data.slot);
+          openVideoById(data.videoId);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [videos]);
+
   const toggleStatus = async (video: SavedVideo) => {
     const newStatus: WatchStatus = video.status === "unread" ? "watched" : "unread";
     haptics.success();
@@ -597,6 +766,12 @@ export default function HomeScreen() {
 
     if (detailVideo && detailVideo.id === video.id) {
       setDetailVideo((prev) => (prev ? { ...prev, status: newStatus } : null));
+    }
+
+    if (newStatus === "watched") {
+      // User watched video -> cancel scheduled reminder & track event
+      cancelLikedVideoReminder(video.id);
+      analytics.trackVideoWatched(video, "app_status");
     }
 
     setToast({
@@ -630,6 +805,19 @@ export default function HomeScreen() {
       setDetailVideo((prev) => (prev ? { ...prev, is_favorite: newFav } : null));
     }
 
+    if (newFav) {
+      // If user liked the video and has NOT watched it yet, schedule free-time reminder
+      if (video.status !== "watched") {
+        scheduleLikedVideoReminder(video);
+      } else {
+        analytics.trackVideoLiked(video);
+      }
+    } else {
+      // Video was unliked -> cancel pending reminder
+      cancelLikedVideoReminder(video.id);
+      analytics.trackVideoUnliked(video.id);
+    }
+
     setToast({
       message: newFav ? "Saved to Favorites ❤️" : "Removed from Favorites",
       type: "success",
@@ -644,6 +832,9 @@ export default function HomeScreen() {
   const handleDeleteVideo = async (video: SavedVideo) => {
     haptics.warning();
     triggerLayoutMotion();
+
+    // Cancel any scheduled notification for deleted video
+    cancelLikedVideoReminder(video.id);
 
     // Optimistic UI removal
     setVideos((prev) => prev.filter((v) => v.id !== video.id));
@@ -665,6 +856,17 @@ export default function HomeScreen() {
     if (error) {
       console.warn("Failed to delete video:", error.message);
       fetchVideos();
+    }
+  };
+
+  const handleTestNotification = async (video: SavedVideo) => {
+    haptics.selection();
+    const id = await sendTestNotificationNow(video);
+    if (id) {
+      setToast({
+        message: "Test reminder scheduled! Will pop up in 5 seconds 🔔",
+        type: "info",
+      });
     }
   };
 
@@ -880,6 +1082,7 @@ export default function HomeScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!isModalOpen}
+        removeClippedSubviews={false}
         style={styles.pagerScrollView}
         contentContainerStyle={{ width: screenWidth * 4, height: "100%" }}
       >
@@ -887,29 +1090,41 @@ export default function HomeScreen() {
         <View style={{ width: screenWidth, height: "100%" }}>
           <View style={styles.tabContentContainer}>
             {loading ? (
-              <ScrollView
-                contentContainerStyle={[
-                  styles.listContent,
-                  {
-                    paddingTop: headerHeight,
-                    paddingBottom: Math.max(insets.bottom, 12) + 60,
-                  },
-                ]}
-              >
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </ScrollView>
+              <View key="feed-loading-container" style={{ flex: 1 }}>
+                <ScrollView
+                  removeClippedSubviews={false}
+                  contentContainerStyle={[
+                    styles.listContent,
+                    {
+                      paddingTop: headerHeight,
+                      paddingBottom: Math.max(insets.bottom, 12) + 60,
+                    },
+                  ]}
+                >
+                  <SkeletonCard />
+                  <SkeletonCard />
+                  <SkeletonCard />
+                </ScrollView>
+              </View>
             ) : (
               /* 1-COLUMN FEED LIST (CLASSIC POST VIEW) */
-              <FlatList
-                ref={flatListRef}
-                key="list-view-1-col"
-                data={feedVideos}
-                numColumns={1}
-                keyExtractor={(item) => item.id}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
+              <Animated.View
+                key="feed-list-container"
+                style={{
+                  flex: 1,
+                  transform: [{ translateY: pullDistanceAnim }],
+                }}
+              >
+                <FlatList
+                  ref={flatListRef}
+                  key="list-view-1-col"
+                  data={feedVideos}
+                  numColumns={1}
+                  keyExtractor={(item) => item.id}
+                  removeClippedSubviews={false}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  keyboardShouldPersistTaps="handled"
                 ListHeaderComponent={
                   selectedDate ? (
                     <View style={styles.activeDateFilterHeader}>
@@ -970,18 +1185,15 @@ export default function HomeScreen() {
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}
-                    onRefresh={() => {
-                      haptics.light();
-                      setRefreshing(true);
-                      fetchVideos();
-                    }}
-                    tintColor={appleColors.accent}
-                    colors={[appleColors.accent]}
-                    progressViewOffset={headerHeight}
+                    onRefresh={handleRefresh}
+                    tintColor="#FFFFFF"
+                    colors={["#FFFFFF"]}
+                    progressBackgroundColor="#181818"
                   />
                 }
               />
-            )}
+            </Animated.View>
+          )}
 
             {/* Top Apple / Threads Header (Floating Translucent Frosted Glass) */}
             <AppleHeader
@@ -989,6 +1201,8 @@ export default function HomeScreen() {
               totalCount={videos.length}
               unreadCount={unreadCount}
               translateY={headerTranslateY}
+              pullDistanceAnim={pullDistanceAnim}
+              isRefreshing={refreshing}
               selectedPlatform={selectedPlatform}
               onSelectPlatform={handleSelectPlatform}
               onPressActiveTab={() => {
@@ -1273,6 +1487,13 @@ export default function HomeScreen() {
         }}
       />
 
+      {/* First-Time Login Camera Scan or Skip Prompt Modal */}
+      <FirstTimeScanPromptModal
+        visible={showFirstTimeScanModal}
+        onScanPress={handleFirstTimeScanPress}
+        onSkipPress={handleFirstTimeSkipPress}
+      />
+
       {/* QR Scanner Camera Modal */}
       <QRScannerModal
         visible={showScanner}
@@ -1307,13 +1528,16 @@ export default function HomeScreen() {
         video={detailVideo}
         visible={showDetailSheet}
         onClose={() => setShowDetailSheet(false)}
-        onPlay={(v) =>
-          openVideoDirectly(v.clean_url, v.platform as any, v.platform_video_id)
-        }
+        onPlay={(v) => {
+          cancelLikedVideoReminder(v.id);
+          analytics.trackVideoWatched(v, "player_play");
+          openVideoDirectly(v.clean_url, v.platform as any, v.platform_video_id);
+        }}
         onToggleStatus={toggleStatus}
         onToggleFavorite={toggleFavorite}
         onCopyLink={handleCopyLink}
         onDelete={handleDeleteVideo}
+        onTestNotification={handleTestNotification}
       />
 
       {/* Ask Elio Conversational RAG Modal */}

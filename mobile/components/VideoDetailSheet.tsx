@@ -26,6 +26,7 @@ interface VideoDetailSheetProps {
   onToggleFavorite?: (video: SavedVideo) => void;
   onCopyLink?: (url: string) => void;
   onDelete: (video: SavedVideo) => void;
+  onTestNotification?: (video: SavedVideo) => void;
 }
 
 export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
@@ -37,6 +38,7 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   onToggleFavorite,
   onCopyLink,
   onDelete,
+  onTestNotification,
 }) => {
   const [activeTab, setActiveTab] = useState<"digest" | "actions">("digest");
   const [aiMeta, setAiMeta] = useState<VideoAIMetadata | null>(null);
@@ -531,6 +533,23 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
             <TouchableOpacity activeOpacity={0.7} style={styles.actionRow} onPress={handleOpenPlay}>
               <Text style={styles.actionLabel}>Open in Native App</Text>
               <PikaIcon name="open-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            {/* Test Notification Action */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.actionRow}
+              onPress={() => {
+                if (onTestNotification && video) onTestNotification(video);
+              }}
+            >
+              <View>
+                <Text style={styles.actionLabel}>Test Reminder (Send in 5s)</Text>
+                <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                  Triggers reminder popup after 5 seconds
+                </Text>
+              </View>
+              <PikaIcon name="notifications-outline" size={22} color="#8B5CF6" />
             </TouchableOpacity>
 
             <TouchableOpacity

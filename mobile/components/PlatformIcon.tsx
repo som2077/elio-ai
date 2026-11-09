@@ -1,13 +1,19 @@
 import React from "react";
-import { StyleProp, TextStyle } from "react-native";
-import { FontAwesome6 } from "@expo/vector-icons";
+import {
+  Image,
+  ImageStyle,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { PikaIcon } from "./PikaIcon";
 
 export interface PlatformIconProps {
   platform: string;
   size?: number;
   color?: string;
-  style?: StyleProp<TextStyle>;
+  style?: StyleProp<ImageStyle | TextStyle | ViewStyle>;
 }
 
 export const PLATFORM_BRAND_COLORS: Record<string, string> = {
@@ -23,15 +29,29 @@ export const PLATFORM_BRAND_COLORS: Record<string, string> = {
   all: "#FFFFFF",
 };
 
+export const PLATFORM_IMAGES: Record<string, any> = {
+  youtube: require("../assets/social-icons/youtube.png"),
+  instagram: require("../assets/social-icons/instagram.png"),
+  twitter: require("../assets/social-icons/twitter.png"),
+  x: require("../assets/social-icons/twitter.png"),
+  tiktok: require("../assets/social-icons/tiktok.png"),
+  reddit: require("../assets/social-icons/reddit.png"),
+  facebook: require("../assets/social-icons/facebook.png"),
+  linkedin: require("../assets/social-icons/linkedin.png"),
+  pinterest: require("../assets/social-icons/pinterest.png"),
+};
+
 /**
  * Authentic Official Social Platform Brand Icon
- * Uses official FontAwesome6 brand vector glyphs:
- * - 𝕏 (x-twitter)
- * - TikTok (official musical note glyph)
- * - YouTube (official play rectangle)
- * - Instagram (official camera outline glyph)
- * - Reddit (official alien glyph)
- * - Facebook & LinkedIn & Pinterest
+ * Uses official high-res app icons:
+ * - YouTube (official authentic red play button rectangle with white triangle)
+ * - Instagram (official vibrant gradient squircle)
+ * - X / Twitter (official 𝕏 icon)
+ * - TikTok (official neon cyan/magenta note)
+ * - Reddit (official orange Snoo icon)
+ * - Facebook (official blue circle with white 'f')
+ * - LinkedIn (official blue square with white 'in')
+ * - Pinterest (official red circle with white 'P')
  */
 export const PlatformIcon: React.FC<PlatformIconProps> = ({
   platform,
@@ -40,90 +60,58 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({
   style,
 }) => {
   const p = (platform || "").toLowerCase().trim();
-  const iconColor = color || PLATFORM_BRAND_COLORS[p] || "#FFFFFF";
+  const iconSource = PLATFORM_IMAGES[p];
 
-  switch (p) {
-    case "youtube":
-      return (
-        <FontAwesome6
-          name="youtube"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "instagram":
-      return (
-        <FontAwesome6
-          name="instagram"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "twitter":
-    case "x":
-      return (
-        <FontAwesome6
-          name="x-twitter"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "tiktok":
-      return (
-        <FontAwesome6
-          name="tiktok"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "reddit":
-      return (
-        <FontAwesome6
-          name="reddit"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "facebook":
-      return (
-        <FontAwesome6
-          name="facebook"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "linkedin":
-      return (
-        <FontAwesome6
-          name="linkedin"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    case "pinterest":
-      return (
-        <FontAwesome6
-          name="pinterest"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
-    default:
-      return (
-        <PikaIcon
-          name="play-circle-outline"
-          size={size}
-          color={iconColor}
-          style={style}
-        />
-      );
+  if (p === "all" || p === "queue") {
+    return (
+      <Ionicons
+        name="layers-outline"
+        size={size}
+        color={color || PLATFORM_BRAND_COLORS.all || "#FFFFFF"}
+        style={style as any}
+      />
+    );
   }
+
+  if (iconSource) {
+    const isYouTube = p === "youtube";
+    // YouTube's official play rectangle has an authentic 1.428 aspect ratio
+    const iconWidth = isYouTube ? Math.round(size * 1.35) : size;
+    const iconHeight = isYouTube ? Math.round(size * 0.94) : size;
+
+    // Apply squircle border radius only to icons that need it (not YouTube or round Facebook)
+    const radius =
+      isYouTube || p === "facebook"
+        ? undefined
+        : size > 20
+          ? Math.round(size * 0.22)
+          : Math.max(2, Math.round(size * 0.2));
+
+    return (
+      <Image
+        source={iconSource}
+        style={[
+          {
+            width: iconWidth,
+            height: iconHeight,
+            borderRadius: radius,
+            overflow: radius ? "hidden" : undefined,
+          },
+          style as any,
+        ]}
+        resizeMode="contain"
+      />
+    );
+  }
+
+  // Fallback for custom or unknown platform
+  const iconColor = color || PLATFORM_BRAND_COLORS[p] || "#FFFFFF";
+  return (
+    <PikaIcon
+      name="play-circle-outline"
+      size={size}
+      color={iconColor}
+      style={style as any}
+    />
+  );
 };

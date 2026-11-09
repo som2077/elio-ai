@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Easing,
   Image,
   ScrollView,
   Dimensions,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle } from "react-native-svg";
 import { PikaIcon } from "./PikaIcon";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -54,6 +56,8 @@ interface AppleHeaderProps {
   onOpenSearch?: () => void;
   onOpenFeedsDrawer?: () => void;
   translateY?: Animated.Value;
+  pullDistanceAnim?: Animated.Value;
+  isRefreshing?: boolean;
   // Filter props
   selectedPlatform: string;
   onSelectPlatform: (platform: string) => void;
@@ -71,6 +75,8 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   onOpenSearch,
   onOpenFeedsDrawer,
   translateY,
+  pullDistanceAnim,
+  isRefreshing = false,
   selectedPlatform,
   onSelectPlatform,
   onPressActiveTab,
@@ -81,6 +87,86 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   const insets = useSafeAreaInsets();
   const [isSearchPressed, setIsSearchPressed] = useState(false);
   const searchScale = useRef(new Animated.Value(1)).current;
+
+  // Instagram / Meta Threads Style Pull-to-Refresh Header Stretch & Top Center Spinner
+  const fallbackPullAnim = useRef(new Animated.Value(0)).current;
+  const activePullAnim = pullDistanceAnim || fallbackPullAnim;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isRefreshing) {
+      if (!pullDistanceAnim) {
+        Animated.spring(fallbackPullAnim, {
+          toValue: 46,
+          friction: 7,
+          tension: 70,
+          useNativeDriver: true,
+        }).start();
+      }
+
+      // Continuous 360° spin loop (Threads / Instagram style)
+      spinAnim.setValue(0);
+      const spinLoop = Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 750,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      );
+      spinLoop.start();
+
+      return () => {
+        spinLoop.stop();
+      };
+    } else {
+      if (!pullDistanceAnim) {
+        Animated.spring(fallbackPullAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 85,
+          useNativeDriver: true,
+        }).start();
+      }
+      spinAnim.setValue(0);
+    }
+  }, [isRefreshing, pullDistanceAnim]);
+
+  // 1. Continuous spin during refresh
+  const spinInterpolate = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
+  // 2. Real-time rotation during finger pull gesture (0° -> 320°)
+  const pullRotation = activePullAnim.interpolate({
+    inputRange: [0, 50],
+    outputRange: ["0deg", "320deg"],
+    extrapolate: "clamp",
+  });
+
+  // 3. Dynamic badge scale: grows fluidly with finger pull and settles at 1.0
+  const badgeScale = activePullAnim.interpolate({
+    inputRange: [0, 8, 38, 68],
+    outputRange: [0.35, 0.75, 1, 1.08],
+    extrapolate: "clamp",
+  });
+
+  // 4. Dynamic badge opacity: fades in quickly at start of drag
+  const badgeOpacity = activePullAnim.interpolate({
+    inputRange: [0, 6, 26],
+    outputRange: [0, 0.5, 1],
+    extrapolate: "clamp",
+  });
+
+  // 5. Dynamic badge vertical offset: glides down gracefully with the stretch
+  const badgeTranslateY = activePullAnim.interpolate({
+    inputRange: [0, 68],
+    outputRange: [0, 24],
+    extrapolate: "clamp",
+  });
+
+  const activeBadgeRotation = isRefreshing ? spinInterpolate : pullRotation;
 
   // Sliding indicator refs
   const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
@@ -177,6 +263,10 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
   const totalHeight = insets.top + HEADER_COLLAPSIBLE_HEIGHT;
 
+  const combinedTranslateY = translateY
+    ? Animated.add(translateY, activePullAnim)
+    : activePullAnim;
+
   // Header container slides up like Twitter/X with visible, smooth motion and graceful fade
   const barOpacity = translateY
     ? translateY.interpolate({
@@ -231,14 +321,55 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         />
       </Animated.View>
 
-      {/* 2. Full Unified Header Container (Status bar + Top bar + Platform tabs) */}
+      {/* 2. Top Center Instagram/Threads Refresh Spinner Ring */}
+      <Animated.View
+        style={[
+          styles.topCenterRefreshContainer,
+          {
+            top: insets.top + 7,
+            opacity: badgeOpacity,
+            transform: [
+              { translateY: badgeTranslateY },
+              { scale: badgeScale },
+            ],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <View style={styles.topCenterRefreshBadge}>
+          <Animated.View style={{ transform: [{ rotate: activeBadgeRotation }] }}>
+            <Svg width={22} height={22} viewBox="0 0 24 24">
+              <Circle
+                cx={12}
+                cy={12}
+                r={8.5}
+                stroke="rgba(255, 255, 255, 0.16)"
+                strokeWidth={2.4}
+                fill="none"
+              />
+              <Circle
+                cx={12}
+                cy={12}
+                r={8.5}
+                stroke="#FFFFFF"
+                strokeWidth={2.4}
+                strokeDasharray="36, 18"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </Svg>
+          </Animated.View>
+        </View>
+      </Animated.View>
+
+      {/* 3. Full Unified Header Container (Status bar + Top bar + Platform tabs) */}
       <Animated.View
         style={[
           styles.headerContainer,
           {
             height: totalHeight,
             paddingTop: insets.top,
-            transform: [{ translateY: translateY || 0 }],
+            transform: [{ translateY: combinedTranslateY }],
             opacity: barOpacity,
           },
         ]}
@@ -306,6 +437,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
             horizontal
             showsHorizontalScrollIndicator={false}
             nestedScrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.tabsScrollContent}
           >
             {/* "Platforms" Trigger Tab (Opens Bottom Sheet Modal) */}
@@ -346,6 +478,12 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
               }}
             >
               <View style={styles.tabItemInner}>
+                <PlatformIcon
+                  platform="all"
+                  size={13}
+                  color={selectedPlatform === "all" ? "#FFFFFF" : "#71767B"}
+                  style={{ marginRight: 6 }}
+                />
                 <Text
                   style={[
                     styles.tabItemText,
@@ -399,13 +537,11 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
                   <View style={styles.tabItemInner}>
                     <PlatformIcon
                       platform={platformKey}
-                      size={13}
-                      color={
-                        isActive
-                          ? PLATFORM_COLORS[platformKey] || "#FFFFFF"
-                          : "#71767B"
-                      }
-                      style={{ marginRight: 6 }}
+                      size={15}
+                      style={{
+                        marginRight: 6,
+                        opacity: isActive ? 1 : 0.68,
+                      }}
                     />
                     <Text
                       style={[
@@ -459,6 +595,35 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 };
 
 const styles = StyleSheet.create({
+  topCenterRefreshContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 15,
+  },
+  topCenterRefreshBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(18, 19, 23, 0.96)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.55,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
   statusBarBlurContainer: {
     position: "absolute",
     top: 0,
@@ -499,8 +664,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   elioLogo: {
-    width: 36,
-    height: 36,
+    width: 46,
+    height: 46,
   },
   actionsRight: {
     flexDirection: "row",

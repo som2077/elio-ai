@@ -9,10 +9,27 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Video, ResizeMode } from "expo-av";
 import * as SplashScreen from "expo-splash-screen";
+import { appleColors } from "../theme/appleTokens";
 
 interface StartupVideoSplashProps {
   onFinish: () => void;
 }
+
+let _isSplashActive = true;
+const splashListeners = new Set<() => void>();
+
+export const isSplashShowing = () => _isSplashActive;
+
+export const onSplashCompleted = (callback: () => void) => {
+  if (!_isSplashActive) {
+    callback();
+    return () => {};
+  }
+  splashListeners.add(callback);
+  return () => {
+    splashListeners.delete(callback);
+  };
+};
 
 export const StartupVideoSplash: React.FC<StartupVideoSplashProps> = ({
   onFinish,
@@ -24,6 +41,7 @@ export const StartupVideoSplash: React.FC<StartupVideoSplashProps> = ({
   const handleFinish = () => {
     if (isFinishedRef.current) return;
     isFinishedRef.current = true;
+    _isSplashActive = false;
 
     RNStatusBar.setBarStyle("light-content", true);
 
@@ -33,14 +51,20 @@ export const StartupVideoSplash: React.FC<StartupVideoSplashProps> = ({
       useNativeDriver: true,
     }).start(() => {
       onFinish();
+      splashListeners.forEach((cb) => {
+        try {
+          cb();
+        } catch {}
+      });
+      splashListeners.clear();
     });
   };
 
   useEffect(() => {
-    // Keep status bar visible with white elements (time, battery, wifi)
+    // Keep status bar visible with white elements (time, battery, wifi) on OLED black
     RNStatusBar.setHidden(false, "none");
     RNStatusBar.setBarStyle("light-content", true);
-    RNStatusBar.setBackgroundColor("#101010", true);
+    RNStatusBar.setBackgroundColor(appleColors.canvas, true);
     RNStatusBar.setTranslucent(true);
 
     // Hide native static splash screen as soon as video splash mounts
@@ -65,10 +89,10 @@ export const StartupVideoSplash: React.FC<StartupVideoSplashProps> = ({
         },
       ]}
     >
-      {/* Status Bar with white elements on Threads dark canvas */}
+      {/* Status Bar with white elements on OLED pure black canvas */}
       <StatusBar
         style="light"
-        backgroundColor="#101010"
+        backgroundColor={appleColors.canvas}
         translucent={true}
         hidden={false}
       />
@@ -105,12 +129,12 @@ export const StartupVideoSplash: React.FC<StartupVideoSplashProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#101010",
+    backgroundColor: appleColors.canvas,
     zIndex: 999999,
   },
   container: {
     flex: 1,
-    backgroundColor: "#101010",
+    backgroundColor: appleColors.canvas,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -119,7 +143,7 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#101010",
+    backgroundColor: appleColors.canvas,
   },
   video: {
     width: "100%",

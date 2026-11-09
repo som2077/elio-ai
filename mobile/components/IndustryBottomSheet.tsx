@@ -1,8 +1,7 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
-  Modal,
   Animated,
   PanResponder,
   Dimensions,
@@ -10,8 +9,12 @@ import {
   TouchableWithoutFeedback,
   StyleProp,
   ViewStyle,
+  Platform,
+  BackHandler,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -53,10 +56,12 @@ export const IndustryBottomSheet: React.FC<IndustryBottomSheetProps> = ({
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const isDismissing = useRef(false);
   const hasTriggeredThresholdHaptic = useRef(false);
+  const [isRendered, setIsRendered] = useState(visible);
 
   // Entrance & Exit transitions
   useEffect(() => {
     if (visible) {
+      setIsRendered(true);
       isDismissing.current = false;
       hasTriggeredThresholdHaptic.current = false;
       translateY.setValue(SCREEN_HEIGHT);
@@ -67,9 +72,30 @@ export const IndustryBottomSheet: React.FC<IndustryBottomSheetProps> = ({
         mass: 0.9,
         useNativeDriver: true,
       }).start();
-    } else {
-      translateY.setValue(SCREEN_HEIGHT);
+    } else if (isRendered && !isDismissing.current) {
+      // Smooth dismiss if parent changes visible to false
+      isDismissing.current = true;
+      Animated.timing(translateY, {
+        toValue: SCREEN_HEIGHT,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setIsRendered(false);
+      });
     }
+  }, [visible]);
+
+  // Hardware back button support for Android
+  useEffect(() => {
+    if (!visible) return;
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        animateDismiss();
+        return true;
+      }
+    );
+    return () => backHandler.remove();
   }, [visible]);
 
   const animateDismiss = () => {
@@ -81,6 +107,7 @@ export const IndustryBottomSheet: React.FC<IndustryBottomSheetProps> = ({
       duration: 200,
       useNativeDriver: true,
     }).start(() => {
+      setIsRendered(false);
       onClose();
     });
   };
@@ -134,7 +161,10 @@ export const IndustryBottomSheet: React.FC<IndustryBottomSheetProps> = ({
           if (gestureState.dy > 80 && !hasTriggeredThresholdHaptic.current) {
             hasTriggeredThresholdHaptic.current = true;
             haptics.selection();
-          } else if (gestureState.dy <= 80 && hasTriggeredThresholdHaptic.current) {
+          } else if (
+            gestureState.dy <= 80 &&
+            hasTriggeredThresholdHaptic.current
+          ) {
             hasTriggeredThresholdHaptic.current = false;
           }
         }
@@ -145,7 +175,7 @@ export const IndustryBottomSheet: React.FC<IndustryBottomSheetProps> = ({
       onPanResponderTerminate: (_, gestureState) => {
         handleGestureEnd(gestureState);
       },
-    })
+    }),
   ).current;
 
   // Real-time interpolated backdrop dimming linked directly to drag position
@@ -155,107 +185,121 @@ export const IndustryBottomSheet: React.FC<IndustryBottomSheetProps> = ({
     extrapolate: "clamp",
   });
 
-  if (!visible) return null;
+  if (!visible && !isRendered) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={animateDismiss}
-      statusBarTranslucent
-    >
-      <View style={styles.overlay}>
-        {/* Real-time reactive backdrop */}
-        <TouchableWithoutFeedback onPress={animateDismiss}>
-          <Animated.View
-            style={[
-              styles.backdrop,
-              {
-                opacity: backdropOpacity,
-              },
-            ]}
-          />
-        </TouchableWithoutFeedback>
-
-        {/* Sliding Sheet Container */}
+    <View style={styles.overlay} pointerEvents="box-none">
+      {/* Real-time reactive backdrop */}
+      <TouchableWithoutFeedback onPress={animateDismiss}>
         <Animated.View
           style={[
-            styles.sheetContainer,
+            styles.backdrop,
             {
-              maxHeight: SCREEN_HEIGHT * maxHeightRatio,
-              paddingBottom: Math.max(insets.bottom, 16) + 8,
-              transform: [{ translateY }],
+              opacity: backdropOpacity,
             },
-            containerStyle,
           ]}
-        >
-          {/* Header & Gesture Zone (Interactive Grab Area) */}
-          <View {...panResponder.panHandlers} style={styles.gestureHeaderZone}>
-            {showHandle && (
-              <View style={styles.handleContainer}>
-                <View style={styles.handleBar} />
-              </View>
-            )}
+        />
+      </TouchableWithoutFeedback>
 
-            {(title || headerRight) && (
-              <View style={styles.headerRow}>
-                <View style={styles.titleColumn}>
-                  {title && <Text style={styles.titleText}>{title}</Text>}
-                  {subtitle && <Text style={styles.subtitleText}>{subtitle}</Text>}
-                </View>
-                {headerRight && <View style={styles.headerRightContainer}>{headerRight}</View>}
-              </View>
-            )}
-          </View>
+      {/* Sliding Sheet Container */}
+      <Animated.View
+        style={[
+          styles.sheetContainer,
+          {
+            maxHeight: SCREEN_HEIGHT * maxHeightRatio,
+            paddingBottom: Math.max(insets.bottom, 16),
+            transform: [{ translateY }],
+          },
+          containerStyle,
+        ]}
+      >
+        {/* Authentic Frosted Liquid Glass Blur Engine */}
+        <BlurView
+          intensity={Platform.OS === "ios" ? 85 : 60}
+          tint={Platform.OS === "ios" ? "systemUltraThinMaterialDark" : "dark"}
+          blurReductionFactor={Platform.OS === "android" ? 2 : 1}
+          experimentalBlurMethod="dimezisBlurView"
+          style={StyleSheet.absoluteFill}
+        />
 
-          {/* Sheet Body Content */}
-          <View style={styles.contentBody}>{children}</View>
-        </Animated.View>
-      </View>
-    </Modal>
+        {/* Translucent Charcoal Tint allowing true background blur transparency */}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: "rgba(20, 20, 24, 0.45)" },
+          ]}
+          pointerEvents="none"
+        />
+
+        {/* Header & Gesture Zone (Interactive Grab Area) */}
+        <View {...panResponder.panHandlers} style={styles.gestureHeaderZone}>
+          {showHandle && (
+            <View style={styles.handleContainer}>
+              <View style={styles.handleBar} />
+            </View>
+          )}
+
+          {(title || headerRight) && (
+            <View style={styles.headerRow}>
+              <View style={styles.titleColumn}>
+                {title && <Text style={styles.titleText}>{title}</Text>}
+                {subtitle && (
+                  <Text style={styles.subtitleText}>{subtitle}</Text>
+                )}
+              </View>
+              {headerRight && (
+                <View style={styles.headerRightContainer}>{headerRight}</View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Sheet Body Content */}
+        <View style={styles.contentBody}>{children}</View>
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 99999,
+    elevation: 99999,
     justifyContent: "flex-end",
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(16, 16, 16, 0.72)",
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
   },
   sheetContainer: {
-    backgroundColor: "#181818",
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: "transparent",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 24,
     elevation: 24,
     overflow: "hidden",
   },
   gestureHeaderZone: {
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 10,
     paddingHorizontal: 20,
-    backgroundColor: "#181818",
+    backgroundColor: "transparent",
   },
   handleContainer: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    marginBottom: 6,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   handleBar: {
-    width: 38,
-    height: 4.5,
-    borderRadius: 2.5,
-    backgroundColor: "rgba(255, 255, 255, 0.32)",
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
   },
   headerRow: {
     flexDirection: "row",
@@ -268,14 +312,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   titleText: {
-    color: "#FFFFFF",
-    fontSize: 18,
+    color: "#F3F5F7",
+    fontSize: 17.5,
     fontWeight: "700",
     letterSpacing: -0.3,
     textAlign: "center",
   },
   subtitleText: {
-    color: "#71767B",
+    color: "#777777",
     fontSize: 13,
     marginTop: 3,
     textAlign: "center",

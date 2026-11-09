@@ -278,6 +278,7 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
           data={devices}
           keyExtractor={(item) => item.device_id || item.id}
           renderItem={renderDeviceItem}
+          removeClippedSubviews={false}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -376,21 +377,21 @@ const styles = StyleSheet.create({
   deviceCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#131B2E",
+    backgroundColor: "#16161A",
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   deviceCardRevoked: {
     opacity: 0.5,
-    backgroundColor: "#0F1420",
+    backgroundColor: "#101012",
   },
   deviceIconBox: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "#1E293B",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -489,7 +490,7 @@ const styles = StyleSheet.create({
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderColor: "#1E293B",
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   linkNewBtn: {
     backgroundColor: "#6366F1",

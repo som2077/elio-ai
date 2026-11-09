@@ -1,9 +1,9 @@
-import { LayoutAnimation, Platform, UIManager } from 'react-native';
+import { LayoutAnimation, Platform } from 'react-native';
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Note: Do NOT call UIManager.setLayoutAnimationEnabledExperimental(true) on Android.
+// In React Native Paper architecture, enabling experimental LayoutAnimation on Android causes:
+// "IndexOutOfBoundsException: index=X count=Y in ReactViewGroup.addViewWithSubviewClippingEnabled"
+// during view unmounting, list re-rendering, and batch operations.
 
 /**
  * Apple WWDC Designing Fluid Interfaces Spring Parameters
@@ -39,8 +39,12 @@ export const motionTokens = {
 
 /**
  * Trigger smooth Apple-style native layout transition across React Native state updates
+ * Safely runs on iOS only to prevent Android NativeViewHierarchyManager view desync crashes.
  */
 export const triggerLayoutMotion = (duration = motionTokens.duration.normal) => {
+  if (Platform.OS !== 'ios') {
+    return;
+  }
   try {
     LayoutAnimation.configureNext({
       duration,

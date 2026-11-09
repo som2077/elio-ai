@@ -17,6 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../services/supabase";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
+import { AppleSwitch } from "./AppleSwitch";
 
 export interface DevicesViewProps {
   userEmail?: string;
@@ -51,6 +52,30 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [cacheSize, setCacheSize] = useState<string>("Calculating...");
   const [clearingCache, setClearingCache] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
+
+  // Load user settings preferences
+  useEffect(() => {
+    AsyncStorage.getItem("@setting_haptics_enabled").then((val) => {
+      if (val !== null) setHapticsEnabled(val === "true");
+    });
+    AsyncStorage.getItem("@setting_autoplay_previews").then((val) => {
+      if (val !== null) setAutoPlayEnabled(val === "true");
+    });
+  }, []);
+
+  const handleToggleHaptics = async (val: boolean) => {
+    setHapticsEnabled(val);
+    await AsyncStorage.setItem("@setting_haptics_enabled", String(val));
+    if (val) haptics.selection();
+  };
+
+  const handleToggleAutoPlay = async (val: boolean) => {
+    setAutoPlayEnabled(val);
+    await AsyncStorage.setItem("@setting_autoplay_previews", String(val));
+    haptics.selection();
+  };
 
   const fetchDevices = async () => {
     try {
@@ -250,11 +275,12 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews={false}
     >
       {/* 1. TOP STATUS BAR / HEADER */}
       <View style={styles.topHeaderRow}>
         <View style={styles.topHeaderLeft}>
-          <Text style={styles.screenTitle}>Profile & Hub</Text>
+          <Text style={styles.screenTitle}>Settings & Profile</Text>
           <View style={styles.cloudSyncPill}>
             <View style={styles.livePulseDot} />
             <Text style={styles.cloudSyncText}>Cloud Sync Active</Text>
@@ -284,7 +310,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         <View style={styles.profileHeaderRow}>
           {/* Avatar with Electric Gradient Ring */}
           <LinearGradient
-            colors={["#1D9BF0", "#6366F1", "#A855F7"]}
+            colors={["#6366F1", "#818CF8", "#4F46E5"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.avatarGradientRing}
@@ -300,7 +326,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               <Text style={styles.displayNameText} numberOfLines={1}>
                 {displayName}
               </Text>
-              <Ionicons name="checkmark-circle" size={17} color="#1D9BF0" />
+              <Ionicons name="checkmark-circle" size={17} color={appleColors.accent} />
             </View>
 
             <Text style={styles.handleText} numberOfLines={1}>
@@ -309,11 +335,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
             <View style={styles.tierBadgeRow}>
               <View style={styles.tierPill}>
-                <Ionicons name="sparkles" size={11} color="#A855F7" />
+                <Ionicons name="sparkles" size={11} color="#818CF8" />
                 <Text style={styles.tierPillText}>ELIO VAULT PRO</Text>
               </View>
               <View style={styles.securityPill}>
-                <Ionicons name="lock-closed" size={10} color="#10B981" />
+                <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
                 <Text style={styles.securityPillText}>AES-256 SECURED</Text>
               </View>
             </View>
@@ -330,7 +356,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           <View style={styles.bentoDivider} />
 
           <View style={styles.bentoStatItem}>
-            <Text style={[styles.bentoStatValue, { color: "#A855F7" }]}>
+            <Text style={[styles.bentoStatValue, { color: appleColors.accentLight }]}>
               {aiSummarizedCount}
             </Text>
             <Text style={styles.bentoStatLabel}>AI Synthesized</Text>
@@ -339,7 +365,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           <View style={styles.bentoDivider} />
 
           <View style={styles.bentoStatItem}>
-            <Text style={[styles.bentoStatValue, { color: "#1D9BF0" }]}>
+            <Text style={styles.bentoStatValue}>
               {devices.length}
             </Text>
             <Text style={styles.bentoStatLabel}>Browsers Paired</Text>
@@ -357,7 +383,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         }}
       >
         <LinearGradient
-          colors={["rgba(29, 155, 240, 0.12)", "rgba(99, 102, 241, 0.04)"]}
+          colors={["rgba(99, 102, 241, 0.14)", "rgba(99, 102, 241, 0.02)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -365,10 +391,10 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
         <View style={styles.pairIconBox}>
           <LinearGradient
-            colors={["#1D9BF0", "#38BDF8"]}
+            colors={["#6366F1", "#4F46E5"]}
             style={StyleSheet.absoluteFill}
           />
-          <Ionicons name="qr-code-outline" size={24} color="#000000" />
+          <Ionicons name="qr-code-outline" size={24} color="#FFFFFF" />
         </View>
 
         <View style={styles.pairTextBox}>
@@ -407,13 +433,13 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="small" color="#1D9BF0" />
+          <ActivityIndicator size="small" color={appleColors.accent} />
           <Text style={styles.loadingText}>Syncing device status...</Text>
         </View>
       ) : devices.length === 0 ? (
         <View style={styles.emptyDeviceCard}>
           <View style={styles.emptyIconCircle}>
-            <Ionicons name="laptop-outline" size={32} color="#64748B" />
+            <Ionicons name="laptop-outline" size={32} color={appleColors.accentLight} />
           </View>
           <Text style={styles.emptyTitle}>No Desktop Extensions Linked</Text>
           <Text style={styles.emptySubtitle}>
@@ -482,7 +508,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 style={styles.disconnectBtn}
                 onPress={() => handleRevoke(device.device_id, device.device_name)}
               >
-                <Ionicons name="trash-outline" size={17} color="#FF453A" />
+                <Ionicons name="trash-outline" size={17} color={appleColors.destructive} />
               </TouchableOpacity>
             </View>
           );
@@ -498,16 +524,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         {/* Row 1: AI Model Engine */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(168, 85, 247, 0.15)" }]}>
-              <Ionicons name="sparkles" size={17} color="#A855F7" />
+            <View style={[styles.insetIconBox, { backgroundColor: "rgba(99, 102, 241, 0.14)" }]}>
+              <Ionicons name="sparkles" size={17} color={appleColors.accent} />
             </View>
             <View>
               <Text style={styles.insetTitle}>AI Summary Engine</Text>
               <Text style={styles.insetSubtitle}>GPT-4o Mini + Deep Extraction</Text>
             </View>
           </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(168, 85, 247, 0.15)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#C084FC" }]}>Active</Text>
+          <View style={[styles.pillBadge, { backgroundColor: "rgba(99, 102, 241, 0.15)" }]}>
+            <Text style={[styles.pillBadgeText, { color: appleColors.accentLight }]}>Active</Text>
           </View>
         </View>
 
@@ -516,16 +542,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         {/* Row 2: Vector Embeddings */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(29, 155, 240, 0.15)" }]}>
-              <Ionicons name="layers-outline" size={17} color="#1D9BF0" />
+            <View style={[styles.insetIconBox, { backgroundColor: "rgba(99, 102, 241, 0.10)" }]}>
+              <Ionicons name="layers-outline" size={17} color={appleColors.accentLight} />
             </View>
             <View>
               <Text style={styles.insetTitle}>Semantic Video Search</Text>
               <Text style={styles.insetSubtitle}>1536-dim Vector Similarity</Text>
             </View>
           </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(29, 155, 240, 0.15)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#38BDF8" }]}>pgvector</Text>
+          <View style={[styles.pillBadge, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
+            <Text style={[styles.pillBadgeText, { color: "#E2E8F0" }]}>pgvector</Text>
           </View>
         </View>
 
@@ -534,16 +560,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         {/* Row 3: Multi-Platform Support */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
-              <Ionicons name="globe-outline" size={17} color="#10B981" />
+            <View style={[styles.insetIconBox, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
+              <Ionicons name="globe-outline" size={17} color="#F8FAFC" />
             </View>
             <View>
               <Text style={styles.insetTitle}>Universal Social Scraper</Text>
               <Text style={styles.insetSubtitle}>YouTube, 𝕏, IG, Reddit, TikTok, FB</Text>
             </View>
           </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#34D399" }]}>6 Networks</Text>
+          <View style={[styles.pillBadge, { backgroundColor: "rgba(255, 255, 255, 0.06)" }]}>
+            <Text style={[styles.pillBadgeText, { color: "#94A3B8" }]}>6 Networks</Text>
           </View>
         </View>
 
@@ -552,27 +578,69 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         {/* Row 4: Custom API Key & Vault */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(245, 158, 11, 0.15)" }]}>
-              <Ionicons name="key-outline" size={17} color="#F59E0B" />
+            <View style={[styles.insetIconBox, { backgroundColor: "rgba(16, 185, 129, 0.12)" }]}>
+              <Ionicons name="shield-checkmark-outline" size={17} color="#10B981" />
             </View>
             <View>
               <Text style={styles.insetTitle}>API Key Security</Text>
               <Text style={styles.insetSubtitle}>Zero plaintext • Supabase Vault</Text>
             </View>
           </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(245, 158, 11, 0.15)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#FBBF24" }]}>Encrypted</Text>
+          <View style={[styles.pillBadge, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
+            <Text style={[styles.pillBadgeText, { color: "#34D399" }]}>Encrypted</Text>
           </View>
         </View>
       </View>
 
-      {/* 6. PREFERENCES & STORAGE */}
+      {/* 6. PREFERENCES & SETTINGS */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>PREFERENCES & STORAGE</Text>
+        <Text style={styles.sectionTitle}>PREFERENCES & SETTINGS</Text>
       </View>
 
       <View style={styles.insetCard}>
-        {/* Row 1: Offline Cache */}
+        {/* Row 1: Haptic Feedback Toggle (Apple HIG Switch) */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View style={[styles.insetIconBox, { backgroundColor: "rgba(99, 102, 241, 0.12)" }]}>
+              <Ionicons name="phone-portrait-outline" size={17} color={appleColors.accentLight} />
+            </View>
+            <View>
+              <Text style={styles.insetTitle}>Haptic Feedback</Text>
+              <Text style={styles.insetSubtitle}>Tactile clicks on tap and gestures</Text>
+            </View>
+          </View>
+
+          <AppleSwitch
+            value={hapticsEnabled}
+            onValueChange={handleToggleHaptics}
+            size="sm"
+          />
+        </View>
+
+        <View style={styles.insetRowDivider} />
+
+        {/* Row 2: Auto-play Video Previews (Apple HIG Switch) */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View style={[styles.insetIconBox, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
+              <Ionicons name="play-circle-outline" size={17} color="#F8FAFC" />
+            </View>
+            <View>
+              <Text style={styles.insetTitle}>Auto-Play Previews</Text>
+              <Text style={styles.insetSubtitle}>Play clips automatically in feed</Text>
+            </View>
+          </View>
+
+          <AppleSwitch
+            value={autoPlayEnabled}
+            onValueChange={handleToggleAutoPlay}
+            size="sm"
+          />
+        </View>
+
+        <View style={styles.insetRowDivider} />
+
+        {/* Row 3: Offline Cache */}
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.insetRow}
@@ -648,7 +716,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           );
         }}
       >
-        <Ionicons name="log-out-outline" size={18} color="#FF453A" />
+        <Ionicons name="log-out-outline" size={18} color={appleColors.destructive} />
         <Text style={styles.logoutBtnText}>Sign Out of Elio AI</Text>
       </TouchableOpacity>
 
@@ -790,15 +858,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(168, 85, 247, 0.15)",
+    backgroundColor: "rgba(99, 102, 241, 0.12)",
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 8,
     borderWidth: 0.8,
-    borderColor: "rgba(168, 85, 247, 0.3)",
+    borderColor: "rgba(99, 102, 241, 0.28)",
   },
   tierPillText: {
-    color: "#C084FC",
+    color: "#A5B4FC",
     fontSize: 9.5,
     fontWeight: "800",
     letterSpacing: 0.4,
@@ -807,15 +875,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 8,
     borderWidth: 0.8,
-    borderColor: "rgba(16, 185, 129, 0.25)",
+    borderColor: "rgba(255, 255, 255, 0.10)",
   },
   securityPillText: {
-    color: "#34D399",
+    color: "#E2E8F0",
     fontSize: 9.5,
     fontWeight: "700",
     letterSpacing: 0.3,
@@ -861,7 +929,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "rgba(29, 155, 240, 0.3)",
+    borderColor: "rgba(99, 102, 241, 0.28)",
+    borderTopColor: "rgba(129, 140, 248, 0.40)",
     marginBottom: 20,
     gap: 12,
     overflow: "hidden",
@@ -893,15 +962,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(29, 155, 240, 0.25)",
+    backgroundColor: "rgba(99, 102, 241, 0.22)",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(29, 155, 240, 0.5)",
+    borderColor: "rgba(99, 102, 241, 0.45)",
   },
   pairActionBtnText: {
-    color: "#38BDF8",
+    color: "#A5B4FC",
     fontSize: 11.5,
     fontWeight: "700",
   },
@@ -1003,12 +1072,12 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: "rgba(29, 155, 240, 0.2)",
+    backgroundColor: "rgba(99, 102, 241, 0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
   stepNumText: {
-    color: "#38BDF8",
+    color: "#818CF8",
     fontSize: 10,
     fontWeight: "800",
   },
@@ -1078,10 +1147,10 @@ const styles = StyleSheet.create({
   },
   disconnectBtn: {
     padding: 8,
-    backgroundColor: "rgba(255, 69, 58, 0.08)",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
     borderRadius: 10,
     borderWidth: 0.8,
-    borderColor: "rgba(255, 69, 58, 0.2)",
+    borderColor: "rgba(239, 68, 68, 0.22)",
   },
   insetCard: {
     backgroundColor: "#16161A",
@@ -1148,7 +1217,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   clearCacheActionText: {
-    color: "#FF453A",
+    color: "#EF4444",
     fontSize: 11,
     fontWeight: "700",
   },
@@ -1157,16 +1226,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "rgba(255, 69, 58, 0.10)",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255, 69, 58, 0.25)",
+    borderColor: "rgba(239, 68, 68, 0.22)",
     borderRadius: 16,
     paddingVertical: 14,
     marginTop: 4,
     marginBottom: 16,
   },
   logoutBtnText: {
-    color: "#FF453A",
+    color: "#EF4444",
     fontSize: 14,
     fontWeight: "700",
     letterSpacing: -0.2,

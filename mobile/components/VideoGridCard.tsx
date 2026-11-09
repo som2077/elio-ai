@@ -9,6 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { PikaIcon } from "./PikaIcon";
+import { PlatformIcon } from "./PlatformIcon";
 import { SavedVideo } from "../types/video";
 import { appleColors } from "../theme/appleTokens";
 import { motionTokens } from "../utils/motion";
@@ -179,17 +180,8 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
             />
           ) : (
             <View style={styles.placeholderBox}>
-              <View
-                style={[
-                  styles.placeholderIconRing,
-                  { borderColor: `${platformInfo.color}40` },
-                ]}
-              >
-                <PikaIcon
-                  name={platformInfo.icon}
-                  size={32}
-                  color={platformInfo.color}
-                />
+              <View style={styles.placeholderIconBox}>
+                <PlatformIcon platform={video.platform} size={40} />
               </View>
               <Text style={styles.placeholderText}>Video Clip</Text>
             </View>
@@ -199,10 +191,10 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
           <View style={styles.thumbnailTopRow}>
             {/* Platform Badge */}
             <View style={styles.platformBadge}>
-              <PikaIcon
-                name={platformInfo.icon}
-                size={11}
-                color={platformInfo.color}
+              <PlatformIcon
+                platform={video.platform}
+                size={12}
+                style={{ marginRight: 4 }}
               />
               <Text style={styles.platformText}>{platformInfo.name}</Text>
             </View>
@@ -344,12 +336,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#16161A",
   },
-  placeholderIconRing: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+  placeholderIconBox: {
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 8,
