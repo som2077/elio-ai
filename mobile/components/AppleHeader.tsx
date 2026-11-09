@@ -175,11 +175,13 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
     }).start();
   };
 
-  // Header container slides up and smoothly fades out on scroll
+  const totalHeight = insets.top + HEADER_COLLAPSIBLE_HEIGHT;
+
+  // Header container slides up like Twitter/X with visible, smooth motion and graceful fade
   const barOpacity = translateY
     ? translateY.interpolate({
-        inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -20, 0],
-        outputRange: [0, 0.7, 1],
+        inputRange: [-totalHeight, -totalHeight * 0.5, 0],
+        outputRange: [0, 0.8, 1],
         extrapolate: "clamp",
       })
     : 1;
@@ -187,8 +189,8 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
   // Subtle status bar blur fades in as the header bar collapses
   const statusBarBlurOpacity = translateY
     ? translateY.interpolate({
-        inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -20, 0],
-        outputRange: [1, 0.3, 0],
+        inputRange: [-totalHeight, -totalHeight * 0.4, 0],
+        outputRange: [1, 0.5, 0],
         extrapolate: "clamp",
       })
     : 0;
@@ -234,7 +236,7 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
         style={[
           styles.headerContainer,
           {
-            height: insets.top + HEADER_COLLAPSIBLE_HEIGHT,
+            height: totalHeight,
             paddingTop: insets.top,
             transform: [{ translateY: translateY || 0 }],
             opacity: barOpacity,
@@ -250,28 +252,23 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Row 1: Hamburger, Center Logo, QR, Search */}
+        {/* Row 1: Left Brand Logo & Right Actions */}
         <View style={styles.topBar}>
-          {/* Left Hamburger Drawer Trigger */}
+          {/* Left: Brand Logo (replaces hamburger menu) */}
           <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.iconBtn}
+            activeOpacity={0.75}
+            style={styles.logoBtnLeft}
             onPress={() => {
               haptics.selection();
-              if (onOpenFeedsDrawer) onOpenFeedsDrawer();
+              onPressActiveTab?.();
             }}
           >
-            <Ionicons name="reorder-two-outline" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          {/* Center Logo */}
-          <View style={styles.logoCenter} pointerEvents="none">
             <Image
               source={require("../assets/centerImage.png")}
               style={styles.elioLogo}
               resizeMode="contain"
             />
-          </View>
+          </TouchableOpacity>
 
           {/* Right Action: Search Button */}
           <View style={styles.actionsRight}>
@@ -476,7 +473,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 12,
-    backgroundColor: "rgba(16, 16, 16, 0.85)",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(255, 255, 255, 0.12)",
     overflow: "hidden",
@@ -495,18 +492,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  logoCenter: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    alignItems: "center",
+  logoBtnLeft: {
+    width: 40,
+    height: 40,
+    alignItems: "flex-start",
     justifyContent: "center",
   },
   elioLogo: {
-    width: 52,
-    height: 52,
+    width: 36,
+    height: 36,
   },
   actionsRight: {
     flexDirection: "row",

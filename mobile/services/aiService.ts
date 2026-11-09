@@ -85,6 +85,12 @@ export async function fetchVideoAIMetadata(
       tags: Array.isArray(data.tags) ? data.tags : [],
       read_time_seconds: data.read_time_seconds || 30,
       processing_status: data.processing_status || "completed",
+      full_transcript: data.full_transcript || undefined,
+      transcript_language: data.transcript_language || "en",
+      has_spoken_audio: data.has_spoken_audio ?? false,
+      context_breakdown: Array.isArray(data.context_breakdown)
+        ? data.context_breakdown
+        : [],
       error_message: data.error_message,
       created_at: data.created_at,
       updated_at: data.updated_at,
@@ -144,6 +150,10 @@ export async function generateVideoAIOnDemand(
         tldw: data.metadata.tldw,
         key_takeaways: data.metadata.key_takeaways || [],
         action_items: data.metadata.action_items || [],
+        context_breakdown: data.metadata.context_breakdown || [],
+        full_transcript: data.metadata.full_transcript || undefined,
+        transcript_language: data.metadata.transcript_language || "en",
+        has_spoken_audio: data.metadata.has_spoken_audio ?? false,
         primary_category: data.metadata.primary_category || "Tech",
         tags: data.metadata.tags || [],
         read_time_seconds: 30,
@@ -164,6 +174,27 @@ export async function generateVideoAIOnDemand(
       success: false,
       error: err?.message || "Failed to generate AI summary.",
     };
+  }
+}
+
+/**
+ * Fetches timestamped video transcript chunks from Supabase
+ */
+export async function fetchVideoTranscriptChunks(
+  videoId: string,
+): Promise<{ chunk_index: number; start_seconds: number; end_seconds: number; chunk_text: string }[]> {
+  if (!videoId) return [];
+  try {
+    const { data, error } = await supabase
+      .from("video_transcript_chunks")
+      .select("chunk_index, start_seconds, end_seconds, chunk_text")
+      .eq("video_id", videoId)
+      .order("chunk_index", { ascending: true });
+
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
   }
 }
 

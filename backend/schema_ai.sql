@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS public.video_ai_metadata (
     primary_category TEXT,
     tags TEXT[] DEFAULT '{}',
     read_time_seconds INT DEFAULT 30,
+    full_transcript TEXT,
+    transcript_language VARCHAR(20) DEFAULT 'en',
+    has_spoken_audio BOOLEAN DEFAULT false,
+    context_breakdown JSONB DEFAULT '[]'::jsonb,
     processing_status VARCHAR(20) DEFAULT 'completed', -- 'pending' | 'completed' | 'failed' | 'skipped'
     error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),

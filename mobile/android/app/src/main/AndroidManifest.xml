@@ -35,5 +35,34 @@
       </intent-filter>
     </activity>
     <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" android:exported="false"/>
+
+    <!-- Widget 1: Elio AI Daily Takeaways / Insight Card -->
+    <receiver
+        android:name=".AiInsightWidgetProvider"
+        android:label="@string/widget_ai_insight_name"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="com.elioai.android.ACTION_CYCLE_INSIGHT" />
+      </intent-filter>
+      <meta-data
+          android:name="android.appwidget.provider"
+          android:resource="@xml/widget_ai_insight_info" />
+    </receiver>
+
+    <!-- Widget 2: Elio AI Liked Videos Carousel with Left/Right Navigation -->
+    <receiver
+        android:name=".LikedCarouselWidgetProvider"
+        android:label="@string/widget_liked_carousel_name"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="com.elioai.android.ACTION_NEXT_LIKED" />
+        <action android:name="com.elioai.android.ACTION_PREV_LIKED" />
+      </intent-filter>
+      <meta-data
+          android:name="android.appwidget.provider"
+          android:resource="@xml/widget_liked_carousel_info" />
+    </receiver>
   </application>
 </manifest>

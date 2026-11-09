@@ -27,15 +27,28 @@ Deno.serve(async (req: Request) => {
 
     // Retrieve API key securely: 1) Environment variable, 2) Encrypted Supabase Vault via service_role
     let openaiApiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
-    if (!openaiApiKey && supabaseServiceKey) {
+    let aiGatewayKey = Deno.env.get("AI_GATEWAY_API_KEY") ?? "";
+
+    if ((!openaiApiKey || !aiGatewayKey) && supabaseServiceKey) {
       const adminClient = createClient(supabaseUrl, supabaseServiceKey);
-      const { data: vaultKey } = await adminClient.rpc(
-        "get_internal_ai_secret",
-        {
-          p_name: "OPENAI_API_KEY",
-        },
-      );
-      openaiApiKey = vaultKey ?? "";
+      if (!openaiApiKey) {
+        const { data: vaultKey } = await adminClient.rpc(
+          "get_internal_ai_secret",
+          {
+            p_name: "OPENAI_API_KEY",
+          },
+        );
+        openaiApiKey = vaultKey ?? "";
+      }
+      if (!aiGatewayKey) {
+        const { data: vaultGwKey } = await adminClient.rpc(
+          "get_internal_ai_secret",
+          {
+            p_name: "AI_GATEWAY_API_KEY",
+          },
+        );
+        aiGatewayKey = vaultGwKey || "vck_7zi2EmI4PKgs7ZSibBe8UymuvYN9aAooOlk40V7NBuTamEw4QL2jIitE";
+      }
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -200,8 +213,37 @@ ${contextBlock}`;
 
     let replyText =
       "I reviewed your saved clips, but didn't find a video discussing this topic.";
+    let chatAnswered = false;
 
-    if (openaiApiKey) {
+    // Prioritize Vercel AI Gateway
+    if (aiGatewayKey) {
+      try {
+        const gwRes = await fetch(
+          "https://ai-gateway.vercel.sh/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${aiGatewayKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-4o-mini",
+              temperature: 0.4,
+              messages,
+            }),
+          },
+        );
+        if (gwRes.ok) {
+          const gwJson = await gwRes.json();
+          replyText = gwJson.choices?.[0]?.message?.content || replyText;
+          chatAnswered = true;
+        }
+      } catch (e) {
+        console.warn("[chat-saved-library] AI Gateway call failed:", e);
+      }
+    }
+
+    if (!chatAnswered && openaiApiKey) {
       const chatRes = await fetch(
         "https://api.openai.com/v1/chat/completions",
         {

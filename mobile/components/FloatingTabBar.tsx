@@ -22,6 +22,7 @@ interface FloatingTabBarProps {
   onComposePress?: () => void;
   onOpenAskElio?: () => void;
   translateY?: Animated.Value | Animated.AnimatedInterpolation<number>;
+  opacity?: Animated.Value | Animated.AnimatedInterpolation<number>;
 }
 
 interface AnimatedTabItemProps {
@@ -127,8 +128,11 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
   onComposePress,
   onOpenAskElio,
   translateY,
+  opacity,
 }) => {
   const insets = useSafeAreaInsets();
+
+  const tabOpacity = opacity !== undefined ? opacity : 1;
 
   return (
     <Animated.View
@@ -137,6 +141,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
         {
           paddingBottom: Math.max(insets.bottom, 10),
           transform: [{ translateY: translateY || 0 }],
+          opacity: tabOpacity,
         },
       ]}
     >
@@ -153,7 +158,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
       <View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: "rgba(16, 16, 16, 0.50)" },
+          { backgroundColor: "rgba(0, 0, 0, 0.60)" },
         ]}
         pointerEvents="none"
       />
@@ -257,6 +262,6 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
     backgroundColor: "#1D9BF0",
     borderWidth: 1.5,
-    borderColor: "#101010",
+    borderColor: "#000000",
   },
 });

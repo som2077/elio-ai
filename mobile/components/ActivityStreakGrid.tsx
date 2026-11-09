@@ -8,6 +8,11 @@ import {
   calculateActivityStats,
   getDailyActivityMap,
 } from "../services/dateAnalytics";
+import {
+  appleColors,
+  appleRadii,
+  appleTypography,
+} from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 
 interface ActivityStreakGridProps {
@@ -16,7 +21,6 @@ interface ActivityStreakGridProps {
 }
 
 const WEEKS_COUNT = 12; // Last 12 weeks (84 days)
-const DAY_LABELS = ["M", "W", "F", "S"];
 
 /**
  * GitHub / Apple Fitness Inspired Activity Consistency Heatmap
@@ -46,7 +50,6 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
 
     // Calculate start date: 12 weeks ago, aligned to Monday
     const currentDayOfWeek = (today.getDay() + 6) % 7; // 0=Mon, 6=Sun
-    const totalDays = WEEKS_COUNT * 7;
     const startDate = new Date(today);
     startDate.setDate(
       today.getDate() - currentDayOfWeek - (WEEKS_COUNT - 1) * 7,
@@ -74,9 +77,9 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
 
   const getCellColor = (count: number) => {
     if (count < 0) return "transparent"; // Future
-    if (count === 0) return "#202327";
-    if (count === 1) return "rgba(29, 155, 240, 0.42)";
-    if (count <= 3) return "rgba(29, 155, 240, 0.75)";
+    if (count === 0) return "rgba(255, 255, 255, 0.05)";
+    if (count === 1) return "rgba(29, 155, 240, 0.38)";
+    if (count <= 3) return "rgba(29, 155, 240, 0.72)";
     return "#1D9BF0";
   };
 
@@ -93,11 +96,14 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
 
   return (
     <View style={styles.card}>
+      {/* Specular Highlight Rim */}
+      <View style={styles.specularRim} />
+
       {/* Header */}
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.cardTitle}>Daily Consistency</Text>
-          <Text style={styles.cardSub}>Last 12 weeks of activity</Text>
+          <Text style={styles.cardSub}>Last 12 weeks of save activity</Text>
         </View>
 
         {/* Selected Day Toast */}
@@ -184,17 +190,22 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
       {/* Footer Legend */}
       <View style={styles.legendRow}>
         <Text style={styles.legendLabel}>Less</Text>
-        <View style={[styles.legendBox, { backgroundColor: "#202327" }]} />
         <View
           style={[
             styles.legendBox,
-            { backgroundColor: "rgba(29, 155, 240, 0.42)" },
+            { backgroundColor: "rgba(255, 255, 255, 0.05)" },
           ]}
         />
         <View
           style={[
             styles.legendBox,
-            { backgroundColor: "rgba(29, 155, 240, 0.75)" },
+            { backgroundColor: "rgba(29, 155, 240, 0.38)" },
+          ]}
+        />
+        <View
+          style={[
+            styles.legendBox,
+            { backgroundColor: "rgba(29, 155, 240, 0.72)" },
           ]}
         />
         <View style={[styles.legendBox, { backgroundColor: "#1D9BF0" }]} />
@@ -206,12 +217,23 @@ export const ActivityStreakGrid: React.FC<ActivityStreakGridProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#16181C",
-    borderRadius: 16,
+    backgroundColor: "#16161A",
+    borderRadius: appleRadii.card,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#2F3336",
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: "rgba(255, 255, 255, 0.15)",
     marginBottom: 20,
+    position: "relative",
+    overflow: "hidden",
+  },
+  specularRim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
   },
   headerRow: {
     flexDirection: "row",
@@ -221,35 +243,36 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "700",
     letterSpacing: -0.2,
   },
   cardSub: {
-    color: "#71767B",
+    color: appleColors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   selectedDayPill: {
-    backgroundColor: "#000000",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     borderWidth: 1,
-    borderColor: "#2F3336",
-    paddingHorizontal: 8,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: appleRadii.control,
   },
   selectedDayText: {
     color: "#E7E9EA",
     fontSize: 11,
+    fontWeight: "500",
   },
   statsStrip: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#000000",
-    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#2F3336",
+    borderColor: "rgba(255, 255, 255, 0.06)",
     paddingVertical: 10,
     paddingHorizontal: 12,
     marginBottom: 16,
@@ -263,7 +286,7 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: "#2F3336",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
     marginHorizontal: 4,
   },
   statEmoji: {
@@ -271,12 +294,14 @@ const styles = StyleSheet.create({
   },
   statVal: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
   statLabel: {
-    color: "#71767B",
+    color: appleColors.textSecondary,
     fontSize: 10.5,
+    marginTop: 1,
   },
   matrixContainer: {
     flexDirection: "row",
@@ -290,7 +315,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   dayLabel: {
-    color: "#71767B",
+    color: appleColors.textTertiary,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 12,
@@ -308,7 +333,7 @@ const styles = StyleSheet.create({
   cell: {
     width: 13,
     height: 12,
-    borderRadius: 2.5,
+    borderRadius: 3,
   },
   cellSelected: {
     borderWidth: 1.5,
@@ -322,13 +347,13 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   legendLabel: {
-    color: "#71767B",
+    color: appleColors.textTertiary,
     fontSize: 10.5,
     marginHorizontal: 2,
   },
   legendBox: {
     width: 9,
     height: 9,
-    borderRadius: 2,
+    borderRadius: 2.5,
   },
 });

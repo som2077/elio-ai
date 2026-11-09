@@ -1,17 +1,17 @@
-import type { VideoAIMetadata } from './ai';
+import type { VideoAIMetadata } from "./ai";
 
 export type PlatformType =
-  | 'youtube'
-  | 'instagram'
-  | 'twitter'
-  | 'facebook'
-  | 'reddit'
-  | 'linkedin'
-  | 'pinterest'
-  | 'tiktok'
-  | 'other';
-export type ContentCategory = 'video' | 'short' | 'reel' | 'post';
-export type WatchStatus = 'unread' | 'in_progress' | 'watched' | 'archived';
+  | "youtube"
+  | "instagram"
+  | "twitter"
+  | "facebook"
+  | "reddit"
+  | "linkedin"
+  | "pinterest"
+  | "tiktok"
+  | "other";
+export type ContentCategory = "video" | "short" | "reel" | "post";
+export type WatchStatus = "unread" | "in_progress" | "watched" | "archived";
 
 export interface SavedVideo {
   id: string;
@@ -36,6 +36,7 @@ export interface SavedVideo {
   remind_at?: string;
   watched_at?: string;
   ai_metadata?: VideoAIMetadata;
+  productivity_score?: number;
   created_at: string;
   updated_at: string;
 }

@@ -7,6 +7,19 @@ export interface ActionItem {
   subtitle?: string;
 }
 
+export interface ContextStepItem {
+  time_seconds?: number;
+  time_formatted?: string;
+  title: string;
+  detail: string;
+}
+
+export interface TranscriptSnippet {
+  text: string;
+  start: number; // in seconds
+  duration: number; // in seconds
+}
+
 export type AIProcessingStatus = 'pending' | 'completed' | 'failed' | 'skipped';
 
 export interface VideoAIMetadata {
@@ -14,6 +27,7 @@ export interface VideoAIMetadata {
   video_id: string;
   user_id: string;
   is_educational: boolean;
+  productivity_score?: number; // 0 to 100 high-signal productivity rating
   tldw: string;
   key_takeaways: string[];
   action_items: ActionItem[];
@@ -21,6 +35,10 @@ export interface VideoAIMetadata {
   tags: string[];
   read_time_seconds: number;
   processing_status: AIProcessingStatus;
+  full_transcript?: string;
+  transcript_language?: string;
+  has_spoken_audio?: boolean;
+  context_breakdown?: ContextStepItem[];
   error_message?: string;
   created_at: string;
   updated_at?: string;

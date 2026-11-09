@@ -232,9 +232,18 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             }}
           >
             <View style={styles.aiDigestHeader}>
-              <View style={styles.aiSparkleBadge}>
-                <PikaIcon name="sparkles" size={12} color="#A78BFA" />
-                <Text style={styles.aiBadgeText}>30s Digest</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={styles.aiSparkleBadge}>
+                  <PikaIcon name="sparkles" size={11} color="#A78BFA" />
+                  <Text style={styles.aiBadgeText}>30s Digest</Text>
+                </View>
+                {aiMeta.primary_category && (
+                  <View style={styles.aiCategoryBadge}>
+                    <Text style={styles.aiCategoryBadgeText}>
+                      {aiMeta.primary_category}
+                    </Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.aiExpandHint}>
                 {showAiDigest ? "hide" : "tap to expand"}
@@ -475,6 +484,19 @@ const styles = StyleSheet.create({
   aiSparkleBadge: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  aiCategoryBadge: {
+    backgroundColor: "rgba(99, 102, 241, 0.18)",
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(99, 102, 241, 0.35)",
+  },
+  aiCategoryBadgeText: {
+    color: "#818CF8",
+    fontSize: 9.5,
+    fontWeight: "700",
   },
   aiBadgeText: {
     color: "#C4B5FD",

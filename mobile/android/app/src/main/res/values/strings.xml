@@ -2,4 +2,8 @@
   <string name="app_name">Elio AI</string>
   <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
   <string name="expo_splash_screen_status_bar_translucent" translatable="false">false</string>
+  <string name="widget_ai_insight_name">Elio AI • Daily Takeaways</string>
+  <string name="widget_ai_insight_desc">Bite-sized AI summaries &amp; key takeaways from your saved clips.</string>
+  <string name="widget_liked_carousel_name">Elio AI • Liked Videos Carousel</string>
+  <string name="widget_liked_carousel_desc">Browse and play your favorite video clips with 1-tap playback.</string>
 </resources>

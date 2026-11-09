@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Alert,
   Animated,
+  Easing,
   NativeSyntheticEvent,
   NativeScrollEvent,
   Keyboard,
@@ -25,7 +26,7 @@ import {
 } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "../services/supabase";
-import { SavedVideo } from "../types/video";
+import { SavedVideo, WatchStatus } from "../types/video";
 import { VideoCard } from "../components/VideoCard";
 import { VideoGridCard } from "../components/VideoGridCard";
 import { FloatingTabBar, TabKey } from "../components/FloatingTabBar";
@@ -47,7 +48,7 @@ import {
 } from "../components/AppleHeader";
 import { PlatformFilterModal } from "../components/PlatformFilterModal";
 import { EmptyState } from "../components/EmptyState";
-import { FeedsDrawer, FeedFilterType } from "../components/FeedsDrawer";
+import type { FeedFilterType } from "../components/FeedsDrawer";
 import { CreateFeedModal } from "../components/CreateFeedModal";
 import { QuickClipModal } from "../components/QuickClipModal";
 import { AskElioModal, AskElioView } from "../components/AskElioModal";
@@ -60,6 +61,63 @@ import {
   processSharedContent,
   flushPendingShares,
 } from "../services/shareHandler";
+import { syncWidgetsData } from "../services/widgetSync";
+import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
+
+interface ScrollToTopButtonProps {
+  onPress: () => void;
+  opacity: Animated.AnimatedInterpolation<number>;
+  scale: Animated.AnimatedInterpolation<number>;
+  headerTranslateY: Animated.Value;
+  headerHeight: number;
+  bottomInset: number;
+}
+
+const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = React.memo(
+  ({ onPress, opacity, scale, headerTranslateY, headerHeight, bottomInset }) => {
+    const [canTouch, setCanTouch] = useState(false);
+
+    useEffect(() => {
+      const listenerId = headerTranslateY.addListener(({ value }) => {
+        const isHidden = value <= -headerHeight * 0.55;
+        setCanTouch((prev) => (prev !== isHidden ? isHidden : prev));
+      });
+      return () => {
+        headerTranslateY.removeListener(listenerId);
+      };
+    }, [headerTranslateY, headerHeight]);
+
+    return (
+      <Animated.View
+        pointerEvents={canTouch ? "auto" : "none"}
+        style={[
+          styles.scrollToTopBtnContainer,
+          {
+            bottom: bottomInset,
+            opacity,
+            transform: [{ scale }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          activeOpacity={0.75}
+          style={styles.scrollToTopBtn}
+          onPress={onPress}
+          disabled={!canTouch}
+        >
+          <BlurView
+            intensity={45}
+            tint="systemUltraThinMaterialDark"
+            blurReductionFactor={2}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
+          />
+          <PikaIcon name="arrow-up" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  },
+);
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -70,7 +128,6 @@ export default function HomeScreen() {
   const [showDevicesModal, setShowDevicesModal] = useState(false);
 
   // Threads modals & drawers
-  const [showFeedsDrawer, setShowFeedsDrawer] = useState(false);
   const [showCreateFeedModal, setShowCreateFeedModal] = useState(false);
   const [showQuickClipModal, setShowQuickClipModal] = useState(false);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -99,27 +156,33 @@ export default function HomeScreen() {
   // Twitter Collapsible Header & Bottom Navbar on Scroll
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const isHeaderVisible = useRef(true);
-  const [isHeaderVisibleState, setIsHeaderVisibleState] = useState(true);
   const lastScrollY = useRef(0);
+  const accumulatedDelta = useRef(0);
   const flatListRef = useRef<FlatList<SavedVideo>>(null);
 
   // TabBar slides down out of view when header hides
   const tabBarTranslateY = headerTranslateY.interpolate({
-    inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, 0],
-    outputRange: [110, 0],
+    inputRange: [-headerHeight, 0],
+    outputRange: [120, 0],
+    extrapolate: "clamp",
+  });
+
+  const tabBarOpacity = headerTranslateY.interpolate({
+    inputRange: [-headerHeight, -headerHeight * 0.4, 0],
+    outputRange: [0, 0.75, 1],
     extrapolate: "clamp",
   });
 
   // Floating "Scroll to Top" button pops in at bottom-right when navbar is hidden
   const scrollToTopOpacity = headerTranslateY.interpolate({
-    inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -30, 0],
+    inputRange: [-headerHeight, -headerHeight * 0.5, 0],
     outputRange: [1, 0.4, 0],
     extrapolate: "clamp",
   });
 
   const scrollToTopScale = headerTranslateY.interpolate({
-    inputRange: [-HEADER_COLLAPSIBLE_HEIGHT, -30, 0],
-    outputRange: [1, 0.6, 0],
+    inputRange: [-headerHeight, -headerHeight * 0.5, 0],
+    outputRange: [1, 0.5, 0],
     extrapolate: "clamp",
   });
 
@@ -135,7 +198,6 @@ export default function HomeScreen() {
       showPlatformModal ||
       showAskElioModal ||
       showScanner ||
-      showFeedsDrawer ||
       showQuickClipModal ||
       showDevicesModal,
   );
@@ -204,71 +266,83 @@ export default function HomeScreen() {
     }
   };
 
+  const showHeaderAndNavbar = () => {
+    if (isHeaderVisible.current) return;
+    isHeaderVisible.current = true;
+    headerTranslateY.stopAnimation();
+    Animated.timing(headerTranslateY, {
+      toValue: 0,
+      duration: 250,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideHeaderAndNavbar = () => {
+    if (!isHeaderVisible.current) return;
+    isHeaderVisible.current = false;
+    headerTranslateY.stopAnimation();
+    Animated.timing(headerTranslateY, {
+      toValue: -headerHeight,
+      duration: 260,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: true,
+    }).start();
+  };
+
   const scrollToTop = () => {
     haptics.medium();
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-    if (!isHeaderVisible.current) {
-      isHeaderVisible.current = true;
-      setIsHeaderVisibleState(true);
-      Animated.timing(headerTranslateY, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
+    accumulatedDelta.current = 0;
+    showHeaderAndNavbar();
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const currentY = event.nativeEvent.contentOffset.y;
     const diff = currentY - lastScrollY.current;
 
+    // 1. Top of feed / bounce protection: always show header & navbar immediately
     if (currentY <= 15) {
-      // Near top of feed -> always show full header and navbar
+      accumulatedDelta.current = 0;
       if (!isHeaderVisible.current) {
-        isHeaderVisible.current = true;
-        setIsHeaderVisibleState(true);
-        Animated.timing(headerTranslateY, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }).start();
+        showHeaderAndNavbar();
       }
-    } else if (diff > 8 && currentY > 50) {
-      // Scrolling down -> hide header and navbar
-      if (isHeaderVisible.current) {
-        isHeaderVisible.current = false;
-        setIsHeaderVisibleState(false);
-        Animated.timing(headerTranslateY, {
-          toValue: -HEADER_COLLAPSIBLE_HEIGHT,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
-    } else if (diff < -24) {
-      // Scrolling up -> show header and navbar
-      if (!isHeaderVisible.current) {
-        isHeaderVisible.current = true;
-        setIsHeaderVisibleState(true);
-        Animated.timing(headerTranslateY, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }).start();
-      }
+      lastScrollY.current = Math.max(0, currentY);
+      return;
     }
+
+    // 2. Track accumulated directional delta (resets on direction inversion)
+    if ((diff > 0 && accumulatedDelta.current < 0) || (diff < 0 && accumulatedDelta.current > 0)) {
+      accumulatedDelta.current = diff;
+    } else {
+      accumulatedDelta.current += diff;
+    }
+
+    // 3. Twitter-style responsive hide/show with visible smooth animation:
+    // - Scrolling Down: Hide smoothly when thumb moves down > 24px and past top buffer
+    if (accumulatedDelta.current > 24 && currentY > 40) {
+      hideHeaderAndNavbar();
+    }
+    // - Scrolling Up: Show immediately with smooth animation when thumb reverses by > 14px
+    else if (accumulatedDelta.current < -14) {
+      showHeaderAndNavbar();
+    }
+
     lastScrollY.current = currentY;
   };
 
   // Always keep header & tab bar visible when navigating to AI, Insights, or Devices
   useEffect(() => {
     if (activeTab !== "feed") {
+      headerTranslateY.stopAnimation();
       Animated.timing(headerTranslateY, {
         toValue: 0,
-        duration: 200,
+        duration: 250,
+        easing: Easing.bezier(0.16, 1, 0.3, 1),
         useNativeDriver: true,
       }).start();
       isHeaderVisible.current = true;
-      setIsHeaderVisibleState(true);
+      accumulatedDelta.current = 0;
     }
   }, [activeTab]);
 
@@ -467,7 +541,9 @@ export default function HomeScreen() {
       if (error) {
         console.warn("Supabase fetch notice:", error.message);
       } else if (data) {
-        setVideos(data as SavedVideo[]);
+        const list = data as SavedVideo[];
+        setVideos(list);
+        syncWidgetsData(list);
       }
     } catch (err: any) {
       console.warn("Network issue:", err.message);
@@ -507,13 +583,17 @@ export default function HomeScreen() {
   }, [session?.user?.id]);
 
   const toggleStatus = async (video: SavedVideo) => {
-    const newStatus = video.status === "unread" ? "watched" : "unread";
+    const newStatus: WatchStatus = video.status === "unread" ? "watched" : "unread";
     haptics.success();
     triggerLayoutMotion();
 
-    setVideos((prev) =>
-      prev.map((v) => (v.id === video.id ? { ...v, status: newStatus } : v)),
-    );
+    setVideos((prev) => {
+      const updated = prev.map((v) =>
+        v.id === video.id ? { ...v, status: newStatus } : v,
+      );
+      syncWidgetsData(updated);
+      return updated;
+    });
 
     if (detailVideo && detailVideo.id === video.id) {
       setDetailVideo((prev) => (prev ? { ...prev, status: newStatus } : null));
@@ -530,6 +610,34 @@ export default function HomeScreen() {
     await supabase
       .from("saved_videos")
       .update({ status: newStatus })
+      .eq("id", video.id);
+  };
+
+  const toggleFavorite = async (video: SavedVideo) => {
+    const newFav = !video.is_favorite;
+    haptics.selection();
+    triggerLayoutMotion();
+
+    setVideos((prev) => {
+      const updated = prev.map((v) =>
+        v.id === video.id ? { ...v, is_favorite: newFav } : v,
+      );
+      syncWidgetsData(updated);
+      return updated;
+    });
+
+    if (detailVideo && detailVideo.id === video.id) {
+      setDetailVideo((prev) => (prev ? { ...prev, is_favorite: newFav } : null));
+    }
+
+    setToast({
+      message: newFav ? "Saved to Favorites ❤️" : "Removed from Favorites",
+      type: "success",
+    });
+
+    await supabase
+      .from("saved_videos")
+      .update({ is_favorite: newFav })
       .eq("id", video.id);
   };
 
@@ -600,15 +708,40 @@ export default function HomeScreen() {
     return counts;
   }, [videos]);
 
-  // Feed filtered videos (Platform Tabs + Feed Drawer)
+  // Feed filtered videos (Platform Tabs + Feed Drawer + Calendar Date)
   const feedVideos = useMemo(() => {
     return videos.filter((v) => {
+      // 0. Calendar Date filter
+      if (selectedDate) {
+        const videoDateKey = toDateKey(v.created_at);
+        if (videoDateKey !== selectedDate) {
+          return false;
+        }
+      }
+
       // 1. Top platform horizontal tab filter
       if (selectedPlatform !== "all" && v.platform !== selectedPlatform) {
         return false;
       }
 
       // 2. Feed drawer filter
+      if (feedDrawerFilter === "productive") {
+        // AI Productive Filter: only high-value educational, skill-building, and tutorial clips
+        if (v.ai_metadata?.is_educational === false) return false;
+        if (v.ai_metadata?.is_educational === true) return true;
+        
+        // Keyword & category evaluation for clips pending AI metadata
+        const lowerTitle = (v.title || "").toLowerCase();
+        const lowerNotes = (v.user_notes || "").toLowerCase();
+        const productiveKeywords = [
+          "tutorial", "guide", "how to", "explained", "course", "learn",
+          "code", "coding", "react", "python", "ai", "llm", "developer",
+          "business", "startup", "finance", "invest", "money", "productivity",
+          "habit", "system", "deep work", "book", "summary", "framework",
+          "podcast", "interview", "tips", "hacks", "fitness", "workout", "recipe"
+        ];
+        return productiveKeywords.some((kw) => lowerTitle.includes(kw) || lowerNotes.includes(kw));
+      }
       if (feedDrawerFilter === "following") return v.status === "unread";
       if (
         feedDrawerFilter === "saved" ||
@@ -626,7 +759,7 @@ export default function HomeScreen() {
       }
       return true;
     });
-  }, [videos, feedDrawerFilter, selectedPlatform]);
+  }, [videos, feedDrawerFilter, selectedPlatform, selectedDate]);
 
   // Search filtered videos
   const searchResults = useMemo(() => {
@@ -777,6 +910,35 @@ export default function HomeScreen() {
                 keyExtractor={(item) => item.id}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
+                ListHeaderComponent={
+                  selectedDate ? (
+                    <View style={styles.activeDateFilterHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                        <PikaIcon name="film" size={13} color="#818CF8" />
+                        <Text style={styles.activeDateFilterHeaderText}>
+                          Filtered by {formatDisplayDate(selectedDate)}
+                        </Text>
+                        <View style={styles.activeDateCountBadge}>
+                          <Text style={styles.activeDateCountText}>
+                            {feedVideos.length} {feedVideos.length === 1 ? "clip" : "clips"}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={styles.clearDateFilterBtn}
+                        onPress={() => {
+                          haptics.selection();
+                          setSelectedDate(null);
+                          triggerLayoutMotion();
+                        }}
+                      >
+                        <Text style={styles.clearDateFilterBtnText}>Show All</Text>
+                        <PikaIcon name="close" size={11} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null
+                }
                 renderItem={({ item }) => (
                   <VideoCard
                     video={item}
@@ -842,7 +1004,6 @@ export default function HomeScreen() {
               onOpenSearch={() => {
                 setActiveTab("search");
               }}
-              onOpenFeedsDrawer={() => setShowFeedsDrawer(true)}
             />
           </View>
         </View>
@@ -882,8 +1043,19 @@ export default function HomeScreen() {
           <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
             <DevicesView
               userEmail={session?.user?.email}
+              totalClips={videos.length}
+              aiSummarizedCount={
+                videos.filter(
+                  (v) =>
+                    Boolean(
+                      v.ai_metadata?.tldw ||
+                        v.ai_metadata?.processing_status === "completed",
+                    ),
+                ).length
+              }
               onOpenScanner={() => setShowScanner(true)}
               onLogout={handleLogout}
+              onOpenPlatformModal={() => setShowPlatformModal(true)}
             />
           </View>
         </View>
@@ -1053,32 +1225,14 @@ export default function HomeScreen() {
 
       {/* FLOATING SCROLL TO TOP BUTTON (BOTTOM RIGHT) */}
       {activeTab === "feed" && (
-        <Animated.View
-          pointerEvents={isHeaderVisibleState ? "none" : "auto"}
-          style={[
-            styles.scrollToTopBtnContainer,
-            {
-              bottom: Math.max(insets.bottom, 14) + 16,
-              opacity: scrollToTopOpacity,
-              transform: [{ scale: scrollToTopScale }],
-            },
-          ]}
-        >
-          <TouchableOpacity
-            activeOpacity={0.75}
-            style={styles.scrollToTopBtn}
-            onPress={scrollToTop}
-          >
-            <BlurView
-              intensity={45}
-              tint="systemUltraThinMaterialDark"
-              blurReductionFactor={2}
-              experimentalBlurMethod="dimezisBlurView"
-              style={StyleSheet.absoluteFill}
-            />
-            <PikaIcon name="arrow-up" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-        </Animated.View>
+        <ScrollToTopButton
+          onPress={scrollToTop}
+          opacity={scrollToTopOpacity}
+          scale={scrollToTopScale}
+          headerTranslateY={headerTranslateY}
+          headerHeight={headerHeight}
+          bottomInset={Math.max(insets.bottom, 14) + 16}
+        />
       )}
 
       {/* THREADS 4-TAB BOTTOM NAVIGATION DOCK */}
@@ -1087,21 +1241,10 @@ export default function HomeScreen() {
         isAIActive={activeTab === "ai" || showAskElioModal}
         unreadCount={unreadCount}
         translateY={tabBarTranslateY}
+        opacity={tabBarOpacity}
         onTabSelect={handleTabSelect}
         onOpenAskElio={() => handleTabSelect("ai")}
         onComposePress={() => setShowQuickClipModal(true)}
-      />
-
-      {/* Threads Feeds Switcher Drawer */}
-      <FeedsDrawer
-        visible={showFeedsDrawer}
-        activeFeed={feedDrawerFilter}
-        onClose={() => setShowFeedsDrawer(false)}
-        onSelectFeed={(feedKey) => {
-          setFeedDrawerFilter(feedKey);
-          triggerLayoutMotion();
-        }}
-        onCreateFeedPress={() => setShowCreateFeedModal(true)}
       />
 
       {/* Threads Create Feed Modal */}
@@ -1168,6 +1311,7 @@ export default function HomeScreen() {
           openVideoDirectly(v.clean_url, v.platform as any, v.platform_video_id)
         }
         onToggleStatus={toggleStatus}
+        onToggleFavorite={toggleFavorite}
         onCopyLink={handleCopyLink}
         onDelete={handleDeleteVideo}
       />
@@ -1198,7 +1342,7 @@ const styles = StyleSheet.create({
   },
   searchOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#101010",
+    backgroundColor: "#000000",
     zIndex: 100,
   },
   swipeContainer: {
@@ -1366,5 +1510,48 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 6,
     fontWeight: "500",
+  },
+  activeDateFilterHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(99, 102, 241, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(99, 102, 241, 0.25)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  activeDateFilterHeaderText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  activeDateCountBadge: {
+    backgroundColor: "rgba(99, 102, 241, 0.25)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  activeDateCountText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#818CF8",
+  },
+  clearDateFilterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#27272A",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  clearDateFilterBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#D4D4D8",
   },
 });

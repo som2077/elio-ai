@@ -339,7 +339,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               </View>
             ) : (
               <View style={styles.pillContentRow}>
-                <PikaIcon name="logo-google" size={19} color="#000000" />
+                <Image
+                  source={require("../assets/google_logo.png")}
+                  style={styles.googleIconImage}
+                  resizeMode="contain"
+                />
                 <Text style={styles.pillBtnText}>Continue with Google</Text>
               </View>
             )}
@@ -398,7 +402,7 @@ const styles = StyleSheet.create({
   },
   fullVideo: {
     width: "100%",
-    height: "85%",
+    height: "90%",
   },
   bottomActionSection: {
     width: "100%",
@@ -412,30 +416,30 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   uspLineMuted: {
-    fontSize: 32,
+    fontSize: 50,
     fontWeight: "500",
     color: "#8E8E93",
-    letterSpacing: -0.6,
-    lineHeight: 38,
+    letterSpacing: -1.2,
+    lineHeight: 56,
   },
   uspLineMiddleRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 1,
+    marginVertical: 2,
   },
   uspLineBold: {
-    fontSize: 34,
+    fontSize: 54,
     fontWeight: "800",
     color: "#FFFFFF",
-    letterSpacing: -0.8,
-    lineHeight: 40,
+    letterSpacing: -1.4,
+    lineHeight: 60,
   },
   platformBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 54,
+    height: 54,
+    borderRadius: 15,
     overflow: "hidden",
-    marginHorizontal: 9,
+    marginHorizontal: 11,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(255, 255, 255, 0.18)",
     shadowOffset: { width: 0, height: 3 },
@@ -466,6 +470,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
+  },
+  googleIconImage: {
+    width: 22,
+    height: 22,
   },
   pillBtnText: {
     fontSize: 16,

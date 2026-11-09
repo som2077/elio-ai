@@ -23,6 +23,7 @@ interface VideoDetailSheetProps {
   onClose: () => void;
   onPlay: (video: SavedVideo) => void;
   onToggleStatus: (video: SavedVideo) => void;
+  onToggleFavorite?: (video: SavedVideo) => void;
   onCopyLink?: (url: string) => void;
   onDelete: (video: SavedVideo) => void;
 }
@@ -33,6 +34,7 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   onClose,
   onPlay,
   onToggleStatus,
+  onToggleFavorite,
   onCopyLink,
   onDelete,
 }) => {
@@ -41,6 +43,8 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   const [isLoadingMeta, setIsLoadingMeta] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedTakeaways, setCopiedTakeaways] = useState(false);
+  const [copiedTranscript, setCopiedTranscript] = useState(false);
+  const [showFullTranscript, setShowFullTranscript] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -117,6 +121,30 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     } else {
       Alert.alert("AI Engine Notice", res.error || "Could not generate digest right now.");
     }
+  };
+
+  const handleTranscribeWhisper = async () => {
+    haptics.selection();
+    setIsGenerating(true);
+    const res = await generateVideoAIOnDemand(video, true);
+    setIsGenerating(false);
+
+    if (res.success && res.data) {
+      setAiMeta(res.data);
+      haptics.success();
+    } else {
+      Alert.alert("Speech Engine Notice", res.error || "Could not transcribe audio right now.");
+    }
+  };
+
+  const handleCopyTranscript = () => {
+    if (!aiMeta?.full_transcript) return;
+    haptics.light();
+    if (onCopyLink) {
+      onCopyLink(aiMeta.full_transcript);
+    }
+    setCopiedTranscript(true);
+    setTimeout(() => setCopiedTranscript(false), 2000);
   };
 
   const handleCopyTakeaways = () => {
@@ -226,6 +254,48 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
             </View>
           ) : aiMeta ? (
             <View>
+              {/* Speech Intelligence Status Pill */}
+              <View style={styles.speechBadgeRow}>
+                <View
+                  style={[
+                    styles.speechBadge,
+                    aiMeta.has_spoken_audio
+                      ? styles.speechBadgeActive
+                      : styles.speechBadgeNotes,
+                  ]}
+                >
+                  <PikaIcon
+                    name={aiMeta.has_spoken_audio ? "sparkles" : "film-outline"}
+                    size={12}
+                    color={aiMeta.has_spoken_audio ? "#10B981" : "#A78BFA"}
+                  />
+                  <Text
+                    style={[
+                      styles.speechBadgeText,
+                      {
+                        color: aiMeta.has_spoken_audio ? "#10B981" : "#A78BFA",
+                      },
+                    ]}
+                  >
+                    {aiMeta.has_spoken_audio
+                      ? `Spoken Speech Extracted (${(aiMeta.transcript_language || "EN").toUpperCase()})`
+                      : "Post Caption & Notes Context"}
+                  </Text>
+                </View>
+
+                {!aiMeta.has_spoken_audio && (
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    style={styles.whisperTriggerBtn}
+                    onPress={handleTranscribeWhisper}
+                  >
+                    <Text style={styles.whisperTriggerText}>
+                      Whisper Audio
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               {/* TL;DW Capsule */}
               <View style={styles.tldwCard}>
                 <View style={styles.tldwHeaderRow}>
@@ -270,6 +340,93 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                       <Text style={styles.takeawayText}>{takeaway}</Text>
                     </View>
                   ))}
+                </View>
+              )}
+
+              {/* Spoken Context & Step-by-Step Breakdown */}
+              {aiMeta.context_breakdown && aiMeta.context_breakdown.length > 0 && (
+                <View style={styles.contextBreakdownSection}>
+                  <Text style={styles.sectionTitle}>Spoken Context & Steps</Text>
+                  <View style={styles.breakdownList}>
+                    {aiMeta.context_breakdown.map((item, idx) => (
+                      <View key={idx} style={styles.breakdownCard}>
+                        {item.time_formatted && (
+                          <View style={styles.timeBadge}>
+                            <Text style={styles.timeBadgeText}>
+                              {item.time_formatted}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.breakdownTitle}>{item.title}</Text>
+                          <Text style={styles.breakdownDetail}>{item.detail}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Full Spoken Dialog & Transcript Panel */}
+              {aiMeta.full_transcript && aiMeta.full_transcript.length > 0 && (
+                <View style={styles.transcriptSection}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Spoken Transcript</Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={styles.copyBtn}
+                        onPress={handleCopyTranscript}
+                      >
+                        <PikaIcon
+                          name={copiedTranscript ? "checkmark" : "copy-outline"}
+                          size={13}
+                          color={copiedTranscript ? "#10B981" : "#A78BFA"}
+                        />
+                        <Text
+                          style={[
+                            styles.copyBtnText,
+                            copiedTranscript && { color: "#10B981" },
+                          ]}
+                        >
+                          {copiedTranscript ? "Copied" : "Copy All"}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={styles.copyBtn}
+                        onPress={() => setShowFullTranscript(!showFullTranscript)}
+                      >
+                        <Text style={styles.copyBtnText}>
+                          {showFullTranscript ? "Collapse" : "Expand"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {showFullTranscript ? (
+                    <View style={styles.transcriptBox}>
+                      <Text style={styles.transcriptText} selectable>
+                        {aiMeta.full_transcript}
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={styles.transcriptCollapsed}
+                      onPress={() => setShowFullTranscript(true)}
+                    >
+                      <Text
+                        style={styles.transcriptCollapsedText}
+                        numberOfLines={3}
+                      >
+                        "{aiMeta.full_transcript.slice(0, 180)}..."
+                      </Text>
+                      <Text style={styles.readMoreText}>
+                        Tap to read full transcript →
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
@@ -351,6 +508,23 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                 name={isWatched ? "bookmark" : "checkmark-done-outline"}
                 size={22}
                 color="#FFFFFF"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.actionRow}
+              onPress={() => {
+                if (onToggleFavorite && video) onToggleFavorite(video);
+              }}
+            >
+              <Text style={styles.actionLabel}>
+                {video.is_favorite ? "Remove from Favorites" : "Add to Favorites ❤️"}
+              </Text>
+              <PikaIcon
+                name={video.is_favorite ? "heart" : "heart-outline"}
+                size={22}
+                color={video.is_favorite ? "#EF4444" : "#FFFFFF"}
               />
             </TouchableOpacity>
 
@@ -531,6 +705,125 @@ const styles = StyleSheet.create({
     color: "#71767B",
     fontSize: 11,
     marginTop: 1,
+  },
+  speechBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  speechBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  speechBadgeActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    borderColor: "rgba(16, 185, 129, 0.28)",
+  },
+  speechBadgeNotes: {
+    backgroundColor: "rgba(167, 139, 250, 0.10)",
+    borderColor: "rgba(167, 139, 250, 0.24)",
+  },
+  speechBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  whisperTriggerBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+  },
+  whisperTriggerText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  contextBreakdownSection: {
+    marginTop: 16,
+  },
+  breakdownList: {
+    marginTop: 8,
+    gap: 8,
+  },
+  breakdownCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#161618",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    gap: 10,
+  },
+  timeBadge: {
+    backgroundColor: "rgba(99, 102, 241, 0.18)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(99, 102, 241, 0.35)",
+  },
+  timeBadgeText: {
+    color: "#818CF8",
+    fontSize: 10.5,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  breakdownTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  breakdownDetail: {
+    color: "#94A3B8",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  transcriptSection: {
+    marginTop: 16,
+  },
+  transcriptBox: {
+    backgroundColor: "#121214",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    marginTop: 8,
+    maxHeight: 220,
+  },
+  transcriptText: {
+    color: "#CBD5E1",
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  transcriptCollapsed: {
+    backgroundColor: "#121214",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    marginTop: 8,
+  },
+  transcriptCollapsedText: {
+    color: "#94A3B8",
+    fontSize: 12,
+    lineHeight: 17,
+    fontStyle: "italic",
+  },
+  readMoreText: {
+    color: "#A78BFA",
+    fontSize: 11.5,
+    fontWeight: "600",
+    marginTop: 6,
   },
   emptyAiBox: {
     alignItems: "center",

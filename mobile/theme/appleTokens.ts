@@ -4,9 +4,9 @@
  */
 
 export const appleColors = {
-  // Deep obsidian background hierarchy - Meta Threads calibrated (#101010)
-  canvas: "#101010", // Root Threads dark background
-  canvasElevated: "#161616", // Scroll / header blend
+  // Pure OLED Black background hierarchy (#000000)
+  canvas: "#000000", // Root OLED pure black background
+  canvasElevated: "#0A0A0A", // Scroll / header blend
   surfaceGlass: "rgba(255, 255, 255, 0.04)", // Base frosted glass
   surfaceGlassStrong: "rgba(255, 255, 255, 0.08)", // Active/highlight glass
   surfaceSecondary: "#181818", // Opaque card layer
@@ -181,14 +181,14 @@ export const appleShadows = {
  */
 export const threadsTokens = {
   colors: {
-    canvas: "#101010",
-    card: "#101010",
-    surfaceElevated: "#141414",
-    surfaceCard: "#181818",
-    surfaceInput: "#161616",
-    border: "#262626",
-    borderSubtle: "#1C1C1E",
-    borderStrong: "#333333",
+    canvas: "#000000",
+    card: "#000000",
+    surfaceElevated: "#0D0D0D",
+    surfaceCard: "#121212",
+    surfaceInput: "#0F0F0F",
+    border: "#1F1F1F",
+    borderSubtle: "#18181A",
+    borderStrong: "#2A2A2A",
     textPrimary: "#F3F5F7",
     textSecondary: "#777777",
     textTertiary: "#555555",
