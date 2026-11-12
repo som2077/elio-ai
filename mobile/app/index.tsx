@@ -53,7 +53,7 @@ import { EmptyState } from "../components/EmptyState";
 import type { FeedFilterType } from "../components/FeedsDrawer";
 import { CreateFeedModal } from "../components/CreateFeedModal";
 import { QuickClipModal } from "../components/QuickClipModal";
-import { AskElioModal, AskElioView } from "../components/AskElioModal";
+import { AskElioModal } from "../components/AskElioModal";
 import { searchInsideVideosSemantic } from "../services/aiService";
 import type { SemanticSearchResult } from "../types/ai";
 import { triggerLayoutMotion } from "../utils/motion";
@@ -217,18 +217,16 @@ export default function HomeScreen() {
       showDevicesModal,
   );
 
-  const TABS: TabKey[] = ["feed", "ai", "insights", "devices"];
+  const TABS: TabKey[] = ["feed", "insights", "devices"];
 
   const getTabIndex = (tab: TabKey): number => {
     switch (tab) {
       case "feed":
         return 0;
-      case "ai":
-        return 1;
       case "insights":
-        return 2;
+        return 1;
       case "devices":
-        return 3;
+        return 2;
       default:
         return 0;
     }
@@ -1067,7 +1065,7 @@ export default function HomeScreen() {
         translucent={true}
       />
 
-      {/* Industry-Grade Native Horizontal Pager (Home ⟷ AI ⟷ Insights ⟷ Devices) */}
+      {/* Industry-Grade Native Horizontal Pager (Home ⟷ Insights ⟷ Devices) */}
       <ScrollView
         ref={horizontalPagerRef}
         horizontal
@@ -1084,7 +1082,7 @@ export default function HomeScreen() {
         scrollEnabled={!isModalOpen}
         removeClippedSubviews={false}
         style={styles.pagerScrollView}
-        contentContainerStyle={{ width: screenWidth * 4, height: "100%" }}
+        contentContainerStyle={{ width: screenWidth * 3, height: "100%" }}
       >
         {/* PAGE 0: WATCHLIST FEED */}
         <View style={{ width: screenWidth, height: "100%" }}>
@@ -1222,19 +1220,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* PAGE 1: ASK ELIO AI SCREEN */}
-        <View style={{ width: screenWidth, height: "100%" }}>
-          <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
-            <AskElioView
-              onBack={() => {
-                handleTabSelect("feed");
-              }}
-              isTab={true}
-            />
-          </View>
-        </View>
-
-        {/* PAGE 2: ACTIVITY & INSIGHTS (ALL DATA TELEMETRY) */}
+        {/* PAGE 1: ACTIVITY & INSIGHTS (ALL DATA TELEMETRY) */}
         <View style={{ width: screenWidth, height: "100%" }}>
           <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
             <InsightsView
@@ -1252,7 +1238,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* PAGE 3: DEVICES & PC SYNC */}
+        {/* PAGE 2: DEVICES & PC SYNC */}
         <View style={{ width: screenWidth, height: "100%" }}>
           <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
             <DevicesView
@@ -1449,15 +1435,15 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* THREADS 4-TAB BOTTOM NAVIGATION DOCK */}
+      {/* THREADS 3-TAB BOTTOM NAVIGATION DOCK */}
       <FloatingTabBar
         activeTab={activeTab}
-        isAIActive={activeTab === "ai" || showAskElioModal}
+        isAIActive={showAskElioModal}
         unreadCount={unreadCount}
         translateY={tabBarTranslateY}
         opacity={tabBarOpacity}
         onTabSelect={handleTabSelect}
-        onOpenAskElio={() => handleTabSelect("ai")}
+        onOpenAskElio={() => setShowAskElioModal(true)}
         onComposePress={() => setShowQuickClipModal(true)}
       />
 

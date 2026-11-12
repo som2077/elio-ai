@@ -177,20 +177,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           }}
         />
 
-        {/* 2. Ask Elio (AI) Tab */}
-        <AnimatedTabItem
-          isActive={activeTab === "ai" || isAIActive}
-          activeIcon="LightningThunderElectricOnSolidIcon"
-          inactiveIcon="LightningThunderElectricOnIcon"
-          iconSize={26}
-          onPress={() => {
-            if (activeTab !== "ai") {
-              onTabSelect("ai");
-            }
-          }}
-        />
-
-        {/* 3. Insights & Analytics */}
+        {/* 2. Insights & Analytics */}
         <AnimatedTabItem
           isActive={activeTab === "insights"}
           activeIcon="bar-chart-solid"
@@ -204,7 +191,7 @@ export const FloatingTabBar: React.FC<FloatingTabBarProps> = ({
           }}
         />
 
-        {/* 4. Profile / Linked Devices */}
+        {/* 3. Profile / Linked Devices */}
         <AnimatedTabItem
           isActive={activeTab === "devices"}
           activeIcon="UserSolidIcon"
