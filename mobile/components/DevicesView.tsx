@@ -7,17 +7,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { PikaIcon } from "./PikaIcon";
 import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../services/supabase";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { AppleSwitch } from "./AppleSwitch";
+import {
+  sendTestNotificationNow,
+  registerForPushNotificationsAsync,
+} from "../services/notifications";
 
 export interface DevicesViewProps {
   userEmail?: string;
@@ -46,7 +47,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   onOpenScanner,
   onLogout,
   onOpenPlatformModal,
-  onOpenFeedsDrawer: _onOpenFeedsDrawer,
+  onOpenFeedsDrawer,
 }) => {
   const [devices, setDevices] = useState<LinkedDeviceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +55,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const [clearingCache, setClearingCache] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [autoPlayEnabled, setAutoPlayEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [sendingTestNotification, setSendingTestNotification] = useState(false);
+  const [defaultLayout, setDefaultLayout] = useState<"list" | "grid">("list");
 
   // Load user settings preferences
   useEffect(() => {
@@ -62,6 +66,12 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     });
     AsyncStorage.getItem("@setting_autoplay_previews").then((val) => {
       if (val !== null) setAutoPlayEnabled(val === "true");
+    });
+    AsyncStorage.getItem("@setting_notifications_enabled").then((val) => {
+      if (val !== null) setNotificationsEnabled(val === "true");
+    });
+    AsyncStorage.getItem("@setting_default_layout").then((val) => {
+      if (val === "grid" || val === "list") setDefaultLayout(val);
     });
   }, []);
 
@@ -75,6 +85,59 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     setAutoPlayEnabled(val);
     await AsyncStorage.setItem("@setting_autoplay_previews", String(val));
     haptics.selection();
+  };
+
+  const handleToggleNotifications = async (val: boolean) => {
+    setNotificationsEnabled(val);
+    await AsyncStorage.setItem("@setting_notifications_enabled", String(val));
+    haptics.selection();
+    if (val) {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          await registerForPushNotificationsAsync(session.user.id);
+        }
+      } catch (e) {
+        console.warn("[DevicesView] Push registration on toggle error:", e);
+      }
+    }
+  };
+
+  const handleSelectLayout = async (layout: "list" | "grid") => {
+    setDefaultLayout(layout);
+    await AsyncStorage.setItem("@setting_default_layout", layout);
+    haptics.selection();
+  };
+
+  const handleSendTestNotification = async () => {
+    try {
+      setSendingTestNotification(true);
+      haptics.medium();
+      const id = await sendTestNotificationNow();
+      if (id) {
+        haptics.success();
+        Alert.alert(
+          "Test Reminder Scheduled",
+          "A smart catch-up reminder will arrive on your phone in 5 seconds.",
+          [{ text: "OK" }],
+        );
+      } else {
+        Alert.alert(
+          "Notification Permission",
+          "Unable to schedule notification. Please ensure notifications are allowed in system settings.",
+          [{ text: "OK" }],
+        );
+      }
+    } catch (err: any) {
+      Alert.alert(
+        "Notification Error",
+        err?.message || "Failed to schedule test notification.",
+      );
+    } finally {
+      setSendingTestNotification(false);
+    }
   };
 
   const fetchDevices = async () => {
@@ -100,7 +163,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         // 2. Seamless Fallback: Derive active devices from approved qr_auth_sessions
         const { data: qrSessions } = await supabase
           .from("qr_auth_sessions")
-          .select("id, qr_token, user_id, status, created_at, expires_at, device_metadata")
+          .select(
+            "id, qr_token, user_id, status, created_at, expires_at, device_metadata",
+          )
           .eq("user_id", session.user.id)
           .order("created_at", { ascending: false })
           .limit(10);
@@ -119,7 +184,8 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               const meta = s.device_metadata || {};
               return {
                 device_id: meta.device_id || s.qr_token || `session-${idx}`,
-                device_name: meta.device_name || `Browser Extension ${idx + 1}`,
+                device_name:
+                  meta.device_name || `Browser Extension ${idx + 1}`,
                 browser_type: meta.browser || meta.browser_type || "Chrome",
                 os_name: meta.os || meta.os_name || "Desktop",
                 last_active_at: s.created_at,
@@ -162,7 +228,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
   const handleRevoke = async (deviceId: string, deviceName: string) => {
     Alert.alert(
       "Unlink Browser",
-      `Disconnect "${deviceName}"? It will stop receiving realtime clipped videos from your PC.`,
+      `Disconnect "${deviceName}"? It will stop syncing clipped videos from your PC.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -184,7 +250,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 .or(`qr_token.eq.${deviceId},id.eq.${deviceId}`);
 
               haptics.success();
-              setDevices((prev) => prev.filter((d) => d.device_id !== deviceId));
+              setDevices((prev) =>
+                prev.filter((d) => d.device_id !== deviceId),
+              );
             } catch (err: any) {
               Alert.alert("Notice", err.message);
             }
@@ -208,10 +276,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             haptics.medium();
             try {
               const allKeys = await AsyncStorage.getAllKeys();
-              // Preserve session and pinned platforms keys
+              // Preserve session, settings, and pinned platforms keys
               const keysToRemove = allKeys.filter(
                 (k) =>
                   !k.startsWith("supabase.auth.token") &&
+                  !k.startsWith("@setting_") &&
                   k !== "@clipper_pinned_platforms",
               );
               if (keysToRemove.length > 0) {
@@ -240,14 +309,24 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
     : "Personal Vault";
   const avatarLetter = (userEmail || "E").charAt(0).toUpperCase();
 
-  const getBrowserIcon = (browserType?: string) => {
+  const getBrowserIconMeta = (browserType?: string) => {
     const b = (browserType || "").toLowerCase();
-    if (b.includes("chrome")) return "logo-chrome";
-    if (b.includes("apple") || b.includes("safari")) return "logo-apple";
-    if (b.includes("edge")) return "globe-outline";
-    if (b.includes("firefox")) return "flame-outline";
-    if (b.includes("brave")) return "shield-checkmark-outline";
-    return "laptop-outline";
+    if (b.includes("chrome")) {
+      return { icon: "logo-chrome", color: "#60A5FA" };
+    }
+    if (b.includes("apple") || b.includes("safari")) {
+      return { icon: "logo-apple", color: "#FFFFFF" };
+    }
+    if (b.includes("edge")) {
+      return { icon: "globe-outline", color: "#38BDF8" };
+    }
+    if (b.includes("brave")) {
+      return { icon: "shield-checkmark-outline", color: "#FB923C" };
+    }
+    if (b.includes("firefox")) {
+      return { icon: "flame-outline", color: "#F97316" };
+    }
+    return { icon: "laptop-outline", color: "#A5B4FC" };
   };
 
   const formatRelativeTime = (dateStr?: string) => {
@@ -295,12 +374,12 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             onOpenScanner();
           }}
         >
-          <Ionicons name="qr-code-outline" size={16} color="#000000" />
+          <Ionicons name="qr-code-outline" size={15} color="#000000" />
           <Text style={styles.headerQrText}>Pair PC</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 2. PROFILE HERO IDENTITY CARD (Apple / Threads Obsidian Style) */}
+      {/* 2. PROFILE HERO IDENTITY CARD (Apple HIG / Threads Obsidian Style) */}
       <View style={styles.heroCard}>
         <LinearGradient
           colors={["rgba(255, 255, 255, 0.08)", "rgba(255, 255, 255, 0.02)"]}
@@ -308,9 +387,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         />
 
         <View style={styles.profileHeaderRow}>
-          {/* Avatar with Electric Gradient Ring */}
+          {/* Avatar with Vibrant Gradient Ring */}
           <LinearGradient
-            colors={["#6366F1", "#818CF8", "#4F46E5"]}
+            colors={["#6366F1", "#8B5CF6", "#EC4899"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.avatarGradientRing}
@@ -326,7 +405,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               <Text style={styles.displayNameText} numberOfLines={1}>
                 {displayName}
               </Text>
-              <Ionicons name="checkmark-circle" size={17} color={appleColors.accent} />
+              <Ionicons
+                name="checkmark-circle"
+                size={17}
+                color={appleColors.accent}
+              />
             </View>
 
             <Text style={styles.handleText} numberOfLines={1}>
@@ -339,7 +422,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 <Text style={styles.tierPillText}>ELIO VAULT PRO</Text>
               </View>
               <View style={styles.securityPill}>
-                <Ionicons name="lock-closed" size={10} color="#FFFFFF" />
+                <Ionicons name="lock-closed" size={10} color="#10B981" />
                 <Text style={styles.securityPillText}>AES-256 SECURED</Text>
               </View>
             </View>
@@ -356,7 +439,9 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           <View style={styles.bentoDivider} />
 
           <View style={styles.bentoStatItem}>
-            <Text style={[styles.bentoStatValue, { color: appleColors.accentLight }]}>
+            <Text
+              style={[styles.bentoStatValue, { color: appleColors.accentLight }]}
+            >
               {aiSummarizedCount}
             </Text>
             <Text style={styles.bentoStatLabel}>AI Synthesized</Text>
@@ -365,55 +450,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           <View style={styles.bentoDivider} />
 
           <View style={styles.bentoStatItem}>
-            <Text style={styles.bentoStatValue}>
-              {devices.length}
-            </Text>
-            <Text style={styles.bentoStatLabel}>Browsers Paired</Text>
+            <Text style={styles.bentoStatValue}>{devices.length}</Text>
+            <Text style={styles.bentoStatLabel}>Linked Browsers</Text>
           </View>
         </View>
       </View>
 
-      {/* 3. HERO ACTION: PAIR DESKTOP EXTENSION */}
-      <TouchableOpacity
-        activeOpacity={0.88}
-        style={styles.pairHeroCard}
-        onPress={() => {
-          haptics.medium();
-          onOpenScanner();
-        }}
-      >
-        <LinearGradient
-          colors={["rgba(99, 102, 241, 0.14)", "rgba(99, 102, 241, 0.02)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-
-        <View style={styles.pairIconBox}>
-          <LinearGradient
-            colors={["#6366F1", "#4F46E5"]}
-            style={StyleSheet.absoluteFill}
-          />
-          <Ionicons name="qr-code-outline" size={24} color="#FFFFFF" />
-        </View>
-
-        <View style={styles.pairTextBox}>
-          <Text style={styles.pairTitle}>Pair Desktop Extension</Text>
-          <Text style={styles.pairSubtitle}>
-            Scan the QR code in your Chrome, Brave or Edge extension for instant 1-click sync.
-          </Text>
-        </View>
-
-        <View style={styles.pairActionBtn}>
-          <Ionicons name="camera-outline" size={15} color="#FFFFFF" />
-          <Text style={styles.pairActionBtnText}>Scan</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* 4. CONNECTED BROWSERS SECTION */}
+      {/* 3. CONNECTED DEVICES & PC SYNC */}
       <View style={styles.sectionHeaderRow}>
         <View style={styles.sectionTitleWithCount}>
-          <Text style={styles.sectionTitle}>CONNECTED BROWSERS</Text>
+          <Text style={styles.sectionTitle}>CONNECTED BROWSERS & PC SYNC</Text>
           <View style={styles.countBadge}>
             <Text style={styles.countBadgeText}>{devices.length}</Text>
           </View>
@@ -427,7 +473,11 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
             fetchDevices();
           }}
         >
-          <Ionicons name="refresh" size={15} color={appleColors.textSecondary} />
+          <Ionicons
+            name="refresh"
+            size={15}
+            color={appleColors.textSecondary}
+          />
         </TouchableOpacity>
       </View>
 
@@ -439,11 +489,16 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
       ) : devices.length === 0 ? (
         <View style={styles.emptyDeviceCard}>
           <View style={styles.emptyIconCircle}>
-            <Ionicons name="laptop-outline" size={32} color={appleColors.accentLight} />
+            <Ionicons
+              name="laptop-outline"
+              size={30}
+              color={appleColors.accentLight}
+            />
           </View>
           <Text style={styles.emptyTitle}>No Desktop Extensions Linked</Text>
           <Text style={styles.emptySubtitle}>
-            Pair your desktop browser to save videos with one click directly into this vault.
+            Pair your PC or Mac browser extension to save videos with one click
+            directly into this vault.
           </Text>
 
           <View style={styles.stepsContainer}>
@@ -452,7 +507,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 <Text style={styles.stepNumText}>1</Text>
               </View>
               <Text style={styles.stepText}>
-                Open the Elio AI Extension on your PC
+                Open the Elio AI Extension on your PC or Mac
               </Text>
             </View>
             <View style={styles.stepRow}>
@@ -468,145 +523,198 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
                 <Text style={styles.stepNumText}>3</Text>
               </View>
               <Text style={styles.stepText}>
-                Tap "Scan" above to sync your vault instantly
+                Tap the button below to scan your desktop QR code
               </Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            activeOpacity={0.88}
+            style={styles.emptyScanBtn}
+            onPress={() => {
+              haptics.medium();
+              onOpenScanner();
+            }}
+          >
+            <Ionicons name="qr-code-outline" size={17} color="#000000" />
+            <Text style={styles.emptyScanBtnText}>Pair PC via QR Code</Text>
+          </TouchableOpacity>
         </View>
       ) : (
-        devices.map((device) => {
-          const iconName = getBrowserIcon(device.browser_type);
-          return (
-            <View key={device.device_id} style={styles.deviceCard}>
-              <View style={styles.deviceIconBox}>
+        <View style={styles.insetCard}>
+          {devices.map((device, index) => {
+            const iconMeta = getBrowserIconMeta(device.browser_type);
+            return (
+              <React.Fragment key={device.device_id}>
+                {index > 0 && <View style={styles.insetRowDivider} />}
+                <View style={styles.deviceRow}>
+                  <View style={styles.deviceIconBox}>
+                    <Ionicons
+                      name={iconMeta.icon as any}
+                      size={20}
+                      color={iconMeta.color}
+                    />
+                  </View>
+
+                  <View style={styles.deviceInfoCol}>
+                    <View style={styles.deviceNameRow}>
+                      <Text style={styles.deviceNameText} numberOfLines={1}>
+                        {device.device_name}
+                      </Text>
+                      <View style={styles.onlineBadge}>
+                        <View style={styles.onlineDot} />
+                        <Text style={styles.onlineText}>LIVE SYNC</Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.deviceMetaText}>
+                      {device.browser_type || "Browser"} •{" "}
+                      {device.os_name || "Desktop"} •{" "}
+                      {formatRelativeTime(device.last_active_at)}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.disconnectBtn}
+                    onPress={() =>
+                      handleRevoke(device.device_id, device.device_name)
+                    }
+                  >
+                    <Ionicons
+                      name="trash-outline"
+                      size={16}
+                      color={appleColors.destructive}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </React.Fragment>
+            );
+          })}
+
+          <View style={styles.insetRowDivider} />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.insetRow}
+            onPress={() => {
+              haptics.selection();
+              onOpenScanner();
+            }}
+          >
+            <View style={styles.insetLeft}>
+              <View
+                style={[
+                  styles.insetIconBox,
+                  { backgroundColor: "rgba(99, 102, 241, 0.14)" },
+                ]}
+              >
                 <Ionicons
-                  name={iconName as any}
-                  size={20}
+                  name="qr-code-outline"
+                  size={16}
                   color={appleColors.accentLight}
                 />
               </View>
-
-              <View style={styles.deviceInfoCol}>
-                <View style={styles.deviceNameRow}>
-                  <Text style={styles.deviceNameText} numberOfLines={1}>
-                    {device.device_name}
-                  </Text>
-                  <View style={styles.onlineBadge}>
-                    <View style={styles.onlineDot} />
-                    <Text style={styles.onlineText}>LIVE SYNC</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.deviceMetaText}>
-                  {device.browser_type || "Browser"} • {device.os_name || "Desktop"} •{" "}
-                  {formatRelativeTime(device.last_active_at)}
+              <View style={styles.insetTextCol}>
+                <Text style={styles.insetTitle}>Pair Another Browser</Text>
+                <Text style={styles.insetSubtitle}>
+                  Scan QR code on Chrome, Edge or Brave
                 </Text>
               </View>
-
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.disconnectBtn}
-                onPress={() => handleRevoke(device.device_id, device.device_name)}
-              >
-                <Ionicons name="trash-outline" size={17} color={appleColors.destructive} />
-              </TouchableOpacity>
             </View>
-          );
-        })
+
+            <Ionicons name="chevron-forward" size={16} color="#64748B" />
+          </TouchableOpacity>
+        </View>
       )}
 
-      {/* 5. AI INTELLIGENCE & CLOUD ARCHITECTURE */}
+      {/* 4. APP PREFERENCES & EXPERIENCE */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>AI INTELLIGENCE & VAULT</Text>
+        <Text style={styles.sectionTitle}>PREFERENCES & EXPERIENCE</Text>
       </View>
 
       <View style={styles.insetCard}>
-        {/* Row 1: AI Model Engine */}
+        {/* Row 1: Smart Notifications Toggle */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(99, 102, 241, 0.14)" }]}>
-              <Ionicons name="sparkles" size={17} color={appleColors.accent} />
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(249, 115, 22, 0.14)" },
+              ]}
+            >
+              <Ionicons name="notifications-outline" size={17} color="#FB923C" />
             </View>
-            <View>
-              <Text style={styles.insetTitle}>AI Summary Engine</Text>
-              <Text style={styles.insetSubtitle}>GPT-4o Mini + Deep Extraction</Text>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Smart Catch-Up Reminders</Text>
+              <Text style={styles.insetSubtitle}>
+                Notify during free time for saved clips
+              </Text>
             </View>
           </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(99, 102, 241, 0.15)" }]}>
-            <Text style={[styles.pillBadgeText, { color: appleColors.accentLight }]}>Active</Text>
-          </View>
+
+          <AppleSwitch
+            value={notificationsEnabled}
+            onValueChange={handleToggleNotifications}
+            size="sm"
+          />
         </View>
 
+        {/* Row 2: Send Test Notification Action */}
         <View style={styles.insetRowDivider} />
-
-        {/* Row 2: Vector Embeddings */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(99, 102, 241, 0.10)" }]}>
-              <Ionicons name="layers-outline" size={17} color={appleColors.accentLight} />
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(168, 85, 247, 0.14)" },
+              ]}
+            >
+              <Ionicons name="paper-plane-outline" size={16} color="#C084FC" />
             </View>
-            <View>
-              <Text style={styles.insetTitle}>Semantic Video Search</Text>
-              <Text style={styles.insetSubtitle}>1536-dim Vector Similarity</Text>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Test Notification Alert</Text>
+              <Text style={styles.insetSubtitle}>
+                Triggers a 5-second sample catch-up alert
+              </Text>
             </View>
           </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#E2E8F0" }]}>pgvector</Text>
-          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.testNotificationBtn}
+            disabled={sendingTestNotification}
+            onPress={handleSendTestNotification}
+          >
+            {sendingTestNotification ? (
+              <ActivityIndicator size="small" color="#C084FC" />
+            ) : (
+              <Text style={styles.testNotificationBtnText}>Test Now</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
+        {/* Row 3: Haptic Feedback Toggle */}
         <View style={styles.insetRowDivider} />
-
-        {/* Row 3: Multi-Platform Support */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
-              <Ionicons name="globe-outline" size={17} color="#F8FAFC" />
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(99, 102, 241, 0.14)" },
+              ]}
+            >
+              <Ionicons
+                name="phone-portrait-outline"
+                size={17}
+                color={appleColors.accentLight}
+              />
             </View>
-            <View>
-              <Text style={styles.insetTitle}>Universal Social Scraper</Text>
-              <Text style={styles.insetSubtitle}>YouTube, 𝕏, IG, Reddit, TikTok, FB</Text>
-            </View>
-          </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(255, 255, 255, 0.06)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#94A3B8" }]}>6 Networks</Text>
-          </View>
-        </View>
-
-        <View style={styles.insetRowDivider} />
-
-        {/* Row 4: Custom API Key & Vault */}
-        <View style={styles.insetRow}>
-          <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(16, 185, 129, 0.12)" }]}>
-              <Ionicons name="shield-checkmark-outline" size={17} color="#10B981" />
-            </View>
-            <View>
-              <Text style={styles.insetTitle}>API Key Security</Text>
-              <Text style={styles.insetSubtitle}>Zero plaintext • Supabase Vault</Text>
-            </View>
-          </View>
-          <View style={[styles.pillBadge, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
-            <Text style={[styles.pillBadgeText, { color: "#34D399" }]}>Encrypted</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* 6. PREFERENCES & SETTINGS */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>PREFERENCES & SETTINGS</Text>
-      </View>
-
-      <View style={styles.insetCard}>
-        {/* Row 1: Haptic Feedback Toggle (Apple HIG Switch) */}
-        <View style={styles.insetRow}>
-          <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(99, 102, 241, 0.12)" }]}>
-              <Ionicons name="phone-portrait-outline" size={17} color={appleColors.accentLight} />
-            </View>
-            <View>
+            <View style={styles.insetTextCol}>
               <Text style={styles.insetTitle}>Haptic Feedback</Text>
-              <Text style={styles.insetSubtitle}>Tactile clicks on tap and gestures</Text>
+              <Text style={styles.insetSubtitle}>
+                Tactile clicks on tap & gesture actions
+              </Text>
             </View>
           </View>
 
@@ -617,17 +725,27 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           />
         </View>
 
+        {/* Row 4: Auto-Play Previews Toggle */}
         <View style={styles.insetRowDivider} />
-
-        {/* Row 2: Auto-play Video Previews (Apple HIG Switch) */}
         <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
-              <Ionicons name="play-circle-outline" size={17} color="#F8FAFC" />
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(6, 182, 212, 0.14)" },
+              ]}
+            >
+              <Ionicons
+                name="play-circle-outline"
+                size={17}
+                color="#22D3EE"
+              />
             </View>
-            <View>
+            <View style={styles.insetTextCol}>
               <Text style={styles.insetTitle}>Auto-Play Previews</Text>
-              <Text style={styles.insetSubtitle}>Play clips automatically in feed</Text>
+              <Text style={styles.insetSubtitle}>
+                Inline video previews while browsing
+              </Text>
             </View>
           </View>
 
@@ -638,31 +756,80 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           />
         </View>
 
+        {/* Row 5: Default Feed Layout Preference */}
         <View style={styles.insetRowDivider} />
-
-        {/* Row 3: Offline Cache */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.insetRow}
-          onPress={handleClearCache}
-          disabled={clearingCache}
-        >
+        <View style={styles.insetRow}>
           <View style={styles.insetLeft}>
-            <View style={[styles.insetIconBox, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
-              <Ionicons name="trash-bin-outline" size={17} color="#F8FAFC" />
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(148, 163, 184, 0.14)" },
+              ]}
+            >
+              <Ionicons
+                name={defaultLayout === "grid" ? "grid-outline" : "list-outline"}
+                size={17}
+                color="#E2E8F0"
+              />
             </View>
-            <View>
-              <Text style={styles.insetTitle}>Offline Vault Cache</Text>
-              <Text style={styles.insetSubtitle}>Cached clips & local thumbnails</Text>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Default Feed Layout</Text>
+              <Text style={styles.insetSubtitle}>
+                Initial display format on app launch
+              </Text>
             </View>
           </View>
 
-          <View style={styles.cacheRight}>
-            <Text style={styles.cacheSizeText}>{cacheSize}</Text>
-            <Text style={styles.clearCacheActionText}>Clear</Text>
-          </View>
-        </TouchableOpacity>
+          <View style={styles.segmentContainer}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.segmentBtn,
+                defaultLayout === "list" && styles.segmentBtnActive,
+              ]}
+              onPress={() => handleSelectLayout("list")}
+            >
+              <Ionicons
+                name="list-outline"
+                size={13}
+                color={defaultLayout === "list" ? "#000000" : "#94A3B8"}
+              />
+              <Text
+                style={[
+                  styles.segmentBtnText,
+                  defaultLayout === "list" && styles.segmentBtnTextActive,
+                ]}
+              >
+                List
+              </Text>
+            </TouchableOpacity>
 
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.segmentBtn,
+                defaultLayout === "grid" && styles.segmentBtnActive,
+              ]}
+              onPress={() => handleSelectLayout("grid")}
+            >
+              <Ionicons
+                name="grid-outline"
+                size={13}
+                color={defaultLayout === "grid" ? "#000000" : "#94A3B8"}
+              />
+              <Text
+                style={[
+                  styles.segmentBtnText,
+                  defaultLayout === "grid" && styles.segmentBtnTextActive,
+                ]}
+              >
+                Grid
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Row 6: Pinned Platforms selector trigger */}
         {onOpenPlatformModal && (
           <>
             <View style={styles.insetRowDivider} />
@@ -675,12 +842,53 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
               }}
             >
               <View style={styles.insetLeft}>
-                <View style={[styles.insetIconBox, { backgroundColor: "rgba(255, 255, 255, 0.08)" }]}>
-                  <Ionicons name="options-outline" size={17} color="#F8FAFC" />
+                <View
+                  style={[
+                    styles.insetIconBox,
+                    { backgroundColor: "rgba(168, 85, 247, 0.14)" },
+                  ]}
+                >
+                  <Ionicons name="options-outline" size={17} color="#C084FC" />
                 </View>
-                <View>
+                <View style={styles.insetTextCol}>
                   <Text style={styles.insetTitle}>Pinned Platforms</Text>
-                  <Text style={styles.insetSubtitle}>Customize feed header tabs</Text>
+                  <Text style={styles.insetSubtitle}>
+                    Customize feed header filter tabs
+                  </Text>
+                </View>
+              </View>
+
+              <Ionicons name="chevron-forward" size={16} color="#64748B" />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* Row 7: Feeds Drawer Trigger (if provided) */}
+        {onOpenFeedsDrawer && (
+          <>
+            <View style={styles.insetRowDivider} />
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.insetRow}
+              onPress={() => {
+                haptics.selection();
+                onOpenFeedsDrawer();
+              }}
+            >
+              <View style={styles.insetLeft}>
+                <View
+                  style={[
+                    styles.insetIconBox,
+                    { backgroundColor: "rgba(59, 130, 246, 0.14)" },
+                  ]}
+                >
+                  <Ionicons name="folder-outline" size={17} color="#60A5FA" />
+                </View>
+                <View style={styles.insetTextCol}>
+                  <Text style={styles.insetTitle}>Custom Feeds & Folders</Text>
+                  <Text style={styles.insetSubtitle}>
+                    Manage smart video collections
+                  </Text>
                 </View>
               </View>
 
@@ -690,9 +898,261 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
         )}
       </View>
 
-      {/* 7. ACCOUNT & SECURITY (LOGOUT) */}
+      {/* 5. STORAGE & OFFLINE VAULT */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>ACCOUNT & SIGN OUT</Text>
+        <Text style={styles.sectionTitle}>STORAGE & OFFLINE VAULT</Text>
+      </View>
+
+      <View style={styles.insetCard}>
+        {/* Row 1: Offline Cache */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(16, 185, 129, 0.14)" },
+              ]}
+            >
+              <Ionicons name="server-outline" size={17} color="#34D399" />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Offline Vault Cache</Text>
+              <Text style={styles.insetSubtitle}>
+                Cached thumbnails & local query cache
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.cacheRight}>
+            <Text style={styles.cacheSizeText}>{cacheSize}</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleClearCache}
+              disabled={clearingCache}
+              style={styles.clearCacheActionBtn}
+            >
+              <Text style={styles.clearCacheActionText}>
+                {clearingCache ? "Clearing..." : "Clear"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.insetRowDivider} />
+
+        {/* Row 2: Cloud Sync & Storage */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(59, 130, 246, 0.14)" },
+              ]}
+            >
+              <Ionicons name="cloud-done-outline" size={17} color="#60A5FA" />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Cloud Storage Sync</Text>
+              <Text style={styles.insetSubtitle}>
+                Instant multi-device cloud replication
+              </Text>
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.pillBadge,
+              { backgroundColor: "rgba(59, 130, 246, 0.15)" },
+            ]}
+          >
+            <Text style={[styles.pillBadgeText, { color: "#93C5FD" }]}>
+              Encrypted
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 6. AI INTELLIGENCE & INFRASTRUCTURE */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>AI INTELLIGENCE & ARCHITECTURE</Text>
+      </View>
+
+      <View style={styles.insetCard}>
+        {/* Row 1: AI Model Engine */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(99, 102, 241, 0.14)" },
+              ]}
+            >
+              <Ionicons name="sparkles" size={17} color={appleColors.accent} />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>AI Summary Engine</Text>
+              <Text style={styles.insetSubtitle}>
+                GPT-4o Mini + Deep Transcript Extractor
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.pillBadge,
+              { backgroundColor: "rgba(99, 102, 241, 0.15)" },
+            ]}
+          >
+            <Text
+              style={[styles.pillBadgeText, { color: appleColors.accentLight }]}
+            >
+              Active
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.insetRowDivider} />
+
+        {/* Row 2: Vector Embeddings */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(139, 92, 246, 0.14)" },
+              ]}
+            >
+              <Ionicons name="layers-outline" size={17} color="#A78BFA" />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Semantic Video Search</Text>
+              <Text style={styles.insetSubtitle}>
+                1536-dim Vector Embeddings
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.pillBadge,
+              { backgroundColor: "rgba(255, 255, 255, 0.08)" },
+            ]}
+          >
+            <Text style={[styles.pillBadgeText, { color: "#E2E8F0" }]}>
+              pgvector
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.insetRowDivider} />
+
+        {/* Row 3: Universal Social Scraper */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(16, 185, 129, 0.14)" },
+              ]}
+            >
+              <Ionicons name="globe-outline" size={17} color="#34D399" />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Universal Social Scraper</Text>
+              <Text style={styles.insetSubtitle}>
+                YouTube, 𝕏, IG, TikTok, Reddit, FB, Pinterest
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.pillBadge,
+              { backgroundColor: "rgba(255, 255, 255, 0.06)" },
+            ]}
+          >
+            <Text style={[styles.pillBadgeText, { color: "#94A3B8" }]}>
+              8 Networks
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 7. ABOUT & APP INFO */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>ABOUT & APP INFO</Text>
+      </View>
+
+      <View style={styles.insetCard}>
+        {/* Row 1: App Version & Build */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(148, 163, 184, 0.14)" },
+              ]}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={17}
+                color="#94A3B8"
+              />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Elio AI Client</Text>
+              <Text style={styles.insetSubtitle}>v2.4.0 • Build 2026.11</Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.pillBadge,
+              { backgroundColor: "rgba(255, 255, 255, 0.08)" },
+            ]}
+          >
+            <Text style={[styles.pillBadgeText, { color: "#E2E8F0" }]}>
+              Obsidian Core
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.insetRowDivider} />
+
+        {/* Row 2: Architecture */}
+        <View style={styles.insetRow}>
+          <View style={styles.insetLeft}>
+            <View
+              style={[
+                styles.insetIconBox,
+                { backgroundColor: "rgba(148, 163, 184, 0.14)" },
+              ]}
+            >
+              <Ionicons
+                name="hardware-chip-outline"
+                size={17}
+                color="#94A3B8"
+              />
+            </View>
+            <View style={styles.insetTextCol}>
+              <Text style={styles.insetTitle}>Client Architecture</Text>
+              <Text style={styles.insetSubtitle}>
+                Expo 51 • React Native 0.74 • Hermes
+              </Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.pillBadge,
+              { backgroundColor: "rgba(16, 185, 129, 0.15)" },
+            ]}
+          >
+            <Text style={[styles.pillBadgeText, { color: "#34D399" }]}>
+              60 FPS Native
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 8. ACCOUNT & SECURITY (LOGOUT) */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>ACCOUNT & SECURITY</Text>
       </View>
 
       <TouchableOpacity
@@ -702,7 +1162,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           haptics.warning();
           Alert.alert(
             "Sign Out",
-            "Are you sure you want to log out of your Elio AI account on this phone?",
+            "Are you sure you want to sign out of your Elio AI account on this device?",
             [
               { text: "Cancel", style: "cancel" },
               {
@@ -716,15 +1176,20 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           );
         }}
       >
-        <Ionicons name="log-out-outline" size={18} color={appleColors.destructive} />
+        <Ionicons
+          name="log-out-outline"
+          size={18}
+          color={appleColors.destructive}
+        />
         <Text style={styles.logoutBtnText}>Sign Out of Elio AI</Text>
       </TouchableOpacity>
 
       <Text style={styles.versionFooter}>
-        Elio AI Mobile v2.4.0 • Build 2026.11 • Obsidian Core
+        Elio AI Mobile v2.4.0 • Obsidian Core Engine
       </Text>
 
-      <View style={{ height: 110 }} />
+      {/* Ample bottom spacing so FloatingTabBar never covers content */}
+      <View style={{ height: 120 }} />
     </ScrollView>
   );
 };
@@ -776,7 +1241,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 13,
-    paddingVertical: 8,
+    paddingVertical: 7.5,
     borderRadius: 18,
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 2 },
@@ -797,7 +1262,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.08)",
     borderTopColor: "rgba(255, 255, 255, 0.16)",
-    marginBottom: 14,
+    marginBottom: 16,
     overflow: "hidden",
   },
   profileHeaderRow: {
@@ -875,15 +1340,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: "rgba(16, 185, 129, 0.10)",
     paddingHorizontal: 7,
     paddingVertical: 2.5,
     borderRadius: 8,
     borderWidth: 0.8,
-    borderColor: "rgba(255, 255, 255, 0.10)",
+    borderColor: "rgba(16, 185, 129, 0.25)",
   },
   securityPillText: {
-    color: "#E2E8F0",
+    color: "#34D399",
     fontSize: 9.5,
     fontWeight: "700",
     letterSpacing: 0.3,
@@ -922,64 +1387,12 @@ const styles = StyleSheet.create({
     height: 22,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
   },
-  pairHeroCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#16161A",
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "rgba(99, 102, 241, 0.28)",
-    borderTopColor: "rgba(129, 140, 248, 0.40)",
-    marginBottom: 20,
-    gap: 12,
-    overflow: "hidden",
-  },
-  pairIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  pairTextBox: {
-    flex: 1,
-  },
-  pairTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
-  pairSubtitle: {
-    color: "#94A3B8",
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  pairActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(99, 102, 241, 0.22)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(99, 102, 241, 0.45)",
-  },
-  pairActionBtnText: {
-    color: "#A5B4FC",
-    fontSize: 11.5,
-    fontWeight: "700",
-  },
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
-    marginTop: 6,
+    marginBottom: 8,
+    marginTop: 10,
     paddingHorizontal: 2,
   },
   sectionTitleWithCount: {
@@ -1009,12 +1422,12 @@ const styles = StyleSheet.create({
   },
   loadingBox: {
     backgroundColor: "#16161A",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.06)",
   },
@@ -1025,43 +1438,48 @@ const styles = StyleSheet.create({
   },
   emptyDeviceCard: {
     backgroundColor: "#16161A",
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 20,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.06)",
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    borderTopColor: "rgba(255, 255, 255, 0.14)",
     marginBottom: 16,
   },
   emptyIconCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(99, 102, 241, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(99, 102, 241, 0.25)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptyTitle: {
     color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
     letterSpacing: -0.2,
   },
   emptySubtitle: {
     color: "#94A3B8",
-    fontSize: 11.5,
+    fontSize: 12,
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 17,
     marginTop: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   stepsContainer: {
     width: "100%",
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    borderRadius: 14,
     padding: 12,
     marginTop: 14,
-    gap: 8,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.05)",
   },
   stepRow: {
     flexDirection: "row",
@@ -1069,39 +1487,52 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   stepNumPill: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "rgba(99, 102, 241, 0.18)",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(99, 102, 241, 0.20)",
     alignItems: "center",
     justifyContent: "center",
   },
   stepNumText: {
     color: "#818CF8",
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: "800",
   },
   stepText: {
     color: "#E2E8F0",
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: "500",
     flex: 1,
   },
-  deviceCard: {
+  emptyScanBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#16161A",
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.08)",
-    marginBottom: 10,
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginTop: 16,
+  },
+  emptyScanBtnText: {
+    color: "#000000",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  deviceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     gap: 12,
   },
   deviceIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     backgroundColor: "rgba(255, 255, 255, 0.05)",
     alignItems: "center",
     justifyContent: "center",
@@ -1116,7 +1547,7 @@ const styles = StyleSheet.create({
   },
   deviceNameText: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "700",
     maxWidth: 160,
   },
@@ -1142,7 +1573,7 @@ const styles = StyleSheet.create({
   },
   deviceMetaText: {
     color: "#64748B",
-    fontSize: 10.5,
+    fontSize: 11,
     marginTop: 2,
   },
   disconnectBtn: {
@@ -1181,21 +1612,68 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  insetTextCol: {
+    flex: 1,
+    paddingRight: 6,
+  },
   insetTitle: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "700",
   },
   insetSubtitle: {
     color: "#64748B",
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: "500",
-    marginTop: 1,
+    marginTop: 1.5,
   },
   insetRowDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: "rgba(255, 255, 255, 0.06)",
     marginLeft: 58,
+  },
+  testNotificationBtn: {
+    backgroundColor: "rgba(168, 85, 247, 0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.35)",
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 10,
+    minWidth: 70,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  testNotificationBtnText: {
+    color: "#C084FC",
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  segmentContainer: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    borderRadius: 10,
+    padding: 2.5,
+    gap: 3,
+  },
+  segmentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 7.5,
+    gap: 4,
+  },
+  segmentBtnActive: {
+    backgroundColor: "#FFFFFF",
+  },
+  segmentBtnText: {
+    color: "#94A3B8",
+    fontSize: 11.5,
+    fontWeight: "600",
+  },
+  segmentBtnTextActive: {
+    color: "#000000",
+    fontWeight: "700",
   },
   pillBadge: {
     paddingHorizontal: 8,
@@ -1207,14 +1685,23 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   cacheRight: {
-    alignItems: "flex-end",
-    gap: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   cacheSizeText: {
     color: "#94A3B8",
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "600",
     fontVariant: ["tabular-nums"],
+  },
+  clearCacheActionBtn: {
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
+    borderWidth: 0.8,
+    borderColor: "rgba(239, 68, 68, 0.25)",
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
   },
   clearCacheActionText: {
     color: "#EF4444",
