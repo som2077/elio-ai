@@ -723,6 +723,8 @@ export default function HomeScreen() {
     if (!target && session?.user?.id) {
       const { data } = await supabase.rpc("get_user_feed_v1", {
         p_user_id: session.user.id,
+        p_platform: null,
+        p_status: null,
         p_limit: 100,
         p_offset: 0,
       });

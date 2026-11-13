@@ -17,6 +17,7 @@ Extract maximum concrete value: frameworks, recipes, workout routines, tools, co
 Return ONLY a valid JSON object matching this schema:
 {
   "tldw": "1-2 punchy sentences in clean English summarizing the visual demonstration.",
+  "tldw_hinglish": "1-2 natural sentences in conversational Roman Hinglish (e.g. 'Creator ne visual recipe/technique dikhayi hai...').",
   "core_premise": "The underlying problem, aesthetic, or technique demonstrated visually.",
   "key_takeaways": [
     "Concrete actionable takeaway 1",
@@ -95,6 +96,7 @@ STRICT CONSTRAINTS & GUIDELINES:
 SCHEMA DEFINITION (JSON):
 {
   "tldw": "1-2 punchy sentences in clean English summarizing the core value.",
+  "tldw_hinglish": "1-2 natural sentences in conversational Roman Hinglish (e.g. 'Creator ka kehna hai ki...'). Keep technical terms in English.",
   "core_premise": "The fundamental problem, thesis, or dilemma addressed in the video.",
   "key_takeaways": [
     "Concrete actionable takeaway 1",
@@ -192,6 +194,7 @@ export function buildFallbackContextResult(
 ): FullVideoContextResult {
   return {
     tldw: `Key highlights and insights from ${title || "saved clip"}.`,
+    tldw_hinglish: `${title || "Yeh video"} ke key highlights aur zaruri takeaways.`,
     core_premise: `Analysis and practical takeaways from this ${platform} video.`,
     key_takeaways: [
       "Core concept explained in the video",

@@ -1,4 +1,4 @@
-export type ActionItemType = 'link' | 'repo' | 'tool' | 'recipe' | 'book';
+export type ActionItemType = "link" | "repo" | "tool" | "recipe" | "book";
 
 export interface ActionItem {
   type: ActionItemType;
@@ -20,22 +20,22 @@ export interface TranscriptSnippet {
   duration: number; // in seconds
 }
 
-export type AIProcessingStatus = 'pending' | 'completed' | 'failed' | 'skipped';
+export type AIProcessingStatus = "pending" | "completed" | "failed" | "skipped";
 
 export type ProcessingStage =
-  | 'queued'
-  | 'transcribing'
-  | 'generating_context'
-  | 'completed'
-  | 'failed'
-  | 'fallback_notes';
+  | "queued"
+  | "transcribing"
+  | "generating_context"
+  | "completed"
+  | "failed"
+  | "fallback_notes";
 
 export type VerdictType =
-  | 'verified_accurate'
-  | 'mostly_accurate_with_nuance'
-  | 'misleading_oversimplification'
-  | 'opinion_hot_take'
-  | 'sponsored_promo';
+  | "verified_accurate"
+  | "mostly_accurate_with_nuance"
+  | "misleading_oversimplification"
+  | "opinion_hot_take"
+  | "sponsored_promo";
 
 export interface FactCheckNuance {
   verdict: VerdictType | string;
@@ -52,13 +52,13 @@ export interface BackgroundLore {
 }
 
 export type EntityCategory =
-  | 'tool'
-  | 'repo'
-  | 'framework'
-  | 'person'
-  | 'company'
-  | 'paper'
-  | 'concept';
+  | "tool"
+  | "repo"
+  | "framework"
+  | "person"
+  | "company"
+  | "paper"
+  | "concept";
 
 export interface EntityReferenced {
   name: string;
@@ -72,7 +72,13 @@ export interface HookInfo {
   read_time_seconds?: number;
   primary_category?: string;
   tags?: string[];
-  intent?: 'educational' | 'news_debate' | 'opinion' | 'sponsored' | 'entertainment' | string;
+  intent?:
+    | "educational"
+    | "news_debate"
+    | "opinion"
+    | "sponsored"
+    | "entertainment"
+    | string;
 }
 
 export interface CorePremiseThesis {
@@ -89,6 +95,7 @@ export interface VideoAIMetadata {
   productivity_score?: number; // 0 to 100 high-signal productivity rating
   tldw: string;
   tldw_en?: string;
+  tldw_hinglish?: string;
   hook?: HookInfo;
   core_premise?: string | CorePremiseThesis;
   key_takeaways: string[];
@@ -135,13 +142,13 @@ export interface AskElioCitation {
 
 export interface AskElioMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   citations?: AskElioCitation[];
   created_at: string;
 }
 
-export type SubscriptionTier = 'free' | 'pro' | 'lifetime';
+export type SubscriptionTier = "free" | "pro" | "lifetime";
 
 export interface UserSubscription {
   id: string;

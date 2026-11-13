@@ -43,6 +43,7 @@ export interface FactCheckNuance {
 
 export interface FullVideoContextResult {
   tldw: string;
+  tldw_hinglish?: string;
   core_premise?: string;
   key_takeaways: string[];
   background_lore?: BackgroundLore;

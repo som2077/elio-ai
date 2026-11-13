@@ -551,6 +551,7 @@ Deno.serve(async (req: Request) => {
           user_id: video.user_id,
           is_educational: aiResult.is_educational ?? true,
           tldw: aiResult.tldw,
+          tldw_hinglish: aiResult.tldw_hinglish || null,
           core_premise: aiResult.core_premise || null,
           background_lore: aiResult.background_lore || {},
           entities_referenced: aiResult.entities_referenced || [],
