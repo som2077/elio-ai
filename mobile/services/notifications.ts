@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import { supabase } from "./supabase";
 import { SavedVideo } from "../types/video";
 import { analytics } from "./analytics";
+import { logger } from "../utils/logger";
 
 const REMINDER_STORAGE_KEY = "@elio_liked_video_reminders";
 
@@ -25,7 +26,7 @@ if (Platform.OS === "android") {
     vibrationPattern: [0, 250, 250, 250],
     lightColor: "#8B5CF6",
   }).catch((err) => {
-    console.warn("[Notifications] Failed to set Android notification channel:", err);
+    logger.warn("[Notifications] Failed to set Android notification channel:", err);
   });
 }
 
@@ -188,13 +189,13 @@ export async function scheduleContextReadyNotification(
       trigger: null, // deliver immediately
     });
 
-    console.log(
+    logger.log(
       `[Notifications] Dispatched Context Ready notification for video ${video.id}: ${title}`
     );
 
     return notificationId;
   } catch (error) {
-    console.warn("[Notifications] Failed to schedule context ready notification:", error);
+    logger.warn("[Notifications] Failed to schedule context ready notification:", error);
     return null;
   }
 }
@@ -247,7 +248,7 @@ export async function scheduleLikedVideoReminder(
     map[video.id] = notificationId;
     await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(map));
 
-    console.log(
+    logger.log(
       `[Notifications] Scheduled local reminder for video ${video.id} at slot "${slotName}" (${
         overrideSeconds ? overrideSeconds + "s" : targetDate.toLocaleTimeString()
       })`
@@ -264,7 +265,7 @@ export async function scheduleLikedVideoReminder(
 
     return notificationId;
   } catch (error) {
-    console.warn("[Notifications] Failed to schedule reminder:", error);
+    logger.warn("[Notifications] Failed to schedule reminder:", error);
     return null;
   }
 }
@@ -296,7 +297,7 @@ export async function sendTestNotificationNow(
       trigger: { seconds: 5 },
     });
 
-    console.log(
+    logger.log(
       `[Notifications] Test notification scheduled to pop in 5 seconds (ID: ${notificationId})`
     );
 
@@ -306,7 +307,7 @@ export async function sendTestNotificationNow(
 
     return notificationId;
   } catch (error) {
-    console.warn("[Notifications] Failed to schedule test notification:", error);
+    logger.warn("[Notifications] Failed to schedule test notification:", error);
     return null;
   }
 }
@@ -326,12 +327,12 @@ export async function cancelLikedVideoReminder(videoId: string): Promise<void> {
       await Notifications.cancelScheduledNotificationAsync(notificationId);
       delete map[videoId];
       await AsyncStorage.setItem(REMINDER_STORAGE_KEY, JSON.stringify(map));
-      console.log(
+      logger.log(
         `[Notifications] Cancelled scheduled reminder for video ${videoId} (Notification ID: ${notificationId})`
       );
     }
   } catch (error) {
-    console.warn(
+    logger.warn(
       `[Notifications] Failed to cancel reminder for video ${videoId}:`,
       error
     );
@@ -355,7 +356,7 @@ export async function registerForPushNotificationsAsync(userId: string) {
     }
 
     if (finalStatus !== "granted") {
-      console.log("[Notifications] Push notification permissions not granted by user.");
+      logger.log("[Notifications] Push notification permissions not granted by user.");
       return null;
     }
 
@@ -376,7 +377,7 @@ export async function registerForPushNotificationsAsync(userId: string) {
         token = rawTokenData.data;
       } catch {
         // Firebase not yet initialized on Android (e.g. google-services.json pending)
-        console.info(
+        logger.info(
           "[Notifications] Remote FCM/Firebase push token skipped (FirebaseApp not configured yet). Local scheduled notifications remain 100% active."
         );
       }
@@ -396,9 +397,9 @@ export async function registerForPushNotificationsAsync(userId: string) {
       );
     }
   } catch (e: any) {
-    console.info(
-      "[Notifications] Push token registration skipped:",
-      e?.message || e
+    logger.info(
+      "[Notifications] Push token registration notice:",
+      e?.message || "Skipped"
     );
   }
 

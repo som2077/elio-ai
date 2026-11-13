@@ -3,6 +3,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Linking from "expo-linking";
 import { supabase } from "../services/supabase";
+import { logger } from "../utils/logger";
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -63,8 +64,8 @@ export default function AuthCallback() {
             router.replace("/");
           }
         }, 800);
-      } catch (err) {
-        console.error("Auth callback error:", err);
+      } catch (err: any) {
+        logger.error("Auth callback notice:", err?.message || "Sign-in interrupted");
         if (isMounted) {
           router.replace("/");
         }

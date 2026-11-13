@@ -95,6 +95,7 @@ ALTER TABLE public.video_transcript_chunks ENABLE ROW LEVEL SECURITY;
 -- Revoke direct write access on sensitive tables from client roles
 REVOKE INSERT, UPDATE, DELETE ON public.user_subscriptions FROM anon, authenticated;
 REVOKE INSERT, UPDATE, DELETE ON public.video_ai_metadata FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.video_transcript_chunks FROM anon, authenticated;
 
 -- Policies for user_subscriptions (SELECT only for owner)
 DROP POLICY IF EXISTS "Users can read own subscription" ON public.user_subscriptions;
@@ -766,6 +767,19 @@ BEGIN
                 'action', 'update_notes',
                 'video_id', p_video_id,
                 'user_notes', p_payload->>'notes'
+            );
+
+        WHEN 'update_title' THEN
+            UPDATE public.saved_videos
+            SET title = p_payload->>'title',
+                updated_at = NOW()
+            WHERE id = p_video_id AND user_id = p_user_id;
+
+            RETURN jsonb_build_object(
+                'success', true,
+                'action', 'update_title',
+                'video_id', p_video_id,
+                'title', p_payload->>'title'
             );
 
         ELSE

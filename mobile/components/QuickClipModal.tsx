@@ -15,6 +15,7 @@ import {
 import { PikaIcon } from "./PikaIcon";
 import { threadsTokens, appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
+import { logger } from "../utils/logger";
 import { supabase } from "../services/supabase";
 import {
   cleanShareUrl,
@@ -56,15 +57,21 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
         data: { user },
       } = await supabase.auth.getUser();
 
-      const result = await processSharedContent(url.trim(), user?.id);
+      const result = await processSharedContent(
+        url.trim(),
+        user?.id,
+        title.trim() || undefined
+      );
 
       if (result.success) {
-        // If user entered a custom title, update it
-        if (title.trim() && result.video?.id) {
-          await supabase
-            .from("saved_videos")
-            .update({ title: title.trim() })
-            .eq("id", result.video.id);
+        // If user entered a custom title and clip was already in library, update via backend RPC
+        if (title.trim() && result.video?.id && result.isDuplicate && user?.id) {
+          await supabase.rpc("dispatch_video_action", {
+            p_user_id: user.id,
+            p_action_type: "update_title",
+            p_video_id: result.video.id,
+            p_payload: { title: title.trim() },
+          });
         }
         haptics.success();
         setUrl("");
@@ -72,11 +79,11 @@ export const QuickClipModal: React.FC<QuickClipModalProps> = ({
         onClipSaved();
         onClose();
       } else {
-        console.warn("Save clip error:", result.error);
+        logger.warn("Save clip notice:", result.error);
         Alert.alert("Unable to Save", result.error || "Please check the URL.");
       }
     } catch (err: any) {
-      console.warn("Failed to insert clip:", err.message);
+      logger.warn("Failed to insert clip:", err?.message);
     } finally {
       setLoading(false);
     }

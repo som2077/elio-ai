@@ -26,6 +26,7 @@ import {
 } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "../services/supabase";
+import { logger } from "../utils/logger";
 import { SavedVideo, WatchStatus } from "../types/video";
 import { VideoCard } from "../components/VideoCard";
 import { VideoGridCard } from "../components/VideoGridCard";
@@ -398,7 +399,7 @@ export default function HomeScreen() {
             setPinnedPlatforms(parsed);
           }
         } catch (e) {
-          console.warn("Failed to load pinned platforms:", e);
+          logger.warn("Failed to load pinned platforms:", e);
         }
       }
     });
@@ -513,10 +514,10 @@ export default function HomeScreen() {
           }
         }
       } else if (result.error) {
-        console.warn("[Share Handler] Notice:", result.error);
+        logger.warn("[Share Handler] Notice:", result.error);
       }
     } catch (err: any) {
-      console.warn("[Share Handler] Error processing link:", err.message);
+      logger.warn("[Share Handler] Error processing link:", err?.message);
     }
   };
 
@@ -569,7 +570,7 @@ export default function HomeScreen() {
         }, 500);
       });
     } catch (e) {
-      console.warn("[Elio AI] Check first-time scan error:", e);
+      logger.warn("[Elio AI] Check first-time scan error:", e);
     }
   };
 
@@ -663,25 +664,14 @@ export default function HomeScreen() {
       });
 
       if (error) {
-        console.warn("get_user_feed_v1 notice:", error.message);
-        // Fallback to direct query if RPC unavailable
-        const { data: fallbackData } = await supabase
-          .from("saved_videos")
-          .select("*")
-          .eq("user_id", targetUserId)
-          .order("created_at", { ascending: false });
-        if (fallbackData) {
-          const list = fallbackData as SavedVideo[];
-          setVideos(list);
-          syncWidgetsData(list);
-        }
+        logger.warn("get_user_feed_v1 notice:", error.message);
       } else if (data && Array.isArray(data.videos)) {
         const list = data.videos as SavedVideo[];
         setVideos(list);
         syncWidgetsData(list);
       }
     } catch (err: any) {
-      console.warn("Network issue in fetchVideos:", err.message);
+      logger.warn("Network issue in fetchVideos:", err?.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -713,7 +703,7 @@ export default function HomeScreen() {
         supabase.removeChannel(channel);
       };
     } catch (err) {
-      console.warn("Realtime subscription warning:", err);
+      logger.warn("Realtime subscription warning:", err);
     }
   }, [session?.user?.id]);
 
@@ -879,7 +869,7 @@ export default function HomeScreen() {
       });
 
       if (error) {
-        console.warn("Failed to delete video via dispatch_video_action:", error.message);
+        logger.warn("Failed to delete video via dispatch_video_action:", error.message);
         fetchVideos();
       }
     }
@@ -1019,7 +1009,7 @@ export default function HomeScreen() {
         const res = await searchInsideVideosSemantic(searchQuery.trim());
         setSemanticResults(res);
       } catch (e) {
-        console.warn("Inside-video search issue:", e);
+        logger.warn("Inside-video search issue:", e);
       } finally {
         setIsSearchingSemantic(false);
       }

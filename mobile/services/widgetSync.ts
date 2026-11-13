@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from "react-native";
 import { SavedVideo } from "../types/video";
+import { logger } from "../utils/logger";
 
 const { WidgetDataModule } = NativeModules;
 
@@ -54,7 +55,7 @@ export async function syncWidgetsData(videos: SavedVideo[]): Promise<boolean> {
     await WidgetDataModule.setWidgetData(JSON.stringify(payload));
     return true;
   } catch (err: any) {
-    console.warn("[WidgetSync] Notice:", err?.message || err);
+    logger.warn("[WidgetSync] Notice:", err?.message || err);
     return false;
   }
 }
@@ -67,6 +68,6 @@ export async function refreshWidgets(): Promise<void> {
   try {
     await WidgetDataModule.updateWidgets();
   } catch (err: any) {
-    console.warn("[WidgetSync] Refresh notice:", err?.message || err);
+    logger.warn("[WidgetSync] Refresh notice:", err?.message || err);
   }
 }

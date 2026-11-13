@@ -4,6 +4,7 @@
  * Uses @pikaicons/core-free icon data + react-native-svg renderer
  */
 import React from "react";
+import { logger } from "../utils/logger";
 import Svg, {
   Path,
   G,
@@ -387,7 +388,7 @@ export const PikaIcon: React.FC<PikaIconProps> = ({
   const iconData = PIKA_MAP[name];
 
   if (!iconData) {
-    console.warn(`[PikaIcon] No mapping for icon: "${name}"`);
+    logger.warn(`[PikaIcon] No mapping for icon: "${name}"`);
     return null;
   }
 

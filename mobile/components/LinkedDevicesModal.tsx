@@ -13,6 +13,7 @@ import { supabase } from "../services/supabase";
 import { LinkedDevice } from "../types/video";
 import { appleColors, appleRadii, appleTypography } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
+import { logger } from "../utils/logger";
 import { IndustryBottomSheet } from "./IndustryBottomSheet";
 
 interface LinkedDevicesModalProps {
@@ -128,7 +129,7 @@ export const LinkedDevicesModal: React.FC<LinkedDevicesModalProps> = ({
 
       setDevices(fetchedDevices);
     } catch (err) {
-      console.warn("[Elio AI] Linked devices notice:", err);
+      logger.warn("[Elio AI] Linked devices notice:", err);
     } finally {
       setLoading(false);
     }

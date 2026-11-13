@@ -1,5 +1,6 @@
 import { Mixpanel } from "mixpanel-react-native";
 import { SavedVideo } from "../types/video";
+import { logger } from "../utils/logger";
 
 const MIXPANEL_TOKEN = process.env.EXPO_PUBLIC_MIXPANEL_TOKEN || "";
 
@@ -15,7 +16,7 @@ class AnalyticsService {
     if (this.isInitialized) return;
 
     if (!MIXPANEL_TOKEN || MIXPANEL_TOKEN === "your-mixpanel-token-here") {
-      console.info(
+      logger.info(
         "[Mixpanel Analytics] No EXPO_PUBLIC_MIXPANEL_TOKEN configured. Analytics will run in no-op mode."
       );
       return;
@@ -25,9 +26,9 @@ class AnalyticsService {
       this.instance = new Mixpanel(MIXPANEL_TOKEN, false);
       await this.instance.init();
       this.isInitialized = true;
-      console.log("[Mixpanel Analytics] Initialized successfully");
+      logger.log("[Mixpanel Analytics] Initialized successfully");
     } catch (error) {
-      console.warn("[Mixpanel Analytics] Initialization failed:", error);
+      logger.warn("[Mixpanel Analytics] Initialization notice:", error);
     }
   }
 
@@ -44,7 +45,7 @@ class AnalyticsService {
         if (userDetails.name) people.set("$name", userDetails.name);
       }
     } catch (err) {
-      console.warn("[Mixpanel Analytics] Identify failed:", err);
+      logger.warn("[Mixpanel Analytics] Identify notice:", err);
     }
   }
 
@@ -56,7 +57,7 @@ class AnalyticsService {
     try {
       this.instance.reset();
     } catch (err) {
-      console.warn("[Mixpanel Analytics] Reset failed:", err);
+      logger.warn("[Mixpanel Analytics] Reset notice:", err);
     }
   }
 
@@ -66,14 +67,14 @@ class AnalyticsService {
   track(eventName: string, properties: Record<string, any> = {}) {
     if (!this.instance) {
       if (__DEV__) {
-        console.log(`[Mixpanel Track (DEV Mock)]: ${eventName}`, properties);
+        logger.debug(`[Mixpanel Track (DEV Mock)]: ${eventName}`, properties);
       }
       return;
     }
     try {
       this.instance.track(eventName, properties);
     } catch (err) {
-      console.warn(`[Mixpanel Analytics] Track failed for ${eventName}:`, err);
+      logger.warn(`[Mixpanel Analytics] Track notice for ${eventName}:`, err);
     }
   }
 

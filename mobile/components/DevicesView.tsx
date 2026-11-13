@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../services/supabase";
 import { appleColors } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
+import { logger } from "../utils/logger";
 import { AppleSwitch } from "./AppleSwitch";
 import {
   sendTestNotificationNow,
@@ -100,7 +101,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
           await registerForPushNotificationsAsync(session.user.id);
         }
       } catch (e) {
-        console.warn("[DevicesView] Push registration on toggle error:", e);
+        logger.warn("[DevicesView] Push registration on toggle notice:", e);
       }
     }
   };
@@ -197,7 +198,7 @@ export const DevicesView: React.FC<DevicesViewProps> = ({
 
       setDevices(fetchedDevices);
     } catch (err: any) {
-      console.warn("[DevicesView] Fetch error:", err.message);
+      logger.warn("[DevicesView] Fetch notice:", err?.message);
     } finally {
       setLoading(false);
     }
