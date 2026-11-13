@@ -34,6 +34,19 @@ CREATE TABLE IF NOT EXISTS public.saved_videos (
 ALTER TABLE public.saved_videos ADD COLUMN IF NOT EXISTS device_id UUID;
 ALTER TABLE public.saved_videos ADD COLUMN IF NOT EXISTS source_device_name TEXT;
 
+-- Ensure unique constraint on saved_videos (idempotency & deduplication)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'unique_user_clean_url'
+  ) THEN
+    ALTER TABLE public.saved_videos ADD CONSTRAINT unique_user_clean_url UNIQUE (user_id, clean_url);
+  END IF;
+EXCEPTION
+  WHEN duplicate_table OR duplicate_object THEN
+    NULL;
+END $$;
+
 -- Indices for saved_videos
 CREATE INDEX IF NOT EXISTS idx_saved_videos_user_status ON public.saved_videos(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_saved_videos_clean_url ON public.saved_videos(user_id, clean_url);

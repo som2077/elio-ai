@@ -1,40 +1,68 @@
 -- ====================================================================
 -- ✦ ELIO AI - FULL CONTEXT & DEEP LORE SCHEMA MIGRATION
 -- Migration: 02_full_context_lore_schema.sql
--- Run this in Supabase SQL Editor
+-- Run this in Supabase SQL Editor or via Supabase MCP
 --
--- Adds:
 -- 1. Rich context columns to public.video_ai_metadata:
 --    - core_premise (TEXT)
---    - tldw_hinglish (TEXT)
 --    - background_lore (JSONB)
 --    - entities_referenced (JSONB)
 --    - fact_check_nuance (JSONB)
 --    - processing_stage (VARCHAR(30))
--- 2. Unique constraint on saved_videos (user_id, clean_url)
+--    - full_transcript (TEXT)
+--    - transcript_language (VARCHAR(10))
+--    - has_spoken_audio (BOOLEAN)
+--    - context_breakdown (JSONB)
+-- 2. Safe deduplication & Unique constraint on saved_videos (user_id, clean_url)
 -- 3. HNSW vector index on video_transcript_chunks
 -- 4. Multi-scope RPC function: match_video_chunks_v2
 -- 5. pg_net asynchronous background trigger on saved_videos INSERT
 -- ====================================================================
 
--- 1. ADD FULL CONTEXT & LORE COLUMNS TO video_ai_metadata
+-- 1. ADD FULL CONTEXT & AUDIO INTELLIGENCE COLUMNS TO video_ai_metadata
 ALTER TABLE public.video_ai_metadata
+    ADD COLUMN IF NOT EXISTS full_transcript TEXT,
+    ADD COLUMN IF NOT EXISTS transcript_language VARCHAR(10) DEFAULT 'en',
+    ADD COLUMN IF NOT EXISTS has_spoken_audio BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS context_breakdown JSONB DEFAULT '[]'::jsonb,
     ADD COLUMN IF NOT EXISTS core_premise TEXT,
-    ADD COLUMN IF NOT EXISTS tldw_hinglish TEXT,
     ADD COLUMN IF NOT EXISTS background_lore JSONB DEFAULT '{}'::jsonb,
     ADD COLUMN IF NOT EXISTS entities_referenced JSONB DEFAULT '[]'::jsonb,
     ADD COLUMN IF NOT EXISTS fact_check_nuance JSONB DEFAULT '{}'::jsonb,
-    ADD COLUMN IF NOT EXISTS processing_stage VARCHAR(30) DEFAULT 'queued';
+    ADD COLUMN IF NOT EXISTS processing_stage VARCHAR(30) DEFAULT 'queued',
+    DROP COLUMN IF EXISTS tldw_hinglish;
 
 -- Update documentation comments
 COMMENT ON COLUMN public.video_ai_metadata.core_premise IS 'Underlying thesis or fundamental problem addressed in the video.';
-COMMENT ON COLUMN public.video_ai_metadata.tldw_hinglish IS 'Natural Roman Hinglish 1-sentence summary for dual-language UI toggle.';
 COMMENT ON COLUMN public.video_ai_metadata.background_lore IS 'Deep contextual backstory, historical context, industry impact, and prerequisites.';
 COMMENT ON COLUMN public.video_ai_metadata.entities_referenced IS 'Extracted knowledge graph of tools, repos, people, papers, books mentioned.';
 COMMENT ON COLUMN public.video_ai_metadata.fact_check_nuance IS 'Fact-check verdict, hidden trade-offs, and critical nuances omitted in the video.';
 COMMENT ON COLUMN public.video_ai_metadata.processing_stage IS 'Granular pipeline progress: queued | scraping_metadata | transcribing | generating_context | completed | failed | skipped';
 
--- 2. ENSURE STRICT IDEMPOTENCY / DEDUPLICATION ON saved_videos
+-- 2. SAFE DEDUPLICATION AND STRICT IDEMPOTENCY ON saved_videos
+WITH ranked_duplicates AS (
+    SELECT 
+        v.id,
+        ROW_NUMBER() OVER (
+            PARTITION BY v.user_id, v.clean_url 
+            ORDER BY 
+                (SELECT COUNT(*) FROM public.video_ai_metadata m WHERE m.video_id = v.id) DESC,
+                (SELECT COUNT(*) FROM public.video_transcript_chunks c WHERE c.video_id = v.id) DESC,
+                v.created_at DESC
+        ) AS rank
+    FROM public.saved_videos v
+    WHERE (v.user_id, v.clean_url) IN (
+        SELECT user_id, clean_url 
+        FROM public.saved_videos 
+        GROUP BY user_id, clean_url 
+        HAVING COUNT(*) > 1
+    )
+)
+DELETE FROM public.saved_videos
+WHERE id IN (
+    SELECT id FROM ranked_duplicates WHERE rank > 1
+);
+
 DO $$
 BEGIN
   IF NOT EXISTS (

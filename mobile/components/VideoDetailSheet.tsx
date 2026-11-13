@@ -28,7 +28,6 @@ import type {
 } from "../types/ai";
 
 export type DetailTabType = "summary" | "lore" | "tools" | "timestamps" | "actions";
-export type LanguageMode = "en" | "hinglish";
 
 interface VideoDetailSheetProps {
   video: SavedVideo | null;
@@ -56,7 +55,6 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   onAskElio,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTabType>("summary");
-  const [languageMode, setLanguageMode] = useState<LanguageMode>("en");
   const [aiMeta, setAiMeta] = useState<VideoAIMetadata | null>(null);
   const [isLoadingMeta, setIsLoadingMeta] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -104,38 +102,25 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
 
   const isWatched = video.status === "watched";
 
-  // Helpers to resolve dual-language texts
+  // Resolved English summary and takeaways
   const getResolvedTldw = (): string => {
     if (!aiMeta) return "";
     const core = typeof aiMeta.core_premise === "object" ? aiMeta.core_premise : null;
-    if (languageMode === "hinglish") {
-      return (
-        aiMeta.tldw_hinglish ||
-        core?.tldw_hinglish ||
-        (typeof aiMeta.core_premise === "string" ? aiMeta.core_premise : null) ||
-        aiMeta.tldw
-      );
-    }
     return (
+      aiMeta.tldw ||
       aiMeta.tldw_en ||
       core?.tldw_en ||
-      (typeof aiMeta.core_premise === "string" ? aiMeta.core_premise : null) ||
-      aiMeta.tldw
+      (typeof aiMeta.core_premise === "string" ? aiMeta.core_premise : "") ||
+      ""
     );
   };
 
   const getResolvedTakeaways = (): string[] => {
     if (!aiMeta?.key_takeaways) return [];
     if (Array.isArray(aiMeta.key_takeaways)) {
-      if (languageMode === "hinglish" && aiMeta.takeaways_hinglish?.length) {
-        return aiMeta.takeaways_hinglish;
-      }
       return aiMeta.key_takeaways;
     }
-    const record = aiMeta.key_takeaways as { english?: string[]; hinglish?: string[] };
-    if (languageMode === "hinglish" && record.hinglish && record.hinglish.length > 0) {
-      return record.hinglish;
-    }
+    const record = aiMeta.key_takeaways as { english?: string[] };
     return record.english || [];
   };
 
@@ -325,7 +310,7 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
       onClose={onClose}
       maxHeightRatio={0.88}
     >
-      {/* 1. Header Row: Video Meta + Language Segmented Switch [EN | Hinglish] */}
+      {/* 1. Header Row: Video Platform & Title */}
       <View style={styles.sheetHeaderRow}>
         <View style={styles.videoHeaderMeta}>
           <Text style={styles.videoPlatformText}>
@@ -335,42 +320,6 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
           <Text style={styles.videoTitleText} numberOfLines={1}>
             {video.title || "Video Intelligence"}
           </Text>
-        </View>
-
-        {/* 0ms Language Mode Toggle Pill */}
-        <View style={styles.langTogglePill}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[styles.langBtn, languageMode === "en" && styles.langBtnActive]}
-            onPress={() => {
-              haptics.selection();
-              setLanguageMode("en");
-            }}
-          >
-            <Text
-              style={[styles.langBtnText, languageMode === "en" && styles.langBtnTextActive]}
-            >
-              EN
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={[styles.langBtn, languageMode === "hinglish" && styles.langBtnActive]}
-            onPress={() => {
-              haptics.selection();
-              setLanguageMode("hinglish");
-            }}
-          >
-            <Text
-              style={[
-                styles.langBtnText,
-                languageMode === "hinglish" && styles.langBtnTextActive,
-              ]}
-            >
-              Hinglish
-            </Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -590,9 +539,7 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                 <View style={styles.tldwHeaderRow}>
                   <View style={styles.badgeRow}>
                     <PikaIcon name="flash" size={13} color="#FBBF24" />
-                    <Text style={styles.tldwBadgeLabel}>
-                      {languageMode === "hinglish" ? "30-SEC HINGLISH TL;DW" : "30-SEC TL;DW"}
-                    </Text>
+                    <Text style={styles.tldwBadgeLabel}>30-SEC TL;DW</Text>
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     {aiMeta.productivity_score ? (
@@ -1092,31 +1039,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     marginTop: 2,
-  },
-  langTogglePill: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 14,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-  },
-  langBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 11,
-  },
-  langBtnActive: {
-    backgroundColor: "#7C3AED",
-  },
-  langBtnText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#94A3B8",
-  },
-  langBtnTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "700",
   },
   tabScrollContainer: {
     marginBottom: 14,

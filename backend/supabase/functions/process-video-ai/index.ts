@@ -413,7 +413,7 @@ Deno.serve(async (req: Request) => {
       .update({ processing_stage: "generating_context" as ProcessingStage })
       .eq("video_id", video.id);
 
-    // 4. Single-Pass Dual-Language (EN + Hinglish) Deep Context LLM Call
+    // 4. Single-Pass Deep Context & Lore LLM Call (Strict English)
     const systemPrompt = buildFullContextSystemPrompt(isSilentOrVisual);
     const userPrompt = buildVideoUserPrompt({
       platform: video.platform,
@@ -551,7 +551,6 @@ Deno.serve(async (req: Request) => {
           user_id: video.user_id,
           is_educational: aiResult.is_educational ?? true,
           tldw: aiResult.tldw,
-          tldw_hinglish: aiResult.tldw_hinglish || null,
           core_premise: aiResult.core_premise || null,
           background_lore: aiResult.background_lore || {},
           entities_referenced: aiResult.entities_referenced || [],
@@ -589,7 +588,6 @@ Deno.serve(async (req: Request) => {
       const masterAnchorParts = [
         `Title: ${video.title || "Video Clip"}.`,
         `TLDW: ${aiResult.tldw || ""}.`,
-        aiResult.tldw_hinglish ? `Hinglish: ${aiResult.tldw_hinglish}.` : "",
         aiResult.core_premise ? `Core Premise: ${aiResult.core_premise}.` : "",
         aiResult.background_lore?.why_it_matters
           ? `Why It Matters: ${aiResult.background_lore.why_it_matters}.`

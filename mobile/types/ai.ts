@@ -77,7 +77,6 @@ export interface HookInfo {
 
 export interface CorePremiseThesis {
   tldw_en?: string;
-  tldw_hinglish?: string;
   problem_addressed?: string;
   main_solution_or_claim?: string;
 }
@@ -90,11 +89,9 @@ export interface VideoAIMetadata {
   productivity_score?: number; // 0 to 100 high-signal productivity rating
   tldw: string;
   tldw_en?: string;
-  tldw_hinglish?: string;
   hook?: HookInfo;
   core_premise?: string | CorePremiseThesis;
-  key_takeaways: string[] | { english?: string[]; hinglish?: string[] };
-  takeaways_hinglish?: string[];
+  key_takeaways: string[];
   background_lore?: BackgroundLore;
   fact_check_nuance?: FactCheckNuance;
   entities_referenced?: EntityReferenced[];

@@ -59,46 +59,31 @@ export async function fetchVideoAIMetadata(
     // Ignore storage parse errors
   }
 
-  // 3. Supabase Database Lookup
+  // 3. Backend-Driven RPC Lookup via get_user_feed_v1
   try {
-    const { data, error } = await supabase
-      .from("video_ai_metadata")
-      .select("*")
-      .eq("video_id", videoId)
-      .maybeSingle();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (error || !data) {
-      return null;
+    if (user) {
+      const { data, error } = await supabase.rpc("get_user_feed_v1", {
+        p_user_id: user.id,
+        p_limit: 100,
+        p_offset: 0,
+      });
+
+      if (!error && data && Array.isArray(data.videos)) {
+        const found = data.videos.find((v: any) => v.id === videoId);
+        if (found?.ai_metadata) {
+          const metadata = found.ai_metadata as VideoAIMetadata;
+          memoryCache[videoId] = metadata;
+          setStorageItem(`@elio_ai_meta_${videoId}`, JSON.stringify(metadata));
+          return metadata;
+        }
+      }
     }
 
-    const metadata: VideoAIMetadata = {
-      id: data.id,
-      video_id: data.video_id,
-      user_id: data.user_id,
-      is_educational: data.is_educational ?? true,
-      tldw: data.tldw || "AI summary ready.",
-      key_takeaways: Array.isArray(data.key_takeaways)
-        ? data.key_takeaways
-        : [],
-      action_items: Array.isArray(data.action_items) ? data.action_items : [],
-      primary_category: data.primary_category || "Tech",
-      tags: Array.isArray(data.tags) ? data.tags : [],
-      read_time_seconds: data.read_time_seconds || 30,
-      processing_status: data.processing_status || "completed",
-      full_transcript: data.full_transcript || undefined,
-      transcript_language: data.transcript_language || "en",
-      has_spoken_audio: data.has_spoken_audio ?? false,
-      context_breakdown: Array.isArray(data.context_breakdown)
-        ? data.context_breakdown
-        : [],
-      error_message: data.error_message,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-    };
-
-    memoryCache[videoId] = metadata;
-    setStorageItem(`@elio_ai_meta_${videoId}`, JSON.stringify(metadata));
-    return metadata;
+    return null;
   } catch (err) {
     console.warn(
       `[aiService] Error fetching AI metadata for video ${videoId}:`,
@@ -300,25 +285,33 @@ export async function getUserSubscription(): Promise<UserSubscription | null> {
 
     if (!user) return null;
 
-    const { data, error } = await supabase
-      .from("user_subscriptions")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    // Use secure RPC get_user_insights_v1 instead of direct user_subscriptions query
+    const { data, error } = await supabase.rpc("get_user_insights_v1", {
+      p_user_id: user.id,
+      p_time_range: "30d",
+    });
 
-    if (error || !data) {
+    if (!error && data?.subscription) {
       return {
-        id: "default",
+        id: user.id,
         user_id: user.id,
-        tier: "free",
-        ai_summaries_used_this_month: 0,
+        tier: data.subscription.tier || "free",
+        ai_summaries_used_this_month: data.subscription.usedThisMonth || 0,
         subscription_status: "active",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
     }
 
-    return data as UserSubscription;
+    return {
+      id: "default",
+      user_id: user.id,
+      tier: "free",
+      ai_summaries_used_this_month: 0,
+      subscription_status: "active",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
   } catch {
     return null;
   }

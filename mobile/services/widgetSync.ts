@@ -45,7 +45,7 @@ export async function syncWidgetsData(videos: SavedVideo[]): Promise<boolean> {
             tldw: v.ai_metadata.tldw || "",
             key_takeaways: Array.isArray(v.ai_metadata.key_takeaways)
               ? v.ai_metadata.key_takeaways
-              : v.ai_metadata.key_takeaways?.english || [],
+              : [],
             read_time_seconds: v.ai_metadata.read_time_seconds || 120,
           }
         : undefined,

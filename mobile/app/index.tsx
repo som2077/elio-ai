@@ -648,26 +648,40 @@ export default function HomeScreen() {
   const fetchVideos = async (userId?: string) => {
     try {
       const targetUserId = userId || session?.user?.id;
-      let query = supabase
-        .from("saved_videos")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (targetUserId) {
-        query = query.eq("user_id", targetUserId);
+      if (!targetUserId) {
+        setVideos([]);
+        return;
       }
 
-      const { data, error } = await query;
+      // Backend-driven RPC call to get_user_feed_v1 (pre-computed, joined with full AI metadata)
+      const { data, error } = await supabase.rpc("get_user_feed_v1", {
+        p_user_id: targetUserId,
+        p_platform: null,
+        p_status: null,
+        p_limit: 100,
+        p_offset: 0,
+      });
 
       if (error) {
-        console.warn("Supabase fetch notice:", error.message);
-      } else if (data) {
-        const list = data as SavedVideo[];
+        console.warn("get_user_feed_v1 notice:", error.message);
+        // Fallback to direct query if RPC unavailable
+        const { data: fallbackData } = await supabase
+          .from("saved_videos")
+          .select("*")
+          .eq("user_id", targetUserId)
+          .order("created_at", { ascending: false });
+        if (fallbackData) {
+          const list = fallbackData as SavedVideo[];
+          setVideos(list);
+          syncWidgetsData(list);
+        }
+      } else if (data && Array.isArray(data.videos)) {
+        const list = data.videos as SavedVideo[];
         setVideos(list);
         syncWidgetsData(list);
       }
     } catch (err: any) {
-      console.warn("Network issue:", err.message);
+      console.warn("Network issue in fetchVideos:", err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -706,14 +720,14 @@ export default function HomeScreen() {
   // Helper to open a video detail sheet by its ID (e.g. from notification click)
   const openVideoById = async (videoId: string) => {
     let target = videos.find((v) => v.id === videoId);
-    if (!target) {
-      const { data } = await supabase
-        .from("saved_videos")
-        .select("*")
-        .eq("id", videoId)
-        .maybeSingle();
-      if (data) {
-        target = data as SavedVideo;
+    if (!target && session?.user?.id) {
+      const { data } = await supabase.rpc("get_user_feed_v1", {
+        p_user_id: session.user.id,
+        p_limit: 100,
+        p_offset: 0,
+      });
+      if (data && Array.isArray(data.videos)) {
+        target = data.videos.find((v: any) => v.id === videoId);
       }
     }
     if (target) {
@@ -780,10 +794,14 @@ export default function HomeScreen() {
       type: "success",
     });
 
-    await supabase
-      .from("saved_videos")
-      .update({ status: newStatus })
-      .eq("id", video.id);
+    if (session?.user?.id) {
+      await supabase.rpc("dispatch_video_action", {
+        p_user_id: session.user.id,
+        p_action_type: "toggle_status",
+        p_video_id: video.id,
+        p_payload: { status: newStatus },
+      });
+    }
   };
 
   const toggleFavorite = async (video: SavedVideo) => {
@@ -821,10 +839,14 @@ export default function HomeScreen() {
       type: "success",
     });
 
-    await supabase
-      .from("saved_videos")
-      .update({ is_favorite: newFav })
-      .eq("id", video.id);
+    if (session?.user?.id) {
+      await supabase.rpc("dispatch_video_action", {
+        p_user_id: session.user.id,
+        p_action_type: "toggle_favorite",
+        p_video_id: video.id,
+        p_payload: { is_favorite: newFav },
+      });
+    }
   };
 
   const handleDeleteVideo = async (video: SavedVideo) => {
@@ -846,14 +868,18 @@ export default function HomeScreen() {
       type: "delete",
     });
 
-    const { error } = await supabase
-      .from("saved_videos")
-      .delete()
-      .eq("id", video.id);
+    if (session?.user?.id) {
+      const { error } = await supabase.rpc("dispatch_video_action", {
+        p_user_id: session.user.id,
+        p_action_type: "delete",
+        p_video_id: video.id,
+        p_payload: {},
+      });
 
-    if (error) {
-      console.warn("Failed to delete video:", error.message);
-      fetchVideos();
+      if (error) {
+        console.warn("Failed to delete video via dispatch_video_action:", error.message);
+        fetchVideos();
+      }
     }
   };
 
