@@ -27,7 +27,7 @@ export async function transcribeAudioBuffer(
     const blob =
       audioData instanceof Blob
         ? audioData
-        : new Blob([audioData], { type: "audio/mp4" });
+        : new Blob([audioData as unknown as BlobPart], { type: "audio/mp4" });
 
     formData.append("file", blob, fileName);
     formData.append(

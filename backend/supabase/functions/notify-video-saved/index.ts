@@ -76,8 +76,19 @@ serve(async (req: Request) => {
       );
     }
 
+    const platformEmojiMap: Record<string, string> = {
+      youtube: "🔴 YouTube",
+      instagram: "🟣 Instagram",
+      tiktok: "🎵 TikTok",
+      twitter: "𝕏 Twitter",
+      reddit: "🟠 Reddit",
+      threads: "🧵 Threads",
+      pinterest: "📌 Pinterest",
+      facebook: "🔵 Facebook",
+      snapchat: "👻 Snapchat",
+    };
     const platformEmoji =
-      video.platform === "youtube" ? "🔴 YouTube" : "🟣 Instagram";
+      platformEmojiMap[video.platform] || `🎬 ${video.platform || "Video"}`;
     const notificationTitle = `${platformEmoji} Video Saved!`;
     const notificationBody = video.title
       ? `${video.creator_name ? video.creator_name + ": " : ""}"${video.title}" - Tap to review later`
