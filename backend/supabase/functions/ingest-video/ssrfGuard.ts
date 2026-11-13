@@ -41,12 +41,28 @@ export const ALLOWED_DOMAINS = [
   // Facebook
   "facebook.com",
   "www.facebook.com",
+  "web.facebook.com",
+  "m.facebook.com",
   "fb.watch",
   // Threads & Vimeo
   "threads.net",
   "www.threads.net",
+  "threads.com",
+  "www.threads.com",
   "vimeo.com",
   "www.vimeo.com",
+  // Pinterest
+  "pinterest.com",
+  "www.pinterest.com",
+  "in.pinterest.com",
+  "pin.it",
+  // Snapchat
+  "snapchat.com",
+  "www.snapchat.com",
+  "story.snapchat.com",
+  "t.snapchat.com",
+  "snap.com",
+  "www.snap.com",
 ];
 
 // Tracking parameters stripped on ingestion
@@ -74,6 +90,12 @@ export const TRACKING_PARAMS = new Set([
   "share_id",
   "_branch_match_id",
   "_bhs",
+  "sender_web_id",
+  "xmt",
+  "sref",
+  "invite_id",
+  "sc_referrer",
+  "sc_ua",
 ]);
 
 /**
@@ -191,8 +213,14 @@ function detectPlatform(hostname: string): string {
   if (lower.includes("facebook.com") || lower.includes("fb.watch")) {
     return "facebook";
   }
-  if (lower.includes("threads.net")) {
+  if (lower.includes("threads.net") || lower.includes("threads.com")) {
     return "threads";
+  }
+  if (lower.includes("snapchat.com") || lower.includes("snap.com")) {
+    return "snapchat";
+  }
+  if (lower.includes("pinterest.com") || lower.includes("pin.it")) {
+    return "pinterest";
   }
   if (lower.includes("vimeo.com")) {
     return "vimeo";
@@ -268,6 +296,50 @@ function canonicalizeVideoUrl(
       return {
         cleanUrl: `https://x.com${pathname.split("?")[0]}`,
         platformVideoId: statusId,
+      };
+    }
+  }
+
+  // 5. Threads Canonicalization
+  if (platform === "threads") {
+    const postMatch = pathname.match(/\/post\/([A-Za-z0-9_-]+)/);
+    if (postMatch) {
+      return {
+        cleanUrl: `https://www.threads.net${pathname.split("?")[0]}`,
+        platformVideoId: postMatch[1],
+      };
+    }
+  }
+
+  // 6. Snapchat Canonicalization
+  if (platform === "snapchat") {
+    const snapMatch = pathname.match(/\/(spotlight|p|s|t)\/([A-Za-z0-9_-]+)/);
+    if (snapMatch) {
+      return {
+        cleanUrl: `https://www.snapchat.com${pathname.split("?")[0]}`,
+        platformVideoId: snapMatch[2],
+      };
+    }
+  }
+
+  // 7. Pinterest Canonicalization
+  if (platform === "pinterest") {
+    const pinMatch = pathname.match(/\/pin\/(\d+)/);
+    if (pinMatch) {
+      return {
+        cleanUrl: `https://www.pinterest.com/pin/${pinMatch[1]}/`,
+        platformVideoId: pinMatch[1],
+      };
+    }
+  }
+
+  // 8. Facebook Canonicalization
+  if (platform === "facebook") {
+    const reelMatch = pathname.match(/\/(reel|videos|watch)\/(\d+)/);
+    if (reelMatch) {
+      return {
+        cleanUrl: `https://www.facebook.com/${reelMatch[1]}/${reelMatch[2]}/`,
+        platformVideoId: reelMatch[2],
       };
     }
   }
