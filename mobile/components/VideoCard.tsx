@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Animated,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
 import { appleColors, threadsTokens } from "../theme/appleTokens";
@@ -282,9 +283,35 @@ const VideoCardComponent: React.FC<VideoCardProps> = ({
               onError={() => setImageError(true)}
             />
           ) : (
-            <View style={styles.fallbackThumbnail}>
-              <PlatformIcon platform={platform} size={44} color="#71767B" />
-            </View>
+            <LinearGradient
+              colors={[
+                platformConfig.bg || "rgba(255, 255, 255, 0.08)",
+                "#121216",
+                "#08080A",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.fallbackThumbnail}
+            >
+              <View
+                style={[
+                  styles.fallbackIconGlow,
+                  { backgroundColor: platformConfig.bg || "rgba(255, 255, 255, 0.08)" },
+                ]}
+              >
+                <PlatformIcon
+                  platform={platform}
+                  size={36}
+                  color={platformConfig.color}
+                />
+              </View>
+              <Text style={styles.fallbackCreatorText} numberOfLines={1}>
+                {creatorDisplay}
+              </Text>
+              <Text style={styles.fallbackSubtitleText} numberOfLines={1}>
+                Tap to watch on {platformConfig.label}
+              </Text>
+            </LinearGradient>
           )}
 
           {/* Subtle Scrim */}
@@ -430,7 +457,33 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#181818",
+    backgroundColor: "#121216",
+    paddingHorizontal: 16,
+  },
+  fallbackIconGlow: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+  },
+  fallbackCreatorText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+    textAlign: "center",
+    marginBottom: 3,
+  },
+  fallbackSubtitleText: {
+    color: "rgba(255, 255, 255, 0.65)",
+    fontSize: 12,
+    fontWeight: "500",
+    letterSpacing: -0.1,
+    textAlign: "center",
   },
   thumbnailScrim: {
     ...StyleSheet.absoluteFillObject,

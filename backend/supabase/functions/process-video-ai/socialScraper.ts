@@ -237,69 +237,144 @@ export async function scrapeTwitterContent(
 
 /**
  * TikTok Video Scraper
- * Uses official public oEmbed and meta tag inspection
+ * Uses official public oEmbed, OpenGraph meta tags, and creator URL analysis
  */
 export async function scrapeTikTokContent(
   url: string,
 ): Promise<SocialScrapedContent | null> {
+  const cleanUrl = url.split("?")[0].replace(/\/+$/, "");
+
+  // Extract author handle from URL (e.g. tiktok.com/@nataliireynoldss/video/...)
+  const handleMatch = cleanUrl.match(/@([a-zA-Z0-9_.-]+)/);
+  const handleFromUrl = handleMatch ? `@${handleMatch[1]}` : undefined;
+
+  // 1. Try TikTok oEmbed with proper User-Agent and safe JSON text parsing
   try {
-    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-    const res = await fetch(oembedUrl, { signal: AbortSignal.timeout(5000) });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.title) {
-        return {
-          platform: "tiktok",
-          title: data.title.split("\n")[0].slice(0, 120),
-          creator: data.author_name
-            ? `${data.author_name} (${data.author_unique_id || ""})`.trim()
-            : undefined,
-          caption: data.title,
-          thumbnailUrl: data.thumbnail_url || undefined,
-        };
-      }
-    }
-
-    // Fallback: fetch page meta description
-    const pageRes = await fetch(url, {
+    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
+    const res = await fetch(oembedUrl, {
       headers: {
         "User-Agent":
-          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "application/json, text/plain, */*",
       },
       signal: AbortSignal.timeout(5000),
     });
 
-    if (pageRes.ok) {
-      const html = await pageRes.text();
-      const descMatch =
-        html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) ||
-        html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
-      const titleMatch = html.match(
-        /<meta\s+property="og:title"\s+content="([^"]*)"/i,
-      );
-      const imgMatch = html.match(
-        /<meta\s+property="og:image"\s+content="([^"]*)"/i,
-      );
-
-      if (descMatch) {
-        const decoded = decodeHtmlEntities(descMatch[1]);
-        return {
-          platform: "tiktok",
-          title: titleMatch
-            ? decodeHtmlEntities(titleMatch[1]).slice(0, 120)
-            : decoded.slice(0, 120),
-          caption: decoded,
-          thumbnailUrl: imgMatch ? decodeHtmlEntities(imgMatch[1]) : undefined,
-        };
+    if (res.ok) {
+      const text = await res.text();
+      if (text.trim().startsWith("{")) {
+        const data = JSON.parse(text);
+        if (data && (data.title || data.thumbnail_url || data.author_name)) {
+          return {
+            platform: "tiktok",
+            title: data.title
+              ? data.title.split("\n")[0].slice(0, 120)
+              : undefined,
+            creator: data.author_name
+              ? `${data.author_name} (${data.author_unique_id ? `@${data.author_unique_id}` : handleFromUrl || ""})`.trim()
+              : handleFromUrl,
+            caption: data.title || "",
+            thumbnailUrl: data.thumbnail_url || undefined,
+          };
+        }
       }
     }
-
-    return null;
   } catch (err) {
-    console.warn("[socialScraper] TikTok scraping error:", err);
-    return null;
+    console.warn("[socialScraper] TikTok oEmbed notice:", err);
   }
+
+  // 2. Fallback: inspect page OpenGraph metadata via social bot user agents
+  const botAgents = [
+    "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+    "Mozilla/5.0 (compatible; Twitterbot/1.0)",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  ];
+
+  for (const agent of botAgents) {
+    try {
+      const pageRes = await fetch(cleanUrl, {
+        headers: {
+          "User-Agent": agent,
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (pageRes.ok) {
+        const html = await pageRes.text();
+
+        const getMeta = (prop: string) => {
+          const m1 = html.match(
+            new RegExp(
+              `<meta\\s+[^>]*property=["']${prop}["'][^>]*content=["']([^"']+)["']`,
+              "i",
+            ),
+          );
+          if (m1) return m1[1];
+          const m2 = html.match(
+            new RegExp(
+              `<meta\\s+[^>]*content=["']([^"']+)["'][^>]*property=["']${prop}["']`,
+              "i",
+            ),
+          );
+          if (m2) return m2[1];
+          const m3 = html.match(
+            new RegExp(
+              `<meta\\s+[^>]*name=["']${prop}["'][^>]*content=["']([^"']+)["']`,
+              "i",
+            ),
+          );
+          if (m3) return m3[1];
+          const m4 = html.match(
+            new RegExp(
+              `<meta\\s+[^>]*content=["']([^"']+)["'][^>]*name=["']${prop}["']`,
+              "i",
+            ),
+          );
+          if (m4) return m4[1];
+          return null;
+        };
+
+        const ogImage = getMeta("og:image") || getMeta("twitter:image");
+        const ogTitle = getMeta("og:title") || getMeta("twitter:title");
+        const ogDesc = getMeta("og:description") || getMeta("description");
+
+        if (ogImage || ogTitle || ogDesc) {
+          const decodedTitle = ogTitle ? decodeHtmlEntities(ogTitle) : "";
+          const decodedDesc = ogDesc ? decodeHtmlEntities(ogDesc) : "";
+          const cleanTitle = decodedTitle
+            .replace(/\s*\|\s*TikTok$/i, "")
+            .slice(0, 120);
+
+          return {
+            platform: "tiktok",
+            title:
+              cleanTitle ||
+              (handleFromUrl ? `TikTok Clip by ${handleFromUrl}` : undefined),
+            creator: handleFromUrl,
+            caption: decodedDesc || decodedTitle,
+            thumbnailUrl: ogImage ? decodeHtmlEntities(ogImage) : undefined,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("[socialScraper] TikTok page scrape notice:", err);
+    }
+  }
+
+  // 3. Guaranteed fallback with creator handle from URL
+  if (handleFromUrl) {
+    return {
+      platform: "tiktok",
+      creator: handleFromUrl,
+      title: `TikTok Clip by ${handleFromUrl}`,
+      caption: `TikTok video shared from ${handleFromUrl}`,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -441,7 +516,8 @@ export async function scrapeSnapchatContent(
         "User-Agent":
           "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
         "Accept-Language": "en-US,en;q=0.9",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
       signal: AbortSignal.timeout(6000),
     });
@@ -459,13 +535,17 @@ export async function scrapeSnapchatContent(
       html.match(/<meta\s+property="og:image"\s+content="([^"]*)"/i) ||
       html.match(/<meta\s+name="twitter:image"\s+content="([^"]*)"/i);
 
-    const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : "Snapchat Clip";
+    const title = titleMatch
+      ? decodeHtmlEntities(titleMatch[1])
+      : "Snapchat Clip";
     const caption = descMatch ? decodeHtmlEntities(descMatch[1]) : title;
 
     return {
       platform: "snapchat",
       title: title.slice(0, 120),
-      creator: title.includes("on Snapchat") ? title.split("on Snapchat")[0].trim() : undefined,
+      creator: title.includes("on Snapchat")
+        ? title.split("on Snapchat")[0].trim()
+        : undefined,
       caption: caption || title,
       thumbnailUrl: imgMatch ? decodeHtmlEntities(imgMatch[1]) : undefined,
     };
@@ -488,7 +568,8 @@ export async function scrapeThreadsContent(
         "User-Agent":
           "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
         "Accept-Language": "en-US,en;q=0.9",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
       signal: AbortSignal.timeout(6000),
     });
@@ -506,7 +587,9 @@ export async function scrapeThreadsContent(
       html.match(/<meta\s+property="og:image"\s+content="([^"]*)"/i) ||
       html.match(/<meta\s+name="twitter:image"\s+content="([^"]*)"/i);
 
-    const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : "Threads Post";
+    const title = titleMatch
+      ? decodeHtmlEntities(titleMatch[1])
+      : "Threads Post";
     const caption = descMatch ? decodeHtmlEntities(descMatch[1]) : title;
 
     // Handle extraction: "@creator on Threads: \"post text...\""

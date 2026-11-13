@@ -152,6 +152,7 @@ export default function HomeScreen() {
   const [pinnedPlatforms, setPinnedPlatforms] = useState<string[]>([
     "youtube",
     "instagram",
+    "tiktok",
     "twitter",
     "reddit",
   ]);
@@ -685,8 +686,9 @@ export default function HomeScreen() {
     if (!session?.user?.id) return;
 
     try {
+      const channelName = `saved_videos_${session.user.id}_${Math.random().toString(36).substring(2, 9)}`;
       const channel = supabase
-        .channel("saved_videos_realtime")
+        .channel(channelName)
         .on(
           "postgres_changes",
           {

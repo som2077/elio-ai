@@ -8,6 +8,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { PikaIcon } from "./PikaIcon";
 import { PlatformIcon } from "./PlatformIcon";
 import { SavedVideo } from "../types/video";
@@ -184,12 +185,32 @@ const VideoGridCardComponent: React.FC<VideoGridCardProps> = ({
               onError={() => setImageError(true)}
             />
           ) : (
-            <View style={styles.placeholderBox}>
-              <View style={styles.placeholderIconBox}>
-                <PlatformIcon platform={video.platform} size={40} />
+            <LinearGradient
+              colors={[
+                platformInfo.color ? `${platformInfo.color}25` : "rgba(255, 255, 255, 0.08)",
+                "#121216",
+                "#08080A",
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.placeholderBox}
+            >
+              <View
+                style={[
+                  styles.placeholderIconBox,
+                  { backgroundColor: platformInfo.color ? `${platformInfo.color}25` : "rgba(255, 255, 255, 0.08)" },
+                ]}
+              >
+                <PlatformIcon
+                  platform={video.platform}
+                  size={36}
+                  color={platformInfo.color}
+                />
               </View>
-              <Text style={styles.placeholderText}>Video Clip</Text>
-            </View>
+              <Text style={styles.placeholderText} numberOfLines={1}>
+                {video.creator_name || platformInfo.name}
+              </Text>
+            </LinearGradient>
           )}
 
           {/* Top Row Overlays: Platform Pill & Status Pill */}

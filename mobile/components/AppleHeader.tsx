@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -291,6 +291,22 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
 
   const allCount = platformCounts?.all ?? 0;
 
+  const visiblePlatforms = useMemo(() => {
+    const list = [...pinnedPlatforms];
+    if (platformCounts) {
+      Object.keys(platformCounts).forEach((key) => {
+        if (
+          key !== "all" &&
+          (platformCounts[key] || 0) > 0 &&
+          !list.includes(key)
+        ) {
+          list.push(key);
+        }
+      });
+    }
+    return list;
+  }, [pinnedPlatforms, platformCounts]);
+
   return (
     <>
       {/* 1. Subtle Linear Gradient Status Bar Blur (Twitter's exact linear blur on scroll) */}
@@ -516,8 +532,8 @@ export const AppleHeader: React.FC<AppleHeaderProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* Pinned Platforms (YouTube, Instagram, Twitter, Reddit, etc.) */}
-            {pinnedPlatforms.map((platformKey) => {
+            {/* Pinned & Active Platforms (YouTube, Instagram, TikTok, Twitter, Reddit, etc.) */}
+            {visiblePlatforms.map((platformKey) => {
               const isActive = selectedPlatform === platformKey;
               const label = PLATFORM_LABELS[platformKey] || platformKey;
               const count = platformCounts

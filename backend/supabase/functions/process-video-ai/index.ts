@@ -180,13 +180,10 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (videoError || !video) {
-      return new Response(
-        JSON.stringify({ error: "Video record not found" }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "Video record not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // 2. Check Quota / Entitlement
@@ -308,7 +305,9 @@ Deno.serve(async (req: Request) => {
           lowerTitle === "reddit discussion / clip" ||
           lowerTitle.includes("reel by @") ||
           lowerTitle.includes("post by @") ||
-          lowerTitle.includes("by @creators");
+          lowerTitle.includes("by @creators") ||
+          lowerTitle.includes("by @tiktok_creator") ||
+          lowerTitle.includes("video by @");
 
         const updateFields: Record<string, any> = {};
         if (socialContent.title && isPlaceholderTitle) {
@@ -317,14 +316,17 @@ Deno.serve(async (req: Request) => {
         if (
           socialContent.creator &&
           (!video.creator_name ||
-            video.creator_name.includes("@instagram_creator") ||
-            video.creator_name === "@twitter_user")
+            video.creator_name.includes("creator") ||
+            video.creator_name === "@twitter_user" ||
+            video.creator_name.startsWith("@tiktok"))
         ) {
           updateFields.creator_name = socialContent.creator;
         }
         if (
           socialContent.thumbnailUrl &&
-          (!video.thumbnail_url || video.thumbnail_url.includes("unsplash"))
+          (!video.thumbnail_url ||
+            video.thumbnail_url === "" ||
+            video.thumbnail_url.includes("unsplash"))
         ) {
           updateFields.thumbnail_url = socialContent.thumbnailUrl;
         }
@@ -393,7 +395,10 @@ Deno.serve(async (req: Request) => {
 
     // Step 3E: Detect Silent or Music-Only Videos
     const cleanSpoken = fullContentText
-      .replace(/\[(?:music|applause|laughter|instrumental|audio|sounds)\]/gi, "")
+      .replace(
+        /\[(?:music|applause|laughter|instrumental|audio|sounds)\]/gi,
+        "",
+      )
       .replace(/[♪♫#_]/g, "")
       .trim();
 
