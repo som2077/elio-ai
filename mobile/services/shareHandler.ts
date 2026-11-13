@@ -67,6 +67,11 @@ export function cleanShareUrl(rawUrl: string): string {
       "s",
       "t",
       "feature",
+      "sender_web_id",
+      "share_id",
+      "xmt",
+      "sref",
+      "invite_id",
     ];
 
     trackingParams.forEach((param) => {
@@ -181,6 +186,44 @@ export function analyzeSharedUrl(cleanUrl: string): {
       title: "Pinterest Idea / Pin",
       thumbnailUrl:
         "https://images.unsplash.com/photo-1558655146-d09347e92766?w=600&auto=format&fit=crop&q=80",
+    };
+  }
+
+  // 8. Facebook Reels & Videos
+  if (lower.includes("facebook.com") || lower.includes("fb.watch")) {
+    const isReel =
+      lower.includes("/reel/") ||
+      lower.includes("/videos/") ||
+      lower.includes("fb.watch");
+    return {
+      platform: "facebook",
+      category: isReel ? "reel" : "post",
+      title: isReel ? "Facebook Reel" : "Facebook Video",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&auto=format&fit=crop&q=80",
+    };
+  }
+
+  // 9. Threads Posts & Clips
+  if (lower.includes("threads.net") || lower.includes("threads.com")) {
+    return {
+      platform: "threads",
+      category: "post",
+      title: "Saved Threads Post",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+    };
+  }
+
+  // 10. Snapchat Spotlight & Stories
+  if (lower.includes("snapchat.com") || lower.includes("snap.com")) {
+    const isSpotlight = lower.includes("/spotlight/");
+    return {
+      platform: "snapchat",
+      category: "short",
+      title: isSpotlight ? "Snapchat Spotlight" : "Snapchat Story",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=600&auto=format&fit=crop&q=80",
     };
   }
 
