@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -30,7 +30,7 @@ interface VideoGridCardProps {
  * - Clean title & creator info directly below thumbnail (outside image)
  * - 3-dots more menu for actions
  */
-export const VideoGridCard: React.FC<VideoGridCardProps> = ({
+const VideoGridCardComponent: React.FC<VideoGridCardProps> = ({
   video,
   index = 0,
   onPress,
@@ -40,23 +40,23 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
   const scale = useRef(new Animated.Value(1)).current;
   const [imageError, setImageError] = useState(false);
 
-  const animatePressIn = () => {
+  const animatePressIn = useCallback(() => {
     Animated.spring(scale, {
       toValue: 0.97,
       useNativeDriver: true,
       damping: motionTokens.spring.settle.damping,
       stiffness: motionTokens.spring.settle.stiffness,
     }).start();
-  };
+  }, [scale]);
 
-  const animatePressOut = () => {
+  const animatePressOut = useCallback(() => {
     Animated.spring(scale, {
       toValue: 1,
       useNativeDriver: true,
       damping: motionTokens.spring.bouncy.damping,
       stiffness: motionTokens.spring.bouncy.stiffness,
     }).start();
-  };
+  }, [scale]);
 
   const getPlatformDetails = (platformName: string) => {
     const p = (platformName || "").toLowerCase();
@@ -173,9 +173,14 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
         <View style={[styles.imageBox, { height: imageHeight }]}>
           {hasValidThumbnail ? (
             <Image
-              source={{ uri: video.thumbnail_url }}
+              source={{
+                uri: video.thumbnail_url,
+                cache: "force-cache",
+              }}
               style={styles.posterImage}
               resizeMode="cover"
+              fadeDuration={0}
+              progressiveRenderingEnabled={true}
               onError={() => setImageError(true)}
             />
           ) : (
@@ -299,6 +304,20 @@ export const VideoGridCard: React.FC<VideoGridCardProps> = ({
     </Animated.View>
   );
 };
+
+export const VideoGridCard = React.memo(VideoGridCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.video.status === nextProps.video.status &&
+    prevProps.video.is_favorite === nextProps.video.is_favorite &&
+    prevProps.video.title === nextProps.video.title &&
+    prevProps.video.thumbnail_url === nextProps.video.thumbnail_url &&
+    prevProps.video.creator_name === nextProps.video.creator_name &&
+    prevProps.video.duration_seconds === nextProps.video.duration_seconds &&
+    prevProps.video.ai_metadata?.tldw === nextProps.video.ai_metadata?.tldw &&
+    prevProps.index === nextProps.index
+  );
+});
 
 const styles = StyleSheet.create({
   cardWrapper: {

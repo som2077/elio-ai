@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -129,6 +129,8 @@ const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = React.memo(
     );
   },
 );
+
+const keyExtractor = (item: SavedVideo) => item.id;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -755,127 +757,140 @@ export default function HomeScreen() {
     };
   }, [videos]);
 
-  const toggleStatus = async (video: SavedVideo) => {
-    const newStatus: WatchStatus = video.status === "unread" ? "watched" : "unread";
-    haptics.success();
-    triggerLayoutMotion();
+  const toggleStatus = useCallback(
+    async (video: SavedVideo) => {
+      const newStatus: WatchStatus =
+        video.status === "unread" ? "watched" : "unread";
+      haptics.success();
+      triggerLayoutMotion();
 
-    setVideos((prev) => {
-      const updated = prev.map((v) =>
-        v.id === video.id ? { ...v, status: newStatus } : v,
-      );
-      syncWidgetsData(updated);
-      return updated;
-    });
-
-    if (detailVideo && detailVideo.id === video.id) {
-      setDetailVideo((prev) => (prev ? { ...prev, status: newStatus } : null));
-    }
-
-    if (newStatus === "watched") {
-      // User watched video -> cancel scheduled reminder & track event
-      cancelLikedVideoReminder(video.id);
-      analytics.trackVideoWatched(video, "app_status");
-    }
-
-    setToast({
-      message:
-        newStatus === "watched"
-          ? "Marked as Watched"
-          : "Moved back to In Queue",
-      type: "success",
-    });
-
-    if (session?.user?.id) {
-      await supabase.rpc("dispatch_video_action", {
-        p_user_id: session.user.id,
-        p_action_type: "toggle_status",
-        p_video_id: video.id,
-        p_payload: { status: newStatus },
+      setVideos((prev) => {
+        const updated = prev.map((v) =>
+          v.id === video.id ? { ...v, status: newStatus } : v,
+        );
+        syncWidgetsData(updated);
+        return updated;
       });
-    }
-  };
 
-  const toggleFavorite = async (video: SavedVideo) => {
-    const newFav = !video.is_favorite;
-    haptics.selection();
-    triggerLayoutMotion();
-
-    setVideos((prev) => {
-      const updated = prev.map((v) =>
-        v.id === video.id ? { ...v, is_favorite: newFav } : v,
+      setDetailVideo((prev) =>
+        prev && prev.id === video.id ? { ...prev, status: newStatus } : prev,
       );
-      syncWidgetsData(updated);
-      return updated;
-    });
 
-    if (detailVideo && detailVideo.id === video.id) {
-      setDetailVideo((prev) => (prev ? { ...prev, is_favorite: newFav } : null));
-    }
+      if (newStatus === "watched") {
+        // User watched video -> cancel scheduled reminder & track event
+        cancelLikedVideoReminder(video.id);
+        analytics.trackVideoWatched(video, "app_status");
+      }
 
-    if (newFav) {
-      // If user liked the video and has NOT watched it yet, schedule free-time reminder
-      if (video.status !== "watched") {
-        scheduleLikedVideoReminder(video);
+      setToast({
+        message:
+          newStatus === "watched"
+            ? "Marked as Watched"
+            : "Moved back to In Queue",
+        type: "success",
+      });
+
+      if (session?.user?.id) {
+        await supabase.rpc("dispatch_video_action", {
+          p_user_id: session.user.id,
+          p_action_type: "toggle_status",
+          p_video_id: video.id,
+          p_payload: { status: newStatus },
+        });
+      }
+    },
+    [session?.user?.id],
+  );
+
+  const toggleFavorite = useCallback(
+    async (video: SavedVideo) => {
+      const newFav = !video.is_favorite;
+      haptics.selection();
+      triggerLayoutMotion();
+
+      setVideos((prev) => {
+        const updated = prev.map((v) =>
+          v.id === video.id ? { ...v, is_favorite: newFav } : v,
+        );
+        syncWidgetsData(updated);
+        return updated;
+      });
+
+      setDetailVideo((prev) =>
+        prev && prev.id === video.id ? { ...prev, is_favorite: newFav } : prev,
+      );
+
+      if (newFav) {
+        // If user liked the video and has NOT watched it yet, schedule free-time reminder
+        if (video.status !== "watched") {
+          scheduleLikedVideoReminder(video);
+        } else {
+          analytics.trackVideoLiked(video);
+        }
       } else {
-        analytics.trackVideoLiked(video);
+        // Video was unliked -> cancel pending reminder
+        cancelLikedVideoReminder(video.id);
+        analytics.trackVideoUnliked(video.id);
       }
-    } else {
-      // Video was unliked -> cancel pending reminder
+
+      setToast({
+        message: newFav ? "Saved to Favorites ❤️" : "Removed from Favorites",
+        type: "success",
+      });
+
+      if (session?.user?.id) {
+        await supabase.rpc("dispatch_video_action", {
+          p_user_id: session.user.id,
+          p_action_type: "toggle_favorite",
+          p_video_id: video.id,
+          p_payload: { is_favorite: newFav },
+        });
+      }
+    },
+    [session?.user?.id],
+  );
+
+  const handleDeleteVideo = useCallback(
+    async (video: SavedVideo) => {
+      haptics.warning();
+      triggerLayoutMotion();
+
+      // Cancel any scheduled notification for deleted video
       cancelLikedVideoReminder(video.id);
-      analytics.trackVideoUnliked(video.id);
-    }
 
-    setToast({
-      message: newFav ? "Saved to Favorites ❤️" : "Removed from Favorites",
-      type: "success",
-    });
-
-    if (session?.user?.id) {
-      await supabase.rpc("dispatch_video_action", {
-        p_user_id: session.user.id,
-        p_action_type: "toggle_favorite",
-        p_video_id: video.id,
-        p_payload: { is_favorite: newFav },
-      });
-    }
-  };
-
-  const handleDeleteVideo = async (video: SavedVideo) => {
-    haptics.warning();
-    triggerLayoutMotion();
-
-    // Cancel any scheduled notification for deleted video
-    cancelLikedVideoReminder(video.id);
-
-    // Optimistic UI removal
-    setVideos((prev) => prev.filter((v) => v.id !== video.id));
-    if (detailVideo && detailVideo.id === video.id) {
-      setShowDetailSheet(false);
-      setDetailVideo(null);
-    }
-
-    setToast({
-      message: "Clip removed from vault",
-      type: "delete",
-    });
-
-    if (session?.user?.id) {
-      const { error } = await supabase.rpc("dispatch_video_action", {
-        p_user_id: session.user.id,
-        p_action_type: "delete",
-        p_video_id: video.id,
-        p_payload: {},
+      // Optimistic UI removal
+      setVideos((prev) => prev.filter((v) => v.id !== video.id));
+      setDetailVideo((prev) => {
+        if (prev && prev.id === video.id) {
+          setShowDetailSheet(false);
+          return null;
+        }
+        return prev;
       });
 
-      if (error) {
-        logger.warn("Failed to delete video via dispatch_video_action:", error.message);
-        fetchVideos();
+      setToast({
+        message: "Clip removed from vault",
+        type: "delete",
+      });
+
+      if (session?.user?.id) {
+        const { error } = await supabase.rpc("dispatch_video_action", {
+          p_user_id: session.user.id,
+          p_action_type: "delete",
+          p_video_id: video.id,
+          p_payload: {},
+        });
+
+        if (error) {
+          logger.warn("Failed to delete video via dispatch_video_action:", error.message);
+          fetchVideos();
+        }
       }
-    }
-  };
+    },
+    [session?.user?.id],
+  );
 
-  const handleTestNotification = async (video: SavedVideo) => {
+  const handleTestNotification = useCallback(async (video: SavedVideo) => {
     haptics.selection();
     const id = await sendTestNotificationNow(video);
     if (id) {
@@ -884,15 +899,32 @@ export default function HomeScreen() {
         type: "info",
       });
     }
-  };
+  }, []);
 
-  const handleCopyLink = (_url: string) => {
+  const handleCopyLink = useCallback((_url: string) => {
     haptics.light();
     setToast({
       message: "Link copied to clipboard",
       type: "link",
     });
-  };
+  }, []);
+
+  const handleOpenDetail = useCallback((item: SavedVideo) => {
+    setDetailVideo(item);
+    setShowDetailSheet(true);
+  }, []);
+
+  const renderVideoItem = useCallback(
+    ({ item }: { item: SavedVideo }) => (
+      <VideoCard
+        video={item}
+        onPress={() => handleOpenDetail(item)}
+        onLongPress={() => handleOpenDetail(item)}
+        onToggleStatus={() => toggleStatus(item)}
+      />
+    ),
+    [handleOpenDetail, toggleStatus],
+  );
 
   const handleLogout = async () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out of Elio AI?", [
@@ -1136,8 +1168,12 @@ export default function HomeScreen() {
                   key="list-view-1-col"
                   data={feedVideos}
                   numColumns={1}
-                  keyExtractor={(item, index) => item.id || `video-${index}`}
-                  removeClippedSubviews={false}
+                  keyExtractor={keyExtractor}
+                  removeClippedSubviews={Platform.OS === "android"}
+                  windowSize={7}
+                  maxToRenderPerBatch={5}
+                  initialNumToRender={4}
+                  updateCellsBatchingPeriod={30}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
                   keyboardShouldPersistTaps="handled"
@@ -1170,20 +1206,7 @@ export default function HomeScreen() {
                     </View>
                   ) : null
                 }
-                renderItem={({ item }) => (
-                  <VideoCard
-                    video={item}
-                    onPress={() => {
-                      setDetailVideo(item);
-                      setShowDetailSheet(true);
-                    }}
-                    onLongPress={() => {
-                      setDetailVideo(item);
-                      setShowDetailSheet(true);
-                    }}
-                    onToggleStatus={() => toggleStatus(item)}
-                  />
-                )}
+                renderItem={renderVideoItem}
                 contentContainerStyle={[
                   styles.listContent,
                   {

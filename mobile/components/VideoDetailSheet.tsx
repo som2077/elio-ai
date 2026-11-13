@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -42,7 +42,7 @@ interface VideoDetailSheetProps {
   onAskElio?: (video: SavedVideo, initialQuestion?: string) => void;
 }
 
-export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
+const VideoDetailSheetComponent: React.FC<VideoDetailSheetProps> = ({
   video,
   visible,
   onClose,
@@ -99,19 +99,13 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     };
   }, [aiMeta?.suggested_followups]);
 
-  if (!video) return null;
+  const isWatched = video?.status === "watched";
 
-  const isWatched = video.status === "watched";
-
-  // Resolved English or Hinglish summary and takeaways
-  const getResolvedTldw = (): string => {
+  // Resolved English or Hinglish summary and takeaways (memoized)
+  const resolvedTldw = useMemo(() => {
     if (!aiMeta) return "";
     if (langMode === "hinglish") {
-      return (
-        aiMeta.tldw_hinglish ||
-        aiMeta.tldw ||
-        ""
-      );
+      return aiMeta.tldw_hinglish || aiMeta.tldw || "";
     }
     const core = typeof aiMeta.core_premise === "object" ? aiMeta.core_premise : null;
     return (
@@ -121,9 +115,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
       (typeof aiMeta.core_premise === "string" ? aiMeta.core_premise : "") ||
       ""
     );
-  };
+  }, [aiMeta, langMode]);
 
-  const getResolvedTakeaways = (): string[] => {
+  const resolvedTakeaways = useMemo(() => {
     if (!aiMeta?.key_takeaways) return [];
     if (Array.isArray(aiMeta.key_takeaways)) {
       return aiMeta.key_takeaways;
@@ -133,36 +127,39 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
       return record.hinglish;
     }
     return record.english || [];
-  };
-
-  const resolvedTldw = getResolvedTldw();
-  const resolvedTakeaways = getResolvedTakeaways();
+  }, [aiMeta, langMode]);
 
   // Core Premise Dilemma Breakdown
-  const corePremise: CorePremiseThesis | null =
-    typeof aiMeta?.core_premise === "object" ? aiMeta.core_premise : null;
+  const corePremise: CorePremiseThesis | null = useMemo(
+    () => (typeof aiMeta?.core_premise === "object" ? aiMeta.core_premise : null),
+    [aiMeta?.core_premise]
+  );
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
+    if (!video) return;
     haptics.light();
     if (onCopyLink) {
       onCopyLink(video.clean_url);
     }
     onClose();
-  };
+  }, [video, onCopyLink, onClose]);
 
-  const handleSaveToggle = () => {
+  const handleSaveToggle = useCallback(() => {
+    if (!video) return;
     haptics.selection();
     onToggleStatus(video);
     onClose();
-  };
+  }, [video, onToggleStatus, onClose]);
 
-  const handleOpenPlay = () => {
+  const handleOpenPlay = useCallback(() => {
+    if (!video) return;
     haptics.selection();
     onClose();
     onPlay(video);
-  };
+  }, [video, onClose, onPlay]);
 
-  const handleDeletePrompt = () => {
+  const handleDeletePrompt = useCallback(() => {
+    if (!video) return;
     haptics.warning();
     Alert.alert(
       "Remove Clip",
@@ -179,9 +176,10 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
         },
       ]
     );
-  };
+  }, [video, onClose, onDelete]);
 
-  const handleGenerateAI = async () => {
+  const handleGenerateAI = useCallback(async () => {
+    if (!video) return;
     haptics.selection();
     setIsGenerating(true);
     const res = await generateVideoAIOnDemand(video);
@@ -193,9 +191,10 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     } else {
       Alert.alert("AI Engine Notice", res.error || "Could not generate full context right now.");
     }
-  };
+  }, [video]);
 
-  const handleTranscribeWhisper = async () => {
+  const handleTranscribeWhisper = useCallback(async () => {
+    if (!video) return;
     haptics.selection();
     setIsGenerating(true);
     const res = await generateVideoAIOnDemand(video, true);
@@ -207,9 +206,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     } else {
       Alert.alert("Speech Engine Notice", res.error || "Could not transcribe audio right now.");
     }
-  };
+  }, [video]);
 
-  const handleCopyTranscript = () => {
+  const handleCopyTranscript = useCallback(() => {
     if (!aiMeta?.full_transcript) return;
     haptics.light();
     if (onCopyLink) {
@@ -217,9 +216,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     }
     setCopiedTranscript(true);
     setTimeout(() => setCopiedTranscript(false), 2000);
-  };
+  }, [aiMeta?.full_transcript, onCopyLink]);
 
-  const handleCopyTakeaways = () => {
+  const handleCopyTakeaways = useCallback(() => {
     if (!aiMeta) return;
     haptics.light();
     const textToCopy = `📌 ${resolvedTldw}\n\nKey Takeaways:\n${resolvedTakeaways
@@ -230,9 +229,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     }
     setCopiedTakeaways(true);
     setTimeout(() => setCopiedTakeaways(false), 2000);
-  };
+  }, [aiMeta, resolvedTldw, resolvedTakeaways, onCopyLink]);
 
-  const handleOpenResource = (item: ActionItem) => {
+  const handleOpenResource = useCallback((item: ActionItem) => {
     haptics.light();
     if (item.url && (item.url.startsWith("https://") || item.url.startsWith("http://"))) {
       Linking.openURL(item.url).catch(() => {
@@ -242,9 +241,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
       onCopyLink(item.title);
       Alert.alert("Copied to Clipboard", item.title);
     }
-  };
+  }, [onCopyLink]);
 
-  const handleOpenEntity = (entity: EntityReferenced) => {
+  const handleOpenEntity = useCallback((entity: EntityReferenced) => {
     haptics.light();
     if (
       entity.url_or_search_term &&
@@ -258,9 +257,10 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
       )}`;
       Linking.openURL(searchUrl).catch(() => {});
     }
-  };
+  }, []);
 
-  const handleTimestampJump = (item: ContextStepItem) => {
+  const handleTimestampJump = useCallback((item: ContextStepItem) => {
+    if (!video) return;
     haptics.selection();
     if (video.clean_url) {
       openVideoDirectly(
@@ -270,15 +270,18 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
         item.time_seconds
       );
     }
-  };
+  }, [video]);
 
-  const handleAskElioPress = (prompt?: string) => {
+  const handleAskElioPress = useCallback((prompt?: string) => {
+    if (!video) return;
     haptics.selection();
     onClose();
     if (onAskElio) {
       onAskElio(video, prompt);
     }
-  };
+  }, [video, onClose, onAskElio]);
+
+  if (!video) return null;
 
   const renderActionIcon = (type: ActionItem["type"]) => {
     switch (type) {
@@ -1053,6 +1056,20 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     </IndustryBottomSheet>
   );
 };
+
+export const VideoDetailSheet = React.memo(VideoDetailSheetComponent, (prevProps, nextProps) => {
+  // If sheet was closed and remains closed, skip expensive re-renders
+  if (!prevProps.visible && !nextProps.visible) return true;
+  return (
+    prevProps.visible === nextProps.visible &&
+    prevProps.video?.id === nextProps.video?.id &&
+    prevProps.video?.status === nextProps.video?.status &&
+    prevProps.video?.is_favorite === nextProps.video?.is_favorite &&
+    prevProps.video?.title === nextProps.video?.title &&
+    prevProps.video?.ai_metadata?.processing_status === nextProps.video?.ai_metadata?.processing_status &&
+    prevProps.video?.ai_metadata?.tldw === nextProps.video?.ai_metadata?.tldw
+  );
+});
 
 const styles = StyleSheet.create({
   sheetHeaderRow: {
