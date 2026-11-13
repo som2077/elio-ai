@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "../services/supabase";
 import { haptics } from "../utils/haptics";
+import { logger } from "../utils/logger";
 
 let ExpoCameraModule: any = null;
 try {
@@ -228,7 +229,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
             { onConflict: "user_id,device_id" }
           );
         } catch (linkErr) {
-          console.warn("[Elio AI] Linked devices sync notice:", linkErr);
+          logger.warn("[Elio AI] Linked devices sync notice:", linkErr);
         }
       }
 

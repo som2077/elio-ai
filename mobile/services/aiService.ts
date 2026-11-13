@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { logger } from "../utils/logger";
 import type {
   VideoAIMetadata,
   SemanticSearchResult,
@@ -84,10 +85,10 @@ export async function fetchVideoAIMetadata(
     }
 
     return null;
-  } catch (err) {
-    console.warn(
+  } catch (err: any) {
+    logger.warn(
       `[aiService] Error fetching AI metadata for video ${videoId}:`,
-      err,
+      err?.message || "Metadata fetch error",
     );
     return null;
   }
@@ -203,7 +204,7 @@ export async function searchInsideVideosSemantic(
     );
 
     if (error || !data?.results) {
-      console.warn("[aiService] Semantic search error:", error);
+      logger.warn("[aiService] Semantic search error:", error?.message);
       return [];
     }
 
@@ -219,8 +220,8 @@ export async function searchInsideVideosSemantic(
       chunk_text: r.chunk_text || "",
       similarity: r.similarity || 0,
     }));
-  } catch (err) {
-    console.warn("[aiService] Failed inside-video search:", err);
+  } catch (err: any) {
+    logger.warn("[aiService] Failed inside-video search:", err?.message);
     return [];
   }
 }

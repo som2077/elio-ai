@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { PlatformType, ContentCategory, SavedVideo } from "../types/video";
+import { logger } from "../utils/logger";
 
 // Safe AsyncStorage fallback
 let AsyncStorage: any = null;
@@ -197,13 +198,15 @@ export function analyzeSharedUrl(cleanUrl: string): {
  * Handles incoming shared text from social media:
  * 1. Extracts & cleans the URL
  * 2. Checks if logged in
- * 3. Checks for duplicates in Supabase
- * 4. Inserts into saved_videos
- * 5. Returns status and payload
+ * 3. Thin-Client Security Gateway: routes URL through backend Edge Function 'ingest-video'
+ *    which handles SSRF protection, server-side atomic quota deduction, deduplication,
+ *    and automated background AI context extraction.
+ * 4. Returns status and payload
  */
 export async function processSharedContent(
   rawText: string,
   userId?: string,
+  customTitle?: string,
 ): Promise<ShareProcessResult> {
   const extractedUrl = extractUrlFromText(rawText);
 
@@ -226,6 +229,7 @@ export async function processSharedContent(
         list.push({
           rawUrl: extractedUrl,
           cleanUrl,
+          title: customTitle || metadata.title,
           metadata,
           timestamp: Date.now(),
         });
@@ -234,75 +238,80 @@ export async function processSharedContent(
       return {
         success: true,
         platform: metadata.platform,
-        title: metadata.title,
+        title: customTitle || metadata.title,
         cleanUrl,
       };
     } catch (e: any) {
-      return { success: false, error: e.message };
+      return { success: false, error: e?.message || "Storage error" };
     }
   }
 
   try {
-    // Check if user already saved this URL
-    const { data: existingVideo } = await supabase
-      .from("saved_videos")
-      .select("id, title, platform, status")
-      .eq("user_id", userId)
-      .eq("clean_url", cleanUrl)
-      .maybeSingle();
-
-    if (existingVideo) {
-      return {
-        success: true,
-        isDuplicate: true,
-        platform: (existingVideo.platform as PlatformType) || metadata.platform,
-        title: existingVideo.title || metadata.title,
-        cleanUrl,
-      };
-    }
-
     // Extract any accompanying text/caption sent along with the link
     const surroundingText = rawText.replace(extractedUrl, "").trim();
 
-    // Insert new clip into saved_videos
-    const newRecord = {
-      user_id: userId,
-      clean_url: cleanUrl,
-      original_url: extractedUrl,
-      platform: metadata.platform,
-      category: metadata.category,
-      platform_video_id: metadata.platformVideoId || null,
-      title: metadata.title,
-      thumbnail_url: metadata.thumbnailUrl,
-      user_notes: surroundingText.length > 5 ? surroundingText : null,
-      status: "unread",
-      source_client: "mobile_share_sheet",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data: inserted, error } = await supabase
-      .from("saved_videos")
-      .insert([newRecord])
-      .select()
-      .single();
+    // Thin-Client Security Architecture:
+    // Route video ingestion exclusively through backend Edge Function 'ingest-video'
+    // This executes SSRF validation, atomic quota verification (deduct_ai_summary_quota),
+    // deduplication, and async AI extraction server-side.
+    const { data, error } = await supabase.functions.invoke("ingest-video", {
+      body: {
+        url: extractedUrl,
+        title: customTitle || metadata.title,
+        thumbnail_url: metadata.thumbnailUrl,
+        platform: metadata.platform,
+        user_notes: surroundingText.length > 5 ? surroundingText : undefined,
+        source_client: "mobile_share_sheet",
+        trigger_ai: true,
+      },
+    });
 
     if (error) {
-      console.warn("[ShareHandler] Insert error:", error.message);
+      logger.warn("[ShareHandler] ingest-video function notice:", error.message);
       return { success: false, error: error.message };
+    }
+
+    if (data?.status === "quota_exceeded") {
+      return {
+        success: false,
+        error:
+          data.message ||
+          "Free tier monthly limit of 10 AI digests reached. Upgrade to Elio Pro.",
+      };
+    }
+
+    if (data?.status === "already_saved") {
+      return {
+        success: true,
+        isDuplicate: true,
+        platform: (data.video?.platform as PlatformType) || metadata.platform,
+        title: data.video?.title || metadata.title,
+        cleanUrl: data.clean_url || cleanUrl,
+        video: data.video as SavedVideo,
+      };
+    }
+
+    if (data?.video) {
+      return {
+        success: true,
+        isDuplicate: false,
+        platform: (data.video.platform as PlatformType) || metadata.platform,
+        title: data.video.title || customTitle || metadata.title,
+        cleanUrl: data.clean_url || cleanUrl,
+        video: data.video as SavedVideo,
+      };
     }
 
     return {
       success: true,
       isDuplicate: false,
       platform: metadata.platform,
-      title: metadata.title,
+      title: customTitle || metadata.title,
       cleanUrl,
-      video: inserted as SavedVideo,
     };
   } catch (err: any) {
-    console.warn("[ShareHandler] Exception:", err.message);
-    return { success: false, error: err.message };
+    logger.warn("[ShareHandler] Ingest exception:", err?.message);
+    return { success: false, error: err?.message || "Failed to save video." };
   }
 }
 
@@ -321,7 +330,11 @@ export async function flushPendingShares(userId: string): Promise<number> {
 
     let syncedCount = 0;
     for (const item of list) {
-      const res = await processSharedContent(item.cleanUrl, userId);
+      const res = await processSharedContent(
+        item.cleanUrl || item.rawUrl,
+        userId,
+        item.title
+      );
       if (res.success && !res.isDuplicate) {
         syncedCount++;
       }
@@ -330,8 +343,8 @@ export async function flushPendingShares(userId: string): Promise<number> {
     // Clear queue
     await AsyncStorage.removeItem(PENDING_SHARES_KEY);
     return syncedCount;
-  } catch (e) {
-    console.warn("[ShareHandler] Flush pending error:", e);
+  } catch (e: any) {
+    logger.warn("[ShareHandler] Flush pending notice:", e?.message);
     return 0;
   }
 }

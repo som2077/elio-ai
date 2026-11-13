@@ -6,6 +6,10 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { appleColors } from "../theme/appleTokens";
 import { StartupVideoSplash } from "../components/StartupVideoSplash";
 import { analytics } from "../services/analytics";
+import { initAntiReverseEngineering } from "../utils/logger";
+
+// Initialize anti-reverse-engineering runtime guards (strips console in release builds)
+initAntiReverseEngineering();
 
 export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);

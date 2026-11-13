@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
+import { logger } from '../utils/logger';
 
 /**
  * Validates that the URL uses an allowed HTTP/HTTPS scheme to prevent intent hijacking or XSS
@@ -21,7 +22,7 @@ export async function openVideoDirectly(
 ) {
   // Security guard: Reject non-http(s) URLs
   if (!isSafeUrl(url)) {
-    console.warn('[Elio AI Security] Rejected unsafe URL scheme in openVideoDirectly:', url);
+    logger.warn('[Elio AI Security] Rejected unsafe URL scheme in openVideoDirectly');
     return;
   }
   try {
@@ -56,7 +57,7 @@ export async function openVideoDirectly(
     // Fallback: Open URL in default browser
     await Linking.openURL(targetUrl);
   } catch (error) {
-    console.error('Failed to open deep-link, opening standard URL:', error);
+    logger.error('Failed to open deep-link, opening standard URL');
     if (isSafeUrl(url)) {
       await Linking.openURL(url);
     }

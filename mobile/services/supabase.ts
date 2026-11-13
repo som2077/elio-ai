@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from "react-native";
 import { createClient } from "@supabase/supabase-js";
+import { logger } from "../utils/logger";
 
 // Read exclusively from environment variables injected by Expo at runtime/build-time
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
@@ -10,7 +11,7 @@ export const isSupabaseConfigured = Boolean(
 );
 
 if (!isSupabaseConfigured) {
-  console.warn(
+  logger.warn(
     "[Elio AI Security Warning] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY. Please verify your mobile/.env configuration file."
   );
 }

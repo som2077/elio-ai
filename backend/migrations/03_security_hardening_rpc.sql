@@ -541,6 +541,19 @@ BEGIN
                 'user_notes', p_payload->>'notes'
             );
 
+        WHEN 'update_title' THEN
+            UPDATE public.saved_videos
+            SET title = p_payload->>'title',
+                updated_at = NOW()
+            WHERE id = p_video_id AND user_id = p_user_id;
+
+            RETURN jsonb_build_object(
+                'success', true,
+                'action', 'update_title',
+                'video_id', p_video_id,
+                'title', p_payload->>'title'
+            );
+
         ELSE
             RETURN jsonb_build_object('success', false, 'error', 'Unsupported action type: ' || p_action_type);
     END CASE;
@@ -552,6 +565,7 @@ GRANT EXECUTE ON FUNCTION public.dispatch_video_action(UUID, TEXT, UUID, JSONB) 
 -- 5. REVOKE DIRECT CLIENT WRITE ACCESS ON SENSITIVE TABLES
 REVOKE INSERT, UPDATE, DELETE ON public.user_subscriptions FROM anon, authenticated;
 REVOKE INSERT, UPDATE, DELETE ON public.video_ai_metadata FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.video_transcript_chunks FROM anon, authenticated;
 
 -- Ensure RLS is active
 ALTER TABLE public.user_subscriptions ENABLE ROW LEVEL SECURITY;
