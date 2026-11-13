@@ -429,6 +429,103 @@ export async function scrapeGenericSocialContent(
 }
 
 /**
+ * Specialized Snapchat Spotlight & Story Scraper
+ * Extracts title, story snapshot, and author from Snapchat meta tags
+ */
+export async function scrapeSnapchatContent(
+  url: string,
+): Promise<SocialScrapedContent | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+        "Accept-Language": "en-US,en;q=0.9",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const titleMatch =
+      html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i) ||
+      html.match(/<meta\s+name="twitter:title"\s+content="([^"]*)"/i);
+    const descMatch =
+      html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i) ||
+      html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);
+    const imgMatch =
+      html.match(/<meta\s+property="og:image"\s+content="([^"]*)"/i) ||
+      html.match(/<meta\s+name="twitter:image"\s+content="([^"]*)"/i);
+
+    const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : "Snapchat Clip";
+    const caption = descMatch ? decodeHtmlEntities(descMatch[1]) : title;
+
+    return {
+      platform: "snapchat",
+      title: title.slice(0, 120),
+      creator: title.includes("on Snapchat") ? title.split("on Snapchat")[0].trim() : undefined,
+      caption: caption || title,
+      thumbnailUrl: imgMatch ? decodeHtmlEntities(imgMatch[1]) : undefined,
+    };
+  } catch (err) {
+    console.warn("[socialScraper] Snapchat scrape error:", err);
+    return null;
+  }
+}
+
+/**
+ * Specialized Threads Post Scraper
+ * Extracts author handle, post text, and media thumbnail
+ */
+export async function scrapeThreadsContent(
+  url: string,
+): Promise<SocialScrapedContent | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+        "Accept-Language": "en-US,en;q=0.9",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    const titleMatch =
+      html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i) ||
+      html.match(/<meta\s+name="twitter:title"\s+content="([^"]*)"/i);
+    const descMatch =
+      html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i) ||
+      html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);
+    const imgMatch =
+      html.match(/<meta\s+property="og:image"\s+content="([^"]*)"/i) ||
+      html.match(/<meta\s+name="twitter:image"\s+content="([^"]*)"/i);
+
+    const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : "Threads Post";
+    const caption = descMatch ? decodeHtmlEntities(descMatch[1]) : title;
+
+    // Handle extraction: "@creator on Threads: \"post text...\""
+    const authorMatch = title.match(/^@?([a-zA-Z0-9._]+)\s+on\s+Threads/i);
+
+    return {
+      platform: "threads",
+      title: title.slice(0, 120),
+      creator: authorMatch ? authorMatch[1] : undefined,
+      caption: caption || title,
+      thumbnailUrl: imgMatch ? decodeHtmlEntities(imgMatch[1]) : undefined,
+    };
+  } catch (err) {
+    console.warn("[socialScraper] Threads scrape error:", err);
+    return null;
+  }
+}
+
+/**
  * Unified Dispatcher: Extracts content for any social platform
  */
 export async function extractSocialContent(
@@ -465,6 +562,22 @@ export async function extractSocialContent(
     lowerUrl.includes("redd.it")
   ) {
     return await scrapeRedditContent(targetUrl, videoRecord?.user_notes);
+  }
+
+  if (
+    lowerPlatform === "threads" ||
+    lowerUrl.includes("threads.net") ||
+    lowerUrl.includes("threads.com")
+  ) {
+    return await scrapeThreadsContent(targetUrl);
+  }
+
+  if (
+    lowerPlatform === "snapchat" ||
+    lowerUrl.includes("snapchat.com") ||
+    lowerUrl.includes("snap.com")
+  ) {
+    return await scrapeSnapchatContent(targetUrl);
   }
 
   // Fallback for Facebook, LinkedIn, Pinterest, Other

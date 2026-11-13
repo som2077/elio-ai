@@ -78,6 +78,20 @@ export const ALL_AVAILABLE_PLATFORMS: PlatformConfig[] = [
     color: "#E60023",
     bgColor: "rgba(230, 0, 35, 0.15)",
   },
+  {
+    key: "threads",
+    label: "Threads",
+    icon: "at-outline",
+    color: "#FFFFFF",
+    bgColor: "rgba(255, 255, 255, 0.12)",
+  },
+  {
+    key: "snapchat",
+    label: "Snapchat",
+    icon: "logo-snapchat",
+    color: "#FFFC00",
+    bgColor: "rgba(255, 252, 0, 0.15)",
+  },
 ];
 
 interface PlatformFilterModalProps {

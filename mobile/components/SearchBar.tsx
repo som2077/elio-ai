@@ -64,6 +64,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       icon: "logo-reddit" as const,
       color: "#FF4500",
     },
+    {
+      key: "threads",
+      label: "Threads",
+      icon: "at-outline" as const,
+      color: "#FFFFFF",
+    },
+    {
+      key: "snapchat",
+      label: "Snapchat",
+      icon: "logo-snapchat" as const,
+      color: "#FFFC00",
+    },
   ];
 
   return (

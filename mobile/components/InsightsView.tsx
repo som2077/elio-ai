@@ -42,6 +42,8 @@ const PLATFORM_NAMES: Record<string, string> = {
   facebook: "Facebook",
   linkedin: "LinkedIn",
   pinterest: "Pinterest",
+  threads: "Threads",
+  snapchat: "Snapchat",
 };
 
 export const InsightsView: React.FC<InsightsViewProps> = ({

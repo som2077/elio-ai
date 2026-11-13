@@ -34,6 +34,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   facebook: "Facebook",
   linkedin: "LinkedIn",
   pinterest: "Pinterest",
+  threads: "Threads",
+  snapchat: "Snapchat",
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -46,6 +48,8 @@ const PLATFORM_COLORS: Record<string, string> = {
   facebook: "#1877F2",
   linkedin: "#0A66C2",
   pinterest: "#E60023",
+  threads: "#FFFFFF",
+  snapchat: "#FFFC00",
 };
 
 interface AppleHeaderProps {
