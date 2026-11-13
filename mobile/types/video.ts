@@ -9,6 +9,8 @@ export type PlatformType =
   | "linkedin"
   | "pinterest"
   | "tiktok"
+  | "threads"
+  | "snapchat"
   | "other";
 export type ContentCategory = "video" | "short" | "reel" | "post";
 export type WatchStatus = "unread" | "in_progress" | "watched" | "archived";
