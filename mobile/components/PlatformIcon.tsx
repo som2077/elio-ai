@@ -4,6 +4,7 @@ import {
   ImageStyle,
   StyleProp,
   TextStyle,
+  View,
   ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,8 +22,10 @@ export const PLATFORM_BRAND_COLORS: Record<string, string> = {
   instagram: "#E1306C",
   twitter: "#FFFFFF",
   x: "#FFFFFF",
+  threads: "#FFFFFF",
   tiktok: "#00F2FE",
   reddit: "#FF4500",
+  snapchat: "#FFFC00",
   facebook: "#1877F2",
   linkedin: "#0A66C2",
   pinterest: "#E60023",
@@ -70,6 +73,56 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({
         color={color || PLATFORM_BRAND_COLORS.all || "#FFFFFF"}
         style={style as any}
       />
+    );
+  }
+
+  if (p === "snapchat") {
+    return (
+      <View
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: Math.round(size * 0.22),
+            backgroundColor: "#FFFC00",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          style as any,
+        ]}
+      >
+        <Ionicons
+          name="logo-snapchat"
+          size={Math.max(10, Math.round(size * 0.76))}
+          color="#000000"
+        />
+      </View>
+    );
+  }
+
+  if (p === "threads") {
+    return (
+      <View
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: Math.round(size * 0.22),
+            backgroundColor: "#16181C",
+            borderWidth: 1,
+            borderColor: "rgba(255, 255, 255, 0.18)",
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          style as any,
+        ]}
+      >
+        <Ionicons
+          name="at"
+          size={Math.max(10, Math.round(size * 0.78))}
+          color="#FFFFFF"
+        />
+      </View>
     );
   }
 
