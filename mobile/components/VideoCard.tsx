@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,32 @@ interface VideoCardProps {
   onDelete?: () => void;
 }
 
+const getRelativeTime = (dateStr: string) => {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "now";
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d`;
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
+};
+
+const formatDuration = (seconds?: number) => {
+  if (!seconds || seconds <= 0) return null;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+};
+
 /**
  * Authentic Twitter / X Inspired Post Card
  * - Top: Author Avatar, Display Name, Verified Badge, Handle, Time, Overflow Menu
@@ -31,7 +57,7 @@ interface VideoCardProps {
  * - Below ("nechay jha per video hota ha"): 16:9 Video Preview with #000000 background, #2F3336 border, borderRadius 16
  * - Footer: Watch Status Toggle, Favorite Heart, and Share actions
  */
-export const VideoCard: React.FC<VideoCardProps> = ({
+const VideoCardComponent: React.FC<VideoCardProps> = ({
   video,
   onPress,
   onToggleStatus,
@@ -39,9 +65,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 }) => {
   const isWatched = video.status === "watched";
   const platform = (video.platform || "youtube").toLowerCase();
-  const platformConfig =
-    appleColors.platforms[platform as keyof typeof appleColors.platforms] ||
-    appleColors.platforms.youtube;
+  const platformConfig = useMemo(
+    () =>
+      appleColors.platforms[platform as keyof typeof appleColors.platforms] ||
+      appleColors.platforms.youtube,
+    [platform]
+  );
 
   const [imageError, setImageError] = useState(false);
   const [aiMeta, setAiMeta] = useState<VideoAIMetadata | null>(video.ai_metadata || null);
@@ -64,86 +93,53 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     };
   }, [video.id, video.ai_metadata]);
 
-  const handleCardPressIn = () => {
+  const handleCardPressIn = useCallback(() => {
     Animated.spring(cardScale, {
       toValue: 0.985,
       useNativeDriver: true,
       damping: motionTokens.spring.settle.damping,
       stiffness: motionTokens.spring.settle.stiffness,
     }).start();
-  };
+  }, [cardScale]);
 
-  const handleCardPressOut = () => {
+  const handleCardPressOut = useCallback(() => {
     Animated.spring(cardScale, {
       toValue: 1,
       useNativeDriver: true,
       damping: motionTokens.spring.bouncy.damping,
       stiffness: motionTokens.spring.bouncy.stiffness,
     }).start();
-  };
+  }, [cardScale]);
 
-  const getPlatformIcon = (p: string): string => {
-    switch (p) {
-      case "youtube":
-        return "logo-youtube";
-      case "instagram":
-        return "logo-instagram";
-      case "twitter":
-        return "logo-twitter";
-      case "reddit":
-        return "logo-reddit";
-      case "tiktok":
-        return "musical-notes";
-      case "linkedin":
-        return "logo-linkedin";
-      case "facebook":
-        return "logo-facebook";
-      case "pinterest":
-        return "logo-pinterest";
-      default:
-        return "play-circle-outline";
-    }
-  };
+  const durationStr = useMemo(
+    () => formatDuration(video.duration_seconds),
+    [video.duration_seconds]
+  );
 
-  const getRelativeTime = (dateStr: string) => {
-    try {
-      const diff = Date.now() - new Date(dateStr).getTime();
-      const mins = Math.floor(diff / 60000);
-      if (mins < 1) return "now";
-      if (mins < 60) return `${mins}m`;
-      const hours = Math.floor(mins / 60);
-      if (hours < 24) return `${hours}h`;
-      const days = Math.floor(hours / 24);
-      if (days < 30) return `${days}d`;
-      return new Date(dateStr).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return "";
-    }
-  };
+  const relativeTimeStr = useMemo(
+    () => getRelativeTime(video.created_at),
+    [video.created_at]
+  );
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds || seconds <= 0) return null;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  const hasValidThumbnail = useMemo(
+    () =>
+      Boolean(video.thumbnail_url) &&
+      !imageError &&
+      !video.thumbnail_url?.includes(".mp4") &&
+      !video.thumbnail_url?.includes(".m3u8"),
+    [video.thumbnail_url, imageError]
+  );
 
-  const durationStr = formatDuration(video.duration_seconds);
+  const creatorDisplay = useMemo(
+    () => video.creator_name || `${platformConfig.label} Creator`,
+    [video.creator_name, platformConfig.label]
+  );
 
-  const hasValidThumbnail =
-    Boolean(video.thumbnail_url) &&
-    !imageError &&
-    !video.thumbnail_url?.includes(".mp4") &&
-    !video.thumbnail_url?.includes(".m3u8");
-
-  const creatorDisplay =
-    video.creator_name || `${platformConfig.label} Creator`;
-  const cleanHandle = (video.creator_name || platform)
-    .replace(/\s+/g, "")
-    .toLowerCase();
+  const cleanHandle = useMemo(
+    () =>
+      (video.creator_name || platform).replace(/\s+/g, "").toLowerCase(),
+    [video.creator_name, platform]
+  );
 
   return (
     <Animated.View style={{ transform: [{ scale: cardScale }] }}>
@@ -180,7 +176,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
               </Text>
               <Text style={styles.dotSeparator}>·</Text>
               <Text style={styles.timeText}>
-                {getRelativeTime(video.created_at)}
+                {relativeTimeStr}
               </Text>
             </View>
           </View>
@@ -275,9 +271,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         >
           {hasValidThumbnail ? (
             <Image
-              source={{ uri: video.thumbnail_url }}
+              source={{
+                uri: video.thumbnail_url,
+                cache: "force-cache",
+              }}
               style={styles.thumbnailImage}
               resizeMode="cover"
+              fadeDuration={0}
+              progressiveRenderingEnabled={true}
               onError={() => setImageError(true)}
             />
           ) : (
@@ -321,6 +322,20 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     </Animated.View>
   );
 };
+
+export const VideoCard = React.memo(VideoCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.video.id === nextProps.video.id &&
+    prevProps.video.status === nextProps.video.status &&
+    prevProps.video.is_favorite === nextProps.video.is_favorite &&
+    prevProps.video.title === nextProps.video.title &&
+    prevProps.video.thumbnail_url === nextProps.video.thumbnail_url &&
+    prevProps.video.creator_name === nextProps.video.creator_name &&
+    prevProps.video.duration_seconds === nextProps.video.duration_seconds &&
+    prevProps.video.ai_metadata?.processing_status === nextProps.video.ai_metadata?.processing_status &&
+    prevProps.video.ai_metadata?.tldw === nextProps.video.ai_metadata?.tldw
+  );
+});
 
 const styles = StyleSheet.create({
   cardContainer: {
