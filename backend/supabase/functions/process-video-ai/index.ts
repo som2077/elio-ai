@@ -1,7 +1,7 @@
 // Supabase Edge Function: process-video-ai
-// Single-Pass OpenAI & Whisper Audio Intelligence Engine
-// (`gpt-4o-mini` + `text-embedding-3-small` + `whisper-1` / `whisper-large-v3-turbo`)
-// Multi-platform content & speech intelligence for YouTube, Instagram, Twitter/X, TikTok, Reddit, Facebook, LinkedIn.
+// Single-Pass OpenAI, Groq & Whisper Deep Video Context & Intelligence Engine
+// (`gpt-4o-mini` + `text-embedding-3-small` + `whisper-large-v3-turbo` / `whisper-1`)
+// Multi-platform full context generation for YouTube, Instagram Reels, TikTok, Twitter/X, Reddit, Facebook, LinkedIn.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import {
@@ -15,29 +15,22 @@ import {
   transcribeAudioBuffer,
   downloadClipMediaStream,
 } from "./audioTranscriber.ts";
+import {
+  buildFullContextSystemPrompt,
+  buildVideoUserPrompt,
+  buildFallbackContextResult,
+} from "./promptTemplates.ts";
+import type {
+  FullVideoContextResult,
+  RequestPayload,
+  ProcessingStage,
+} from "./types.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-interface RequestPayload {
-  video_id?: string;
-  force_whisper?: boolean;
-  transcript?: TranscriptSnippet[];
-  content?: string;
-  // Fallback for direct Database Webhook trigger
-  record?: {
-    id: string;
-    user_id: string;
-    platform: string;
-    title?: string;
-    clean_url: string;
-    original_url: string;
-    user_notes?: string;
-  };
-}
 
 /**
  * TypeSafe AI "Jev" System One Decision Engine via Vercel AI Gateway
@@ -67,7 +60,8 @@ async function evaluateWithJevDecision(
           {
             id: "is_educational",
             type: "predicate",
-            instructions: "Is this video educational, skill-building, instructional, or high-signal knowledge?",
+            instructions:
+              "Is this video educational, skill-building, instructional, or high-signal knowledge?",
           },
           {
             id: "primary_category",
@@ -92,7 +86,7 @@ async function evaluateWithJevDecision(
       const decisions = data.decisions || {};
       return {
         is_educational: decisions.is_educational?.result ?? true,
-        productivity_score: 8,
+        productivity_score: 85,
         primary_category: decisions.primary_category?.result ?? "Tech",
       };
     } else {
@@ -113,6 +107,9 @@ Deno.serve(async (req: Request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let videoRecordId = "";
+  let supabaseClientRef: any = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -128,6 +125,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabaseClientRef = supabase;
 
     // Retrieve API keys securely: 1) Environment variable, 2) Encrypted Supabase Vault
     let openaiApiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
@@ -149,10 +147,15 @@ Deno.serve(async (req: Request) => {
     // Vercel AI Gateway Key (Unified routing & spend control)
     let aiGatewayKey = Deno.env.get("AI_GATEWAY_API_KEY") ?? "";
     if (!aiGatewayKey) {
-      const { data: vaultGateway } = await supabase.rpc("get_internal_ai_secret", {
-        p_name: "AI_GATEWAY_API_KEY",
-      });
-      aiGatewayKey = vaultGateway || "vck_7zi2EmI4PKgs7ZSibBe8UymuvYN9aAooOlk40V7NBuTamEw4QL2jIitE";
+      const { data: vaultGateway } = await supabase.rpc(
+        "get_internal_ai_secret",
+        {
+          p_name: "AI_GATEWAY_API_KEY",
+        },
+      );
+      aiGatewayKey =
+        vaultGateway ||
+        "vck_7zi2EmI4PKgs7ZSibBe8UymuvYN9aAooOlk40V7NBuTamEw4QL2jIitE";
     }
 
     const body: RequestPayload = await req.json();
@@ -168,6 +171,7 @@ Deno.serve(async (req: Request) => {
         },
       );
     }
+    videoRecordId = videoId;
 
     const { data: video, error: videoError } = await supabase
       .from("saved_videos")
@@ -176,10 +180,13 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (videoError || !video) {
-      return new Response(JSON.stringify({ error: "Video record not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Video record not found" }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // 2. Check Quota / Entitlement
@@ -216,12 +223,13 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Mark status as pending
+    // Step 2A: Update pipeline status to 'scraping_metadata'
     await supabase.from("video_ai_metadata").upsert(
       {
         video_id: video.id,
         user_id: video.user_id,
         processing_status: "pending",
+        processing_stage: "scraping_metadata" as ProcessingStage,
       },
       { onConflict: "video_id" },
     );
@@ -331,14 +339,17 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Step 3D: On-Demand Speech Transcription via Whisper
-    // If no text transcript exists, or user passed `force_whisper = true`
+    // Step 3D: On-Demand Speech Transcription via Groq or OpenAI Whisper
     const shouldRunWhisper =
       body.force_whisper ||
       (snippets.length === 0 && (openaiApiKey || groqApiKey));
 
     if (shouldRunWhisper) {
-      // Determine media stream candidate URL
+      await supabase
+        .from("video_ai_metadata")
+        .update({ processing_stage: "transcribing" as ProcessingStage })
+        .eq("video_id", video.id);
+
       const mediaTargetUrl =
         socialContent?.extraContext?.match(
           /https:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/,
@@ -353,6 +364,7 @@ Deno.serve(async (req: Request) => {
         try {
           const media = await downloadClipMediaStream(mediaTargetUrl);
           if (media) {
+            // Groq Whisper turbo prioritized for speed (< 1s), OpenAI Whisper fallback
             const whisperApiKey = groqApiKey || openaiApiKey;
             const whisperProvider = groqApiKey ? "groq" : "openai";
 
@@ -379,60 +391,47 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Final fallback to metadata if still completely empty
+    // Step 3E: Detect Silent or Music-Only Videos
+    const cleanSpoken = fullContentText
+      .replace(/\[(?:music|applause|laughter|instrumental|audio|sounds)\]/gi, "")
+      .replace(/[♪♫#_]/g, "")
+      .trim();
+
+    const isSilentOrVisual = !hasSpokenAudio || cleanSpoken.length < 15;
+    if (isSilentOrVisual) {
+      hasSpokenAudio = false;
+    }
+
+    // Final fallback to video metadata if still empty
     if (!fullContentText || fullContentText.trim().length === 0) {
       fullContentText = `Title: ${video.title || "Untitled"}. Platform: ${video.platform}. Creator: ${video.creator_name || "Unknown"}. User Notes: ${video.user_notes || "None"}. Source URL: ${video.clean_url}.`;
     }
 
-    // 4. Single-Pass OpenAI `gpt-4o-mini` Request
-    const systemPrompt = `You are the Elio AI Video & Social Media Intelligence engine.
-Given a video's transcript, spoken dialog, caption, and metadata, produce a high-signal, punchy structured summary.
-Extract concrete, actionable value: exact numbers, frameworks, tools mentioned, tips, prompts, key arguments, or steps.
-Avoid generic filler (e.g. do not say "This video discusses important tips" — state the exact tips).
+    // Step 3F: Mark status as 'generating_context'
+    await supabase
+      .from("video_ai_metadata")
+      .update({ processing_stage: "generating_context" as ProcessingStage })
+      .eq("video_id", video.id);
 
-Return ONLY valid JSON matching this schema:
-{
-  "tldw": "1 punchy sentence summarizing the core value or message.",
-  "key_takeaways": [
-    "Concrete actionable takeaway 1",
-    "Concrete actionable takeaway 2",
-    "Concrete actionable takeaway 3"
-  ],
-  "context_breakdown": [
-    {
-      "time_formatted": "00:15",
-      "time_seconds": 15,
-      "title": "Topic or Step Label",
-      "detail": "What was explained or demonstrated in this section."
-    }
-  ],
-  "primary_category": "One of: Tech | Fitness | Cooking | Finance | Design | Productivity | Entertainment | Other",
-  "tags": ["3 to 5 lowercase hashtags without # symbol, e.g. react, nextjs, devops"],
-  "action_items": [
-    {
-      "type": "repo" | "link" | "tool" | "recipe" | "book",
-      "title": "Clear concise label",
-      "url": "https://... or empty if none",
-      "subtitle": "Brief note e.g. 'Recommended in clip'"
-    }
-  ],
-  "is_educational": true
-}`;
+    // 4. Single-Pass Dual-Language (EN + Hinglish) Deep Context LLM Call
+    const systemPrompt = buildFullContextSystemPrompt(isSilentOrVisual);
+    const userPrompt = buildVideoUserPrompt({
+      platform: video.platform,
+      title: video.title,
+      creatorName: video.creator_name,
+      detectedLanguage,
+      hasSpokenAudio,
+      userNotes: video.user_notes,
+      contentText: fullContentText,
+    });
 
-    let aiResult = {
-      tldw: `Key takeaways from ${video.title || "saved clip"}`,
-      key_takeaways: [
-        "Core concept explained in video",
-        "Key technique or framework demonstrated",
-      ],
-      context_breakdown: [] as any[],
-      primary_category: "Tech",
-      tags: ["video", video.platform || "clip"],
-      action_items: [] as any[],
-      is_educational: true,
-    };
+    let aiResult: FullVideoContextResult = buildFallbackContextResult(
+      video.title,
+      video.platform,
+      hasSpokenAudio,
+    );
 
-    // Step A: Fast System One Decision with Jev (TypeSafe AI) via Vercel AI Gateway
+    // Step 4A: Fast System One Decision with Jev (TypeSafe AI) via Vercel AI Gateway
     if (aiGatewayKey) {
       const jevDecision = await evaluateWithJevDecision(
         aiGatewayKey,
@@ -450,10 +449,10 @@ Return ONLY valid JSON matching this schema:
       }
     }
 
-    // Step B: Comprehensive Structured Digest & Takeaways
-    // Prioritize Vercel AI Gateway if configured, with graceful OpenAI direct fallback
+    // Step 4B: Comprehensive Structured Context Synthesis
     let completionExecuted = false;
 
+    // Prioritize Vercel AI Gateway
     if (aiGatewayKey) {
       try {
         const gatewayRes = await fetch(
@@ -470,10 +469,7 @@ Return ONLY valid JSON matching this schema:
               temperature: 0.3,
               messages: [
                 { role: "system", content: systemPrompt },
-                {
-                  role: "user",
-                  content: `Platform: ${video.platform}\nTitle: ${video.title}\nCreator: ${video.creator_name || "Unknown"}\nDetected Language: ${detectedLanguage}\nHas Spoken Audio: ${hasSpokenAudio}\nTranscript / Spoken Content:\n${fullContentText.slice(0, 30000)}`,
-                },
+                { role: "user", content: userPrompt },
               ],
             }),
           },
@@ -483,7 +479,7 @@ Return ONLY valid JSON matching this schema:
           const completionJson = await gatewayRes.json();
           const rawContent = completionJson.choices?.[0]?.message?.content;
           if (rawContent) {
-            aiResult = JSON.parse(rawContent);
+            aiResult = { ...aiResult, ...JSON.parse(rawContent) };
             completionExecuted = true;
           }
         } else {
@@ -498,6 +494,7 @@ Return ONLY valid JSON matching this schema:
       }
     }
 
+    // Fallback directly to OpenAI API if AI Gateway failed or was unconfigured
     if (!completionExecuted && openaiApiKey) {
       const completionResponse = await fetch(
         "https://api.openai.com/v1/chat/completions",
@@ -513,10 +510,7 @@ Return ONLY valid JSON matching this schema:
             temperature: 0.3,
             messages: [
               { role: "system", content: systemPrompt },
-              {
-                role: "user",
-                content: `Platform: ${video.platform}\nTitle: ${video.title}\nCreator: ${video.creator_name || "Unknown"}\nDetected Language: ${detectedLanguage}\nHas Spoken Audio: ${hasSpokenAudio}\nTranscript / Spoken Content:\n${fullContentText.slice(0, 30000)}`,
-              },
+              { role: "user", content: userPrompt },
             ],
           }),
         },
@@ -527,7 +521,8 @@ Return ONLY valid JSON matching this schema:
         const rawContent = completionJson.choices?.[0]?.message?.content;
         if (rawContent) {
           try {
-            aiResult = JSON.parse(rawContent);
+            aiResult = { ...aiResult, ...JSON.parse(rawContent) };
+            completionExecuted = true;
           } catch (e) {
             console.error("Failed to parse JSON response from OpenAI:", e);
           }
@@ -547,7 +542,7 @@ Return ONLY valid JSON matching this schema:
         ? snippets.map((s) => s.text).join(" ")
         : fullContentText;
 
-    // 5. Upsert AI Metadata with Full Transcript & Context Breakdown
+    // 5. Upsert AI Metadata with Full Context & Lore Schema Columns
     const { error: upsertError } = await supabase
       .from("video_ai_metadata")
       .upsert(
@@ -556,6 +551,11 @@ Return ONLY valid JSON matching this schema:
           user_id: video.user_id,
           is_educational: aiResult.is_educational ?? true,
           tldw: aiResult.tldw,
+          tldw_hinglish: aiResult.tldw_hinglish || null,
+          core_premise: aiResult.core_premise || null,
+          background_lore: aiResult.background_lore || {},
+          entities_referenced: aiResult.entities_referenced || [],
+          fact_check_nuance: aiResult.fact_check_nuance || {},
           key_takeaways: aiResult.key_takeaways || [],
           action_items: aiResult.action_items || [],
           context_breakdown: aiResult.context_breakdown || [],
@@ -564,8 +564,9 @@ Return ONLY valid JSON matching this schema:
           has_spoken_audio: hasSpokenAudio,
           primary_category: aiResult.primary_category || "Tech",
           tags: aiResult.tags || [],
-          read_time_seconds: 30,
+          read_time_seconds: aiResult.read_time_seconds || 30,
           processing_status: "completed",
+          processing_stage: "completed" as ProcessingStage,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "video_id" },
@@ -575,7 +576,7 @@ Return ONLY valid JSON matching this schema:
       console.error("Failed to upsert video_ai_metadata:", upsertError);
     }
 
-    // 6. Vector Embeddings Generation (for Semantic Search & RAG Chat)
+    // 6. 3-Tier pgvector Vector Embeddings Generation for "Ask Elio"
     if (openaiApiKey) {
       let chunksToEmbed: {
         chunkIndex: number;
@@ -584,19 +585,65 @@ Return ONLY valid JSON matching this schema:
         text: string;
       }[] = [];
 
+      // Tier 1: Master Document Anchor Vector (Topic & Lore Synthesis)
+      const masterAnchorParts = [
+        `Title: ${video.title || "Video Clip"}.`,
+        `TLDW: ${aiResult.tldw || ""}.`,
+        aiResult.tldw_hinglish ? `Hinglish: ${aiResult.tldw_hinglish}.` : "",
+        aiResult.core_premise ? `Core Premise: ${aiResult.core_premise}.` : "",
+        aiResult.background_lore?.why_it_matters
+          ? `Why It Matters: ${aiResult.background_lore.why_it_matters}.`
+          : "",
+        aiResult.fact_check_nuance?.explanation
+          ? `Fact Check: ${aiResult.fact_check_nuance.explanation}.`
+          : "",
+        aiResult.key_takeaways?.length
+          ? `Key Takeaways: ${aiResult.key_takeaways.join("; ")}.`
+          : "",
+        aiResult.entities_referenced?.length
+          ? `Entities: ${aiResult.entities_referenced.map((e: any) => e.name).join(", ")}.`
+          : "",
+      ];
+
+      chunksToEmbed.push({
+        chunkIndex: 0,
+        startSeconds: 0,
+        endSeconds: Math.min(60, video.duration_seconds || 60),
+        text: masterAnchorParts.filter(Boolean).join(" ").slice(0, 2000),
+      });
+
+      // Tier 2: Timeline Transcript & Context Segments
       if (snippets.length > 0) {
-        chunksToEmbed = chunkTranscript(snippets, 60);
-      } else {
-        // Embed video title, TL;DW, takeaways, and the actual content text
-        const summaryContext = `${video.title || "Clip"}. ${aiResult.tldw || ""}. Takeaways: ${(aiResult.key_takeaways || []).join(" ")}. Content: ${(fullContentText || "").slice(0, 1500)}`;
-        chunksToEmbed = [
-          {
-            chunkIndex: 0,
-            startSeconds: 0,
-            endSeconds: 30,
-            text: summaryContext,
-          },
-        ];
+        const transcriptChunks = chunkTranscript(snippets, 60);
+        transcriptChunks.forEach((c) => {
+          chunksToEmbed.push({
+            chunkIndex: chunksToEmbed.length,
+            startSeconds: c.startSeconds,
+            endSeconds: c.endSeconds,
+            text: `[Video: "${video.title || "Clip"}"] ${c.text}`,
+          });
+        });
+      } else if (fullContentText && fullContentText.length > 0) {
+        chunksToEmbed.push({
+          chunkIndex: 1,
+          startSeconds: 0,
+          endSeconds: 30,
+          text: `[Video: "${video.title || "Clip"}"] ${fullContentText.slice(0, 1500)}`,
+        });
+      }
+
+      // Tier 3: Synthetic QA Embeddings from suggested follow-ups
+      if (
+        Array.isArray(aiResult.suggested_followups) &&
+        aiResult.suggested_followups.length > 0
+      ) {
+        const qaText = `[Video: "${video.title || "Clip"}"] Frequently Asked: ${aiResult.suggested_followups.join(" | ")}`;
+        chunksToEmbed.push({
+          chunkIndex: chunksToEmbed.length,
+          startSeconds: 0,
+          endSeconds: 30,
+          text: qaText,
+        });
       }
 
       if (chunksToEmbed.length > 0) {
@@ -659,6 +706,7 @@ Return ONLY valid JSON matching this schema:
           full_transcript: fullTranscriptSaved,
           transcript_language: detectedLanguage,
           has_spoken_audio: hasSpokenAudio,
+          processing_stage: "completed",
         },
       }),
       {
@@ -668,6 +716,20 @@ Return ONLY valid JSON matching this schema:
     );
   } catch (err: any) {
     console.error("[process-video-ai] Error:", err);
+
+    if (supabaseClientRef && videoRecordId) {
+      await supabaseClientRef.from("video_ai_metadata").upsert(
+        {
+          video_id: videoRecordId,
+          processing_status: "failed",
+          processing_stage: "failed" as ProcessingStage,
+          error_message: err.message || "Internal server error",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "video_id" },
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: err.message || "Internal server error" }),
       {

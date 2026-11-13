@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  Platform,
 } from "react-native";
 import { PikaIcon } from "./PikaIcon";
 import { SavedVideo } from "../types/video";
@@ -15,7 +16,19 @@ import { threadsTokens } from "../theme/appleTokens";
 import { haptics } from "../utils/haptics";
 import { IndustryBottomSheet } from "./IndustryBottomSheet";
 import { fetchVideoAIMetadata, generateVideoAIOnDemand } from "../services/aiService";
-import type { VideoAIMetadata, ActionItem } from "../types/ai";
+import { openVideoDirectly } from "../services/deepLink";
+import type {
+  VideoAIMetadata,
+  ActionItem,
+  ContextStepItem,
+  EntityReferenced,
+  FactCheckNuance,
+  BackgroundLore,
+  CorePremiseThesis,
+} from "../types/ai";
+
+export type DetailTabType = "summary" | "lore" | "tools" | "timestamps" | "actions";
+export type LanguageMode = "en" | "hinglish";
 
 interface VideoDetailSheetProps {
   video: SavedVideo | null;
@@ -27,6 +40,7 @@ interface VideoDetailSheetProps {
   onCopyLink?: (url: string) => void;
   onDelete: (video: SavedVideo) => void;
   onTestNotification?: (video: SavedVideo) => void;
+  onAskElio?: (video: SavedVideo, initialQuestion?: string) => void;
 }
 
 export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
@@ -39,14 +53,20 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   onCopyLink,
   onDelete,
   onTestNotification,
+  onAskElio,
 }) => {
-  const [activeTab, setActiveTab] = useState<"digest" | "actions">("digest");
+  const [activeTab, setActiveTab] = useState<DetailTabType>("summary");
+  const [languageMode, setLanguageMode] = useState<LanguageMode>("en");
   const [aiMeta, setAiMeta] = useState<VideoAIMetadata | null>(null);
   const [isLoadingMeta, setIsLoadingMeta] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedTakeaways, setCopiedTakeaways] = useState(false);
   const [copiedTranscript, setCopiedTranscript] = useState(false);
   const [showFullTranscript, setShowFullTranscript] = useState(false);
+  const [activeFollowupIndex, setActiveFollowupIndex] = useState(0);
+
+  // Rotating prompt interval for Ask Elio sticky button
+  const intervalRef = useRef<any>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -68,9 +88,63 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     };
   }, [visible, video?.id, video?.ai_metadata]);
 
+  // Rotate Ask Elio prompts every 4 seconds
+  useEffect(() => {
+    if (aiMeta?.suggested_followups && aiMeta.suggested_followups.length > 1) {
+      intervalRef.current = setInterval(() => {
+        setActiveFollowupIndex((prev) => (prev + 1) % aiMeta.suggested_followups!.length);
+      }, 4000);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [aiMeta?.suggested_followups]);
+
   if (!video) return null;
 
   const isWatched = video.status === "watched";
+
+  // Helpers to resolve dual-language texts
+  const getResolvedTldw = (): string => {
+    if (!aiMeta) return "";
+    const core = typeof aiMeta.core_premise === "object" ? aiMeta.core_premise : null;
+    if (languageMode === "hinglish") {
+      return (
+        aiMeta.tldw_hinglish ||
+        core?.tldw_hinglish ||
+        (typeof aiMeta.core_premise === "string" ? aiMeta.core_premise : null) ||
+        aiMeta.tldw
+      );
+    }
+    return (
+      aiMeta.tldw_en ||
+      core?.tldw_en ||
+      (typeof aiMeta.core_premise === "string" ? aiMeta.core_premise : null) ||
+      aiMeta.tldw
+    );
+  };
+
+  const getResolvedTakeaways = (): string[] => {
+    if (!aiMeta?.key_takeaways) return [];
+    if (Array.isArray(aiMeta.key_takeaways)) {
+      if (languageMode === "hinglish" && aiMeta.takeaways_hinglish?.length) {
+        return aiMeta.takeaways_hinglish;
+      }
+      return aiMeta.key_takeaways;
+    }
+    const record = aiMeta.key_takeaways as { english?: string[]; hinglish?: string[] };
+    if (languageMode === "hinglish" && record.hinglish && record.hinglish.length > 0) {
+      return record.hinglish;
+    }
+    return record.english || [];
+  };
+
+  const resolvedTldw = getResolvedTldw();
+  const resolvedTakeaways = getResolvedTakeaways();
+
+  // Core Premise Dilemma Breakdown
+  const corePremise: CorePremiseThesis | null =
+    typeof aiMeta?.core_premise === "object" ? aiMeta.core_premise : null;
 
   const handleCopy = () => {
     haptics.light();
@@ -121,7 +195,7 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
       setAiMeta(res.data);
       haptics.success();
     } else {
-      Alert.alert("AI Engine Notice", res.error || "Could not generate digest right now.");
+      Alert.alert("AI Engine Notice", res.error || "Could not generate full context right now.");
     }
   };
 
@@ -152,7 +226,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
   const handleCopyTakeaways = () => {
     if (!aiMeta) return;
     haptics.light();
-    const textToCopy = `📌 ${aiMeta.tldw}\n\nKey Takeaways:\n${aiMeta.key_takeaways.map((k) => `• ${k}`).join("\n")}`;
+    const textToCopy = `📌 ${resolvedTldw}\n\nKey Takeaways:\n${resolvedTakeaways
+      .map((k) => `• ${k}`)
+      .join("\n")}`;
     if (onCopyLink) {
       onCopyLink(textToCopy);
     }
@@ -172,6 +248,42 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     }
   };
 
+  const handleOpenEntity = (entity: EntityReferenced) => {
+    haptics.light();
+    if (
+      entity.url_or_search_term &&
+      (entity.url_or_search_term.startsWith("http://") ||
+        entity.url_or_search_term.startsWith("https://"))
+    ) {
+      Linking.openURL(entity.url_or_search_term).catch(() => {});
+    } else {
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(
+        entity.url_or_search_term || entity.name
+      )}`;
+      Linking.openURL(searchUrl).catch(() => {});
+    }
+  };
+
+  const handleTimestampJump = (item: ContextStepItem) => {
+    haptics.selection();
+    if (video.clean_url) {
+      openVideoDirectly(
+        video.clean_url,
+        video.platform as any,
+        video.platform_video_id,
+        item.time_seconds
+      );
+    }
+  };
+
+  const handleAskElioPress = (prompt?: string) => {
+    haptics.selection();
+    onClose();
+    if (onAskElio) {
+      onAskElio(video, prompt);
+    }
+  };
+
   const renderActionIcon = (type: ActionItem["type"]) => {
     switch (type) {
       case "repo":
@@ -187,76 +299,251 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
     }
   };
 
+  const getVerdictStyle = (verdict?: string) => {
+    switch (verdict) {
+      case "verified_accurate":
+        return { bg: "rgba(16, 185, 129, 0.12)", border: "#10B981", text: "#10B981" };
+      case "mostly_accurate_with_nuance":
+        return { bg: "rgba(245, 158, 11, 0.12)", border: "#F59E0B", text: "#F59E0B" };
+      case "misleading_oversimplification":
+        return { bg: "rgba(239, 68, 68, 0.12)", border: "#EF4444", text: "#EF4444" };
+      case "sponsored_promo":
+        return { bg: "rgba(139, 92, 246, 0.12)", border: "#8B5CF6", text: "#8B5CF6" };
+      default:
+        return { bg: "rgba(56, 189, 248, 0.12)", border: "#38BDF8", text: "#38BDF8" };
+    }
+  };
+
+  const activeFollowup =
+    aiMeta?.suggested_followups && aiMeta.suggested_followups.length > 0
+      ? aiMeta.suggested_followups[activeFollowupIndex] || aiMeta.suggested_followups[0]
+      : "Ask anything about this video...";
+
   return (
     <IndustryBottomSheet
       visible={visible}
       onClose={onClose}
-      maxHeightRatio={0.82}
+      maxHeightRatio={0.88}
     >
-      {/* 1. Header Segmented Toggle */}
-      <View style={styles.segmentContainer}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={[styles.segmentBtn, activeTab === "digest" && styles.segmentBtnActive]}
-          onPress={() => {
-            haptics.selection();
-            setActiveTab("digest");
-          }}
-        >
-          <PikaIcon
-            name="sparkles"
-            size={13}
-            color={activeTab === "digest" ? "#A78BFA" : "#71767B"}
-            style={{ marginRight: 5 }}
-          />
-          <Text
-            style={[
-              styles.segmentBtnText,
-              activeTab === "digest" && styles.segmentBtnTextActive,
-            ]}
-          >
-            ✦ AI Digest
+      {/* 1. Header Row: Video Meta + Language Segmented Switch [EN | Hinglish] */}
+      <View style={styles.sheetHeaderRow}>
+        <View style={styles.videoHeaderMeta}>
+          <Text style={styles.videoPlatformText}>
+            {(video.platform || "Video").toUpperCase()}
+            {video.creator_name ? ` • @${video.creator_name}` : ""}
           </Text>
-        </TouchableOpacity>
+          <Text style={styles.videoTitleText} numberOfLines={1}>
+            {video.title || "Video Intelligence"}
+          </Text>
+        </View>
 
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={[styles.segmentBtn, activeTab === "actions" && styles.segmentBtnActive]}
-          onPress={() => {
-            haptics.selection();
-            setActiveTab("actions");
-          }}
-        >
-          <Text
-            style={[
-              styles.segmentBtnText,
-              activeTab === "actions" && styles.segmentBtnTextActive,
-            ]}
+        {/* 0ms Language Mode Toggle Pill */}
+        <View style={styles.langTogglePill}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.langBtn, languageMode === "en" && styles.langBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setLanguageMode("en");
+            }}
           >
-            Actions & Options
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[styles.langBtnText, languageMode === "en" && styles.langBtnTextActive]}
+            >
+              EN
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.langBtn, languageMode === "hinglish" && styles.langBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setLanguageMode("hinglish");
+            }}
+          >
+            <Text
+              style={[
+                styles.langBtnText,
+                languageMode === "hinglish" && styles.langBtnTextActive,
+              ]}
+            >
+              Hinglish
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* 2. TAB: AI DIGEST */}
-      {activeTab === "digest" && (
+      {/* 2. 5-Segment Horizontal Tab Navigation */}
+      <View style={styles.tabScrollContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabBarContent}
+        >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.segmentBtn, activeTab === "summary" && styles.segmentBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setActiveTab("summary");
+            }}
+          >
+            <PikaIcon
+              name="sparkles"
+              size={12}
+              color={activeTab === "summary" ? "#A78BFA" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.segmentBtnText,
+                activeTab === "summary" && styles.segmentBtnTextActive,
+              ]}
+            >
+              Summary
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.segmentBtn, activeTab === "lore" && styles.segmentBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setActiveTab("lore");
+            }}
+          >
+            <PikaIcon
+              name="book-outline"
+              size={12}
+              color={activeTab === "lore" ? "#A78BFA" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.segmentBtnText,
+                activeTab === "lore" && styles.segmentBtnTextActive,
+              ]}
+            >
+              Deep Lore
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.segmentBtn, activeTab === "tools" && styles.segmentBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setActiveTab("tools");
+            }}
+          >
+            <PikaIcon
+              name="construct-outline"
+              size={12}
+              color={activeTab === "tools" ? "#A78BFA" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.segmentBtnText,
+                activeTab === "tools" && styles.segmentBtnTextActive,
+              ]}
+            >
+              Tools & Graph
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.segmentBtn, activeTab === "timestamps" && styles.segmentBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setActiveTab("timestamps");
+            }}
+          >
+            <PikaIcon
+              name="time-outline"
+              size={12}
+              color={activeTab === "timestamps" ? "#A78BFA" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.segmentBtnText,
+                activeTab === "timestamps" && styles.segmentBtnTextActive,
+              ]}
+            >
+              Chapters
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.segmentBtn, activeTab === "actions" && styles.segmentBtnActive]}
+            onPress={() => {
+              haptics.selection();
+              setActiveTab("actions");
+            }}
+          >
+            <PikaIcon
+              name="ellipsis-horizontal"
+              size={12}
+              color={activeTab === "actions" ? "#FFFFFF" : "#71767B"}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.segmentBtnText,
+                activeTab === "actions" && styles.segmentBtnTextActive,
+              ]}
+            >
+              Options
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
+      {/* 3. SCROLLABLE TAB BODIES */}
+      {isLoadingMeta || isGenerating ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator color="#A78BFA" size="large" />
+          <Text style={styles.loaderText}>
+            {isGenerating
+              ? "OpenAI is extracting deep lore & nuances..."
+              : aiMeta?.processing_stage === "transcribing"
+              ? "Whisper speech intelligence in progress..."
+              : "Retrieving full video intelligence..."}
+          </Text>
+        </View>
+      ) : !aiMeta ? (
+        <View style={styles.emptyAiBox}>
+          <View style={styles.emptyAiIconRing}>
+            <PikaIcon name="sparkles" size={26} color="#A78BFA" />
+          </View>
+          <Text style={styles.emptyAiTitle}>Full Context Ready to Extract</Text>
+          <Text style={styles.emptyAiSubtitle}>
+            Extract spoken speech, industry backstory, fact-check nuances, and clickable tools with
+            Elio AI.
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.generateBtn}
+            onPress={handleGenerateAI}
+          >
+            <PikaIcon name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.generateBtnText}>Generate Full Context</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
         <ScrollView
           style={styles.digestScroll}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom: 85 }}
           showsVerticalScrollIndicator={false}
         >
-          {isLoadingMeta || isGenerating ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator color="#A78BFA" size="large" />
-              <Text style={styles.loaderText}>
-                {isGenerating
-                  ? "OpenAI is analyzing video transcript..."
-                  : "Retrieving AI digest..."}
-              </Text>
-            </View>
-          ) : aiMeta ? (
+          {/* TAB 1: SUMMARY (TL;DW) */}
+          {activeTab === "summary" && (
             <View>
-              {/* Speech Intelligence Status Pill */}
+              {/* Spoken Speech Status Pill */}
               <View style={styles.speechBadgeRow}>
                 <View
                   style={[
@@ -280,7 +567,9 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                     ]}
                   >
                     {aiMeta.has_spoken_audio
-                      ? `Spoken Speech Extracted (${(aiMeta.transcript_language || "EN").toUpperCase()})`
+                      ? `Spoken Speech Extracted (${(
+                          aiMeta.transcript_language || "EN"
+                        ).toUpperCase()})`
                       : "Post Caption & Notes Context"}
                   </Text>
                 </View>
@@ -291,27 +580,50 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                     style={styles.whisperTriggerBtn}
                     onPress={handleTranscribeWhisper}
                   >
-                    <Text style={styles.whisperTriggerText}>
-                      Whisper Audio
-                    </Text>
+                    <Text style={styles.whisperTriggerText}>Whisper Audio</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* TL;DW Capsule */}
+              {/* TL;DW Capsule Card */}
               <View style={styles.tldwCard}>
                 <View style={styles.tldwHeaderRow}>
                   <View style={styles.badgeRow}>
                     <PikaIcon name="flash" size={13} color="#FBBF24" />
-                    <Text style={styles.tldwBadgeLabel}>30-SEC TL;DW</Text>
+                    <Text style={styles.tldwBadgeLabel}>
+                      {languageMode === "hinglish" ? "30-SEC HINGLISH TL;DW" : "30-SEC TL;DW"}
+                    </Text>
                   </View>
-                  <Text style={styles.readTimeText}>{aiMeta.read_time_seconds}s read</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {aiMeta.productivity_score ? (
+                      <View style={styles.scoreBadge}>
+                        <Text style={styles.scoreBadgeText}>
+                          {aiMeta.productivity_score} Score
+                        </Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.readTimeText}>{aiMeta.read_time_seconds || 30}s read</Text>
+                  </View>
                 </View>
-                <Text style={styles.tldwBodyText}>{aiMeta.tldw}</Text>
+                <Text style={styles.tldwBodyText}>{resolvedTldw}</Text>
               </View>
 
+              {/* Core Dilemma: Problem vs Solution Callout */}
+              {corePremise?.problem_addressed && corePremise?.main_solution_or_claim && (
+                <View style={styles.dilemmaContainer}>
+                  <View style={styles.dilemmaBoxProblem}>
+                    <Text style={styles.dilemmaLabelProblem}>THE FRICTION / PROBLEM</Text>
+                    <Text style={styles.dilemmaText}>{corePremise.problem_addressed}</Text>
+                  </View>
+                  <View style={styles.dilemmaBoxSolution}>
+                    <Text style={styles.dilemmaLabelSolution}>THE RESOLUTION</Text>
+                    <Text style={styles.dilemmaText}>{corePremise.main_solution_or_claim}</Text>
+                  </View>
+                </View>
+              )}
+
               {/* Key Takeaways */}
-              {aiMeta.key_takeaways && aiMeta.key_takeaways.length > 0 && (
+              {resolvedTakeaways && resolvedTakeaways.length > 0 && (
                 <View style={styles.takeawaysSection}>
                   <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionTitle}>Key Takeaways</Text>
@@ -331,12 +643,12 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                           copiedTakeaways && { color: "#10B981" },
                         ]}
                       >
-                        {copiedTakeaways ? "Copied" : "Copy"}
+                        {copiedTakeaways ? "Copied" : "Copy All"}
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  {aiMeta.key_takeaways.map((takeaway, idx) => (
+                  {resolvedTakeaways.map((takeaway, idx) => (
                     <View key={idx} style={styles.takeawayItem}>
                       <View style={styles.bulletDot} />
                       <Text style={styles.takeawayText}>{takeaway}</Text>
@@ -344,16 +656,224 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                   ))}
                 </View>
               )}
+            </View>
+          )}
 
-              {/* Spoken Context & Step-by-Step Breakdown */}
+          {/* TAB 2: DEEP LORE & FACT CHECK */}
+          {activeTab === "lore" && (
+            <View>
+              {/* Fact Check Nuance Banner */}
+              {aiMeta.fact_check_nuance && (
+                <View
+                  style={[
+                    styles.factCheckCard,
+                    {
+                      borderColor: getVerdictStyle(aiMeta.fact_check_nuance.verdict).border,
+                      backgroundColor: getVerdictStyle(aiMeta.fact_check_nuance.verdict).bg,
+                    },
+                  ]}
+                >
+                  <View style={styles.factCheckHeader}>
+                    <PikaIcon
+                      name="shield-checkmark"
+                      size={15}
+                      color={getVerdictStyle(aiMeta.fact_check_nuance.verdict).text}
+                    />
+                    <Text
+                      style={[
+                        styles.factCheckBadgeText,
+                        { color: getVerdictStyle(aiMeta.fact_check_nuance.verdict).text },
+                      ]}
+                    >
+                      {aiMeta.fact_check_nuance.verdict_badge || "Fact-Check & Reality Check"}
+                    </Text>
+                  </View>
+                  <Text style={styles.factCheckExplanation}>
+                    {aiMeta.fact_check_nuance.explanation}
+                  </Text>
+
+                  {/* Missing Nuances */}
+                  {aiMeta.fact_check_nuance.missing_nuances &&
+                    aiMeta.fact_check_nuance.missing_nuances.length > 0 && (
+                      <View style={styles.nuanceBox}>
+                        <Text style={styles.nuanceHeader}>MISSING CAVEATS / TRADE-OFFS:</Text>
+                        {aiMeta.fact_check_nuance.missing_nuances.map((nuance, idx) => (
+                          <View key={idx} style={styles.nuanceItem}>
+                            <Text style={styles.nuanceBullet}>⚠️</Text>
+                            <Text style={styles.nuanceItemText}>{nuance}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                  {/* Hidden Costs / Prerequisites */}
+                  {aiMeta.fact_check_nuance.hidden_costs_or_prereqs &&
+                    aiMeta.fact_check_nuance.hidden_costs_or_prereqs.length > 0 && (
+                      <View style={styles.costsContainer}>
+                        {aiMeta.fact_check_nuance.hidden_costs_or_prereqs.map((cost, idx) => (
+                          <View key={idx} style={styles.costChip}>
+                            <Text style={styles.costChipText}>🔒 {cost}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                </View>
+              )}
+
+              {/* Deep Background Lore & Macro Significance */}
+              {aiMeta.background_lore ? (
+                <View style={styles.loreContainer}>
+                  <View style={styles.loreCard}>
+                    <View style={styles.loreCardHeader}>
+                      <PikaIcon name="bulb-outline" size={15} color="#A78BFA" />
+                      <Text style={styles.loreCardTitle}>Why It Matters Right Now</Text>
+                    </View>
+                    <Text style={styles.loreCardBody}>
+                      {aiMeta.background_lore.why_it_matters}
+                    </Text>
+                  </View>
+
+                  {aiMeta.background_lore.backstory && (
+                    <View style={styles.loreCard}>
+                      <View style={styles.loreCardHeader}>
+                        <PikaIcon name="newspaper-outline" size={15} color="#38BDF8" />
+                        <Text style={styles.loreCardTitle}>Backstory & Industry Lore</Text>
+                      </View>
+                      <Text style={styles.loreCardBody}>
+                        {aiMeta.background_lore.backstory}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Assumed Prerequisites */}
+                  {aiMeta.background_lore.assumed_prerequisites &&
+                    aiMeta.background_lore.assumed_prerequisites.length > 0 && (
+                      <View style={styles.prereqSection}>
+                        <Text style={styles.sectionTitle}>Assumed Prerequisites</Text>
+                        <View style={styles.prereqChips}>
+                          {aiMeta.background_lore.assumed_prerequisites.map((prereq, idx) => (
+                            <View key={idx} style={styles.prereqChip}>
+                              <Text style={styles.prereqChipText}>📚 {prereq}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                </View>
+              ) : (
+                <View style={styles.emptyTabCard}>
+                  <Text style={styles.emptyTabText}>
+                    No deep background lore generated for this short clip yet.
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* TAB 3: TOOLS, REPOS & ENTITIES */}
+          {activeTab === "tools" && (
+            <View>
+              {/* Action Items / Extracted Resources */}
+              {aiMeta.action_items && aiMeta.action_items.length > 0 && (
+                <View style={styles.actionsSection}>
+                  <Text style={styles.sectionTitle}>Clickable Resources & Tools</Text>
+                  <View style={styles.actionChipsContainer}>
+                    {aiMeta.action_items.map((item, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        activeOpacity={0.75}
+                        style={styles.actionChip}
+                        onPress={() => handleOpenResource(item)}
+                      >
+                        <PikaIcon
+                          name={renderActionIcon(item.type)}
+                          size={14}
+                          color="#A78BFA"
+                          style={{ marginRight: 6 }}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.actionChipTitle} numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          {item.subtitle && (
+                            <Text style={styles.actionChipSubtitle} numberOfLines={1}>
+                              {item.subtitle}
+                            </Text>
+                          )}
+                        </View>
+                        <PikaIcon name="open-outline" size={13} color="#71767B" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Entities Referenced Knowledge Graph */}
+              {aiMeta.entities_referenced && aiMeta.entities_referenced.length > 0 && (
+                <View style={styles.entitiesSection}>
+                  <Text style={styles.sectionTitle}>Entities & Concepts Mentioned</Text>
+                  <View style={styles.entityList}>
+                    {aiMeta.entities_referenced.map((entity, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        activeOpacity={0.75}
+                        style={styles.entityCard}
+                        onPress={() => handleOpenEntity(entity)}
+                      >
+                        <View style={styles.entityCategoryBadge}>
+                          <Text style={styles.entityCategoryText}>
+                            {(entity.category || "Entity").toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.entityName}>{entity.name}</Text>
+                          <Text style={styles.entityBio} numberOfLines={2}>
+                            {entity.one_liner}
+                          </Text>
+                        </View>
+                        <PikaIcon name="search-outline" size={13} color="#71767B" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {(!aiMeta.action_items || aiMeta.action_items.length === 0) &&
+                (!aiMeta.entities_referenced || aiMeta.entities_referenced.length === 0) && (
+                  <View style={styles.emptyTabCard}>
+                    <Text style={styles.emptyTabText}>
+                      No external tools or entity links referenced in this clip.
+                    </Text>
+                  </View>
+                )}
+            </View>
+          )}
+
+          {/* TAB 4: TIMESTAMPS & FULL TRANSCRIPT */}
+          {activeTab === "timestamps" && (
+            <View>
+              {/* Chapter Milestones Breakdown */}
               {aiMeta.context_breakdown && aiMeta.context_breakdown.length > 0 && (
                 <View style={styles.contextBreakdownSection}>
-                  <Text style={styles.sectionTitle}>Spoken Context & Steps</Text>
+                  <Text style={styles.sectionTitle}>
+                    Key Moments (Tap to Jump Video)
+                  </Text>
                   <View style={styles.breakdownList}>
                     {aiMeta.context_breakdown.map((item, idx) => (
-                      <View key={idx} style={styles.breakdownCard}>
+                      <TouchableOpacity
+                        key={idx}
+                        activeOpacity={0.75}
+                        style={styles.breakdownCard}
+                        onPress={() => handleTimestampJump(item)}
+                      >
                         {item.time_formatted && (
                           <View style={styles.timeBadge}>
+                            <PikaIcon
+                              name="play"
+                              size={9}
+                              color="#818CF8"
+                              style={{ marginRight: 3 }}
+                            />
                             <Text style={styles.timeBadgeText}>
                               {item.time_formatted}
                             </Text>
@@ -363,7 +883,8 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                           <Text style={styles.breakdownTitle}>{item.title}</Text>
                           <Text style={styles.breakdownDetail}>{item.detail}</Text>
                         </View>
-                      </View>
+                        <PikaIcon name="open-outline" size={13} color="#71767B" />
+                      </TouchableOpacity>
                     ))}
                   </View>
                 </View>
@@ -431,140 +952,117 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
                   )}
                 </View>
               )}
-
-              {/* Action Items / Extracted Resources */}
-              {aiMeta.action_items && aiMeta.action_items.length > 0 && (
-                <View style={styles.actionsSection}>
-                  <Text style={styles.sectionTitle}>Mentioned Resources & Actions</Text>
-                  <View style={styles.actionChipsContainer}>
-                    {aiMeta.action_items.map((item, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        activeOpacity={0.75}
-                        style={styles.actionChip}
-                        onPress={() => handleOpenResource(item)}
-                      >
-                        <PikaIcon
-                          name={renderActionIcon(item.type)}
-                          size={14}
-                          color="#A78BFA"
-                          style={{ marginRight: 6 }}
-                        />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.actionChipTitle} numberOfLines={1}>
-                            {item.title}
-                          </Text>
-                          {item.subtitle && (
-                            <Text style={styles.actionChipSubtitle} numberOfLines={1}>
-                              {item.subtitle}
-                            </Text>
-                          )}
-                        </View>
-                        <PikaIcon name="open-outline" size={13} color="#71767B" />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
             </View>
-          ) : (
-            <View style={styles.emptyAiBox}>
-              <View style={styles.emptyAiIconRing}>
-                <PikaIcon name="sparkles" size={26} color="#A78BFA" />
-              </View>
-              <Text style={styles.emptyAiTitle}>No Digest Generated Yet</Text>
-              <Text style={styles.emptyAiSubtitle}>
-                Extract transcripts, 3-bullet takeaways, and clickable resources using OpenAI in seconds.
-              </Text>
+          )}
+
+          {/* TAB 5: OPTIONS & ACTIONS */}
+          {activeTab === "actions" && (
+            <View style={styles.actionGroup}>
               <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.generateBtn}
-                onPress={handleGenerateAI}
+                activeOpacity={0.7}
+                style={styles.actionRow}
+                onPress={handleCopy}
               >
-                <PikaIcon name="sparkles" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={styles.generateBtnText}>Generate 30-Sec Digest</Text>
+                <Text style={styles.actionLabel}>Copy video link</Text>
+                <PikaIcon name="link-outline" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.actionRow}
+                onPress={handleSaveToggle}
+              >
+                <Text style={styles.actionLabel}>
+                  {isWatched ? "Move back to Queue" : "Mark as Watched"}
+                </Text>
+                <PikaIcon
+                  name={isWatched ? "bookmark" : "checkmark-done-outline"}
+                  size={22}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.actionRow}
+                onPress={() => {
+                  if (onToggleFavorite && video) onToggleFavorite(video);
+                }}
+              >
+                <Text style={styles.actionLabel}>
+                  {video.is_favorite ? "Remove from Favorites" : "Add to Favorites ❤️"}
+                </Text>
+                <PikaIcon
+                  name={video.is_favorite ? "heart" : "heart-outline"}
+                  size={22}
+                  color={video.is_favorite ? "#EF4444" : "#FFFFFF"}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.actionRow}
+                onPress={handleOpenPlay}
+              >
+                <Text style={styles.actionLabel}>Open in Native App</Text>
+                <PikaIcon name="open-outline" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {/* Test Notification Action */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.actionRow}
+                onPress={() => {
+                  if (onTestNotification && video) onTestNotification(video);
+                }}
+              >
+                <View>
+                  <Text style={styles.actionLabel}>Test Reminder (Send in 5s)</Text>
+                  <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
+                    Triggers reminder popup with hook headline after 5 seconds
+                  </Text>
+                </View>
+                <PikaIcon name="notifications-outline" size={22} color="#8B5CF6" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.actionRow}
+                onPress={handleDeletePrompt}
+              >
+                <Text style={[styles.actionLabel, styles.dangerText]}>Remove clip</Text>
+                <PikaIcon
+                  name="trash-outline"
+                  size={22}
+                  color={threadsTokens.colors.destructive}
+                />
               </TouchableOpacity>
             </View>
           )}
         </ScrollView>
       )}
 
-      {/* 3. TAB: ACTIONS */}
-      {activeTab === "actions" && (
-        <View>
-          <View style={styles.actionGroup}>
-            <TouchableOpacity activeOpacity={0.7} style={styles.actionRow} onPress={handleCopy}>
-              <Text style={styles.actionLabel}>Copy link</Text>
-              <PikaIcon name="link-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={handleSaveToggle}
-            >
-              <Text style={styles.actionLabel}>
-                {isWatched ? "Move back to Queue" : "Mark as Watched"}
+      {/* 4. PERSISTENT FROSTED 'ASK ELIO' STICKY FOOTER */}
+      {aiMeta && activeTab !== "actions" && (
+        <View style={styles.stickyFooterContainer}>
+          <TouchableOpacity
+            activeOpacity={0.88}
+            style={styles.askElioStickyBtn}
+            onPress={() => handleAskElioPress(activeFollowup)}
+          >
+            <View style={styles.askElioIconBox}>
+              <PikaIcon name="sparkles" size={14} color="#A78BFA" />
+            </View>
+            <View style={{ flex: 1, paddingRight: 6 }}>
+              <Text style={styles.askElioBtnTitle} numberOfLines={1}>
+                Ask Elio: "{activeFollowup}"
               </Text>
-              <PikaIcon
-                name={isWatched ? "bookmark" : "checkmark-done-outline"}
-                size={22}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={() => {
-                if (onToggleFavorite && video) onToggleFavorite(video);
-              }}
-            >
-              <Text style={styles.actionLabel}>
-                {video.is_favorite ? "Remove from Favorites" : "Add to Favorites ❤️"}
+              <Text style={styles.askElioBtnSub}>
+                Tap to chat with video context & citations
               </Text>
-              <PikaIcon
-                name={video.is_favorite ? "heart" : "heart-outline"}
-                size={22}
-                color={video.is_favorite ? "#EF4444" : "#FFFFFF"}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity activeOpacity={0.7} style={styles.actionRow} onPress={handleOpenPlay}>
-              <Text style={styles.actionLabel}>Open in Native App</Text>
-              <PikaIcon name="open-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            {/* Test Notification Action */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={() => {
-                if (onTestNotification && video) onTestNotification(video);
-              }}
-            >
-              <View>
-                <Text style={styles.actionLabel}>Test Reminder (Send in 5s)</Text>
-                <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>
-                  Triggers reminder popup after 5 seconds
-                </Text>
-              </View>
-              <PikaIcon name="notifications-outline" size={22} color="#8B5CF6" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.actionRow}
-              onPress={handleDeletePrompt}
-            >
-              <Text style={[styles.actionLabel, styles.dangerText]}>Remove clip</Text>
-              <PikaIcon
-                name="trash-outline"
-                size={22}
-                color={threadsTokens.colors.destructive}
-              />
-            </TouchableOpacity>
-          </View>
+            </View>
+            <PikaIcon name="arrow-forward" size={16} color="#A78BFA" />
+          </TouchableOpacity>
         </View>
       )}
     </IndustryBottomSheet>
@@ -572,26 +1070,77 @@ export const VideoDetailSheet: React.FC<VideoDetailSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
-  segmentContainer: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    borderRadius: 12,
-    padding: 3,
-    marginBottom: 16,
-  },
-  segmentBtn: {
-    flex: 1,
+  sheetHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    borderRadius: 9,
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  videoHeaderMeta: {
+    flex: 1,
+    marginRight: 10,
+  },
+  videoPlatformText: {
+    color: "#71767B",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  videoTitleText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  langTogglePill: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 14,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+  },
+  langBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 11,
+  },
+  langBtnActive: {
+    backgroundColor: "#7C3AED",
+  },
+  langBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#94A3B8",
+  },
+  langBtnTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  tabScrollContainer: {
+    marginBottom: 14,
+  },
+  tabBarContent: {
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  segmentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
   },
   segmentBtnActive: {
     backgroundColor: "#1E1E22",
+    borderColor: "rgba(167, 139, 250, 0.4)",
   },
   segmentBtnText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "600",
     color: "#71767B",
   },
@@ -599,10 +1148,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   digestScroll: {
-    maxHeight: 380,
+    maxHeight: 460,
   },
   loaderContainer: {
-    paddingVertical: 36,
+    paddingVertical: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -612,13 +1161,53 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontWeight: "500",
   },
+  speechBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  speechBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  speechBadgeActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    borderColor: "rgba(16, 185, 129, 0.28)",
+  },
+  speechBadgeNotes: {
+    backgroundColor: "rgba(167, 139, 250, 0.10)",
+    borderColor: "rgba(167, 139, 250, 0.24)",
+  },
+  speechBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  whisperTriggerBtn: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+  },
+  whisperTriggerText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
+  },
   tldwCard: {
     backgroundColor: "rgba(167, 139, 250, 0.09)",
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(167, 139, 250, 0.25)",
     padding: 14,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   tldwHeaderRow: {
     flexDirection: "row",
@@ -637,6 +1226,17 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginLeft: 4,
   },
+  scoreBadge: {
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  scoreBadgeText: {
+    color: "#10B981",
+    fontSize: 10,
+    fontWeight: "700",
+  },
   readTimeText: {
     color: "#94A3B8",
     fontSize: 11,
@@ -646,6 +1246,47 @@ const styles = StyleSheet.create({
     color: "#F1F5F9",
     fontSize: 14,
     lineHeight: 20,
+    fontWeight: "500",
+  },
+  dilemmaContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  dilemmaBoxProblem: {
+    flex: 1,
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+  },
+  dilemmaLabelProblem: {
+    color: "#F87171",
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  dilemmaBoxSolution: {
+    flex: 1,
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.2)",
+  },
+  dilemmaLabelSolution: {
+    color: "#34D399",
+    fontSize: 9.5,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  dilemmaText: {
+    color: "#E2E8F0",
+    fontSize: 11.5,
+    lineHeight: 16,
     fontWeight: "500",
   },
   takeawaysSection: {
@@ -698,8 +1339,125 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     fontWeight: "400",
   },
-  actionsSection: {
+  factCheckCard: {
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  factCheckHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  factCheckBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
+  factCheckExplanation: {
+    color: "#F1F5F9",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+  nuanceBox: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.08)",
+  },
+  nuanceHeader: {
+    color: "#F59E0B",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  nuanceItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 4,
+  },
+  nuanceBullet: {
+    fontSize: 11,
+    marginRight: 6,
+    marginTop: 1,
+  },
+  nuanceItemText: {
+    flex: 1,
+    color: "#CBD5E1",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  costsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  costChip: {
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  costChipText: {
+    color: "#94A3B8",
+    fontSize: 10.5,
+    fontWeight: "600",
+  },
+  loreContainer: {
+    gap: 10,
+  },
+  loreCard: {
+    backgroundColor: "#161618",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  loreCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  loreCardTitle: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  loreCardBody: {
+    color: "#CBD5E1",
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  prereqSection: {
+    marginTop: 8,
+  },
+  prereqChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
     marginTop: 6,
+  },
+  prereqChip: {
+    backgroundColor: "rgba(167, 139, 250, 0.1)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.2)",
+  },
+  prereqChipText: {
+    color: "#C4B5FD",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  actionsSection: {
+    marginBottom: 14,
   },
   actionChipsContainer: {
     marginTop: 8,
@@ -725,48 +1483,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
-  speechBadgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
+  entitiesSection: {
+    marginTop: 8,
   },
-  speechBadge: {
+  entityList: {
+    marginTop: 8,
+    gap: 8,
+  },
+  entityCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    backgroundColor: "#161618",
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    gap: 8,
   },
-  speechBadgeActive: {
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    borderColor: "rgba(16, 185, 129, 0.28)",
+  entityCategoryBadge: {
+    backgroundColor: "rgba(56, 189, 248, 0.14)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  speechBadgeNotes: {
-    backgroundColor: "rgba(167, 139, 250, 0.10)",
-    borderColor: "rgba(167, 139, 250, 0.24)",
+  entityCategoryText: {
+    color: "#38BDF8",
+    fontSize: 9.5,
+    fontWeight: "800",
   },
-  speechBadgeText: {
-    fontSize: 11,
+  entityName: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
     fontWeight: "700",
   },
-  whisperTriggerBtn: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
-  },
-  whisperTriggerText: {
-    color: "#FFFFFF",
+  entityBio: {
+    color: "#94A3B8",
     fontSize: 11,
-    fontWeight: "600",
+    lineHeight: 15,
+  },
+  emptyTabCard: {
+    padding: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTabText: {
+    color: "#71767B",
+    fontSize: 13,
+    textAlign: "center",
   },
   contextBreakdownSection: {
-    marginTop: 16,
+    marginBottom: 14,
   },
   breakdownList: {
     marginTop: 8,
@@ -783,9 +1549,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   timeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "rgba(99, 102, 241, 0.18)",
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "rgba(99, 102, 241, 0.35)",
@@ -808,7 +1576,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   transcriptSection: {
-    marginTop: 16,
+    marginTop: 8,
   },
   transcriptBox: {
     backgroundColor: "#121214",
@@ -901,5 +1669,46 @@ const styles = StyleSheet.create({
   },
   dangerText: {
     color: threadsTokens.colors.destructive,
+  },
+  stickyFooterContainer: {
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 16 : 8,
+    left: 14,
+    right: 14,
+  },
+  askElioStickyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#161720",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.4)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  askElioIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(167, 139, 250, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  askElioBtnTitle: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  askElioBtnSub: {
+    color: "#A78BFA",
+    fontSize: 10.5,
+    fontWeight: "500",
+    marginTop: 1,
   },
 });

@@ -1524,6 +1524,10 @@ export default function HomeScreen() {
         onCopyLink={handleCopyLink}
         onDelete={handleDeleteVideo}
         onTestNotification={handleTestNotification}
+        onAskElio={(v, prompt) => {
+          setShowDetailSheet(false);
+          setShowAskElioModal(true);
+        }}
       />
 
       {/* Ask Elio Conversational RAG Modal */}

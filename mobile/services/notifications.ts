@@ -36,6 +36,17 @@ export interface SlotCalculationResult {
   slotName: FreeTimeSlot;
 }
 
+export interface ElioContextNotificationPayload {
+  videoId: string;
+  platform?: string;
+  title?: string;
+  hookHeadline?: string;
+  verdictBadge?: string;
+  tldwSnippet?: string;
+  cleanUrl?: string;
+  suggestedAction?: 'open_lore' | 'ask_elio' | 'open_video';
+}
+
 /**
  * Calculates the next free time slot based on when the user likes the video:
  * - Night (10 PM - 6 AM) -> Morning (9:30 AM)
@@ -94,36 +105,97 @@ export function getNextFreeTimeSlot(now = new Date()): SlotCalculationResult {
 }
 
 /**
- * Returns customized notification copy based on slot and video title
+ * Returns customized notification copy based on slot, video title, and optional AI hook headline
  */
 function getNotificationContentForSlot(
   slot: FreeTimeSlot,
-  videoTitle?: string
+  videoTitle?: string,
+  hookHeadline?: string
 ): { title: string; body: string } {
   const titleText = videoTitle ? `"${videoTitle}"` : "your saved clip";
+  const hookSuffix = hookHeadline ? ` ("${hookHeadline}")` : "";
 
   switch (slot) {
     case "morning":
       return {
         title: "☕ Morning Catch-Up",
-        body: `You liked ${titleText} last night but haven't watched it yet. Perfect to enjoy with your morning coffee!`,
+        body: hookHeadline
+          ? `Last night you saved: "${hookHeadline}". 30s digest ready for your morning coffee!`
+          : `You liked ${titleText} last night but haven't watched it yet. Perfect to enjoy with your morning coffee!`,
       };
     case "afternoon":
       return {
         title: "🍱 Lunch Break Catch-Up",
-        body: `You liked ${titleText} earlier today. Take a quick break and watch it now!`,
+        body: hookHeadline
+          ? `Quick break: "${hookHeadline}". Full context & takeaways waiting in Elio!`
+          : `You liked ${titleText} earlier today. Take a quick break and watch it now!`,
       };
     case "evening":
       return {
         title: "🌆 Evening Wind-Down",
-        body: `Your liked video is waiting: ${titleText}. The perfect time to relax and watch 🎬`,
+        body: hookHeadline
+          ? `Relax & catch up: "${hookHeadline}". Tap to explore deep lore & key insights 🎬`
+          : `Your liked video is waiting: ${titleText}. The perfect time to relax and watch 🎬`,
       };
     case "night":
     default:
       return {
         title: "🌙 Bedtime Watch",
-        body: `Before calling it a night: catch the video you liked earlier: ${titleText} 🍿`,
+        body: hookHeadline
+          ? `Before calling it a night: "${hookHeadline}" 🍿`
+          : `Before calling it a night: catch the video you liked earlier: ${titleText} 🍿`,
       };
+  }
+}
+
+/**
+ * Dispatches an instant or fast-preview notification when video context is ready.
+ * Delivers the 1-line hook preview and interactive buttons.
+ */
+export async function scheduleContextReadyNotification(
+  video: SavedVideo,
+  payload?: ElioContextNotificationPayload
+): Promise<string | null> {
+  try {
+    const hook = payload?.hookHeadline || video.hook_headline || video.ai_metadata?.hook?.headline;
+    const verdict = payload?.verdictBadge || video.ai_metadata?.fact_check_nuance?.verdict_badge;
+    const platformLabel = (video.platform || "Video").toUpperCase();
+
+    const title = verdict
+      ? `✨ Elio Context [${verdict}] • ${platformLabel}`
+      : `✨ Elio Context • ${platformLabel}`;
+
+    const body = hook
+      ? `"${hook}" — 30-sec TL;DW & Deep Lore ready.`
+      : video.title
+      ? `Context ready for "${video.title}". Tap to view key takeaways.`
+      : "Full video context is ready in your vault.";
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: true,
+        data: {
+          videoId: video.id,
+          type: "full_context_ready",
+          targetTab: "lore",
+          cleanUrl: video.clean_url,
+          hookHeadline: hook,
+          title: video.title,
+        },
+      },
+      trigger: null, // deliver immediately
+    });
+
+    console.log(
+      `[Notifications] Dispatched Context Ready notification for video ${video.id}: ${title}`
+    );
+
+    return notificationId;
+  } catch (error) {
+    console.warn("[Notifications] Failed to schedule context ready notification:", error);
+    return null;
   }
 }
 
@@ -133,14 +205,20 @@ function getNotificationContentForSlot(
  */
 export async function scheduleLikedVideoReminder(
   video: SavedVideo,
-  overrideSeconds?: number
+  overrideSeconds?: number,
+  hookHeadline?: string
 ): Promise<string | null> {
   try {
     // First cancel any existing reminder for this video
     await cancelLikedVideoReminder(video.id);
 
+    const activeHook =
+      hookHeadline ||
+      video.hook_headline ||
+      video.ai_metadata?.hook?.headline;
+
     const { targetDate, slotName } = getNextFreeTimeSlot();
-    const content = getNotificationContentForSlot(slotName, video.title);
+    const content = getNotificationContentForSlot(slotName, video.title, activeHook);
 
     // Support overrideSeconds for development testing (e.g. 10s test)
     const trigger: any = overrideSeconds
@@ -157,6 +235,7 @@ export async function scheduleLikedVideoReminder(
           type: "liked_not_watched",
           slot: slotName,
           title: video.title,
+          hookHeadline: activeHook,
         },
       },
       trigger,

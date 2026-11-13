@@ -22,6 +22,66 @@ export interface TranscriptSnippet {
 
 export type AIProcessingStatus = 'pending' | 'completed' | 'failed' | 'skipped';
 
+export type ProcessingStage =
+  | 'queued'
+  | 'transcribing'
+  | 'generating_context'
+  | 'completed'
+  | 'failed'
+  | 'fallback_notes';
+
+export type VerdictType =
+  | 'verified_accurate'
+  | 'mostly_accurate_with_nuance'
+  | 'misleading_oversimplification'
+  | 'opinion_hot_take'
+  | 'sponsored_promo';
+
+export interface FactCheckNuance {
+  verdict: VerdictType | string;
+  verdict_badge: string;
+  explanation: string;
+  missing_nuances?: string[];
+  hidden_costs_or_prereqs?: string[];
+}
+
+export interface BackgroundLore {
+  backstory: string;
+  why_it_matters: string;
+  assumed_prerequisites?: string[];
+}
+
+export type EntityCategory =
+  | 'tool'
+  | 'repo'
+  | 'framework'
+  | 'person'
+  | 'company'
+  | 'paper'
+  | 'concept';
+
+export interface EntityReferenced {
+  name: string;
+  category: EntityCategory | string;
+  one_liner: string;
+  url_or_search_term?: string;
+}
+
+export interface HookInfo {
+  headline: string;
+  read_time_seconds?: number;
+  primary_category?: string;
+  tags?: string[];
+  intent?: 'educational' | 'news_debate' | 'opinion' | 'sponsored' | 'entertainment' | string;
+}
+
+export interface CorePremiseThesis {
+  tldw_en?: string;
+  tldw_hinglish?: string;
+  problem_addressed?: string;
+  main_solution_or_claim?: string;
+}
+
 export interface VideoAIMetadata {
   id: string;
   video_id: string;
@@ -29,16 +89,26 @@ export interface VideoAIMetadata {
   is_educational: boolean;
   productivity_score?: number; // 0 to 100 high-signal productivity rating
   tldw: string;
-  key_takeaways: string[];
+  tldw_en?: string;
+  tldw_hinglish?: string;
+  hook?: HookInfo;
+  core_premise?: string | CorePremiseThesis;
+  key_takeaways: string[] | { english?: string[]; hinglish?: string[] };
+  takeaways_hinglish?: string[];
+  background_lore?: BackgroundLore;
+  fact_check_nuance?: FactCheckNuance;
+  entities_referenced?: EntityReferenced[];
   action_items: ActionItem[];
   primary_category: string;
   tags: string[];
   read_time_seconds: number;
   processing_status: AIProcessingStatus;
+  processing_stage?: ProcessingStage;
   full_transcript?: string;
   transcript_language?: string;
   has_spoken_audio?: boolean;
   context_breakdown?: ContextStepItem[];
+  suggested_followups?: string[];
   error_message?: string;
   created_at: string;
   updated_at?: string;

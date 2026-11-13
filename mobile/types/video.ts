@@ -37,6 +37,9 @@ export interface SavedVideo {
   watched_at?: string;
   ai_metadata?: VideoAIMetadata;
   productivity_score?: number;
+  hook_headline?: string;
+  processing_stage?: string;
+  tldw_hinglish?: string;
   created_at: string;
   updated_at: string;
 }
