@@ -14,6 +14,7 @@ import { SavedVideo } from "../types/video";
 import { toDateKey, formatDisplayDate } from "../services/dateAnalytics";
 import { haptics } from "../utils/haptics";
 import { supabase } from "../services/supabase";
+import { appleColors } from "../theme/appleTokens";
 
 export type TimeRangeFilter = "7d" | "14d" | "30d" | "all";
 
@@ -232,10 +233,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
     let temp = 0;
     const now = new Date();
 
-    // Check today & consecutive days backwards for current streak
     let checkDate = new Date(now);
     if (!activeDates.has(toDateKey(checkDate))) {
-      // Check yesterday if today hasn't had activity yet
       checkDate.setDate(checkDate.getDate() - 1);
     }
     while (activeDates.has(toDateKey(checkDate))) {
@@ -243,7 +242,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
       checkDate.setDate(checkDate.getDate() - 1);
     }
 
-    // Best streak across all dates
     const sortedDates = Array.from(activeDates).sort();
     for (let i = 0; i < sortedDates.length; i++) {
       if (i === 0) {
@@ -267,7 +265,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
     return { currentStreak: current, bestStreak: best };
   }, [videos]);
 
-  // 5. Effective Metrics (Backend RPC merged with client memo)
+  // 5. Effective Metrics
   const effectiveMetrics = useMemo(() => {
     const m = backendInsights?.metrics;
     if (!m) return metrics;
@@ -383,23 +381,23 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
     };
   }, [backendInsights?.streaks, fallbackStreaks]);
 
-  // AI Readiness Count (Videos with full AI digests or embeddings)
   const aiReadyCount = useMemo(() => {
     return videos.filter(
       (v) => (v as any).ai_metadata?.tldw || (v as any).ai_metadata?.id,
     ).length;
   }, [videos]);
 
+  // Heatmap intensity matching app's Electric Indigo palette
   const getHeatmapColor = (level: number) => {
     switch (level) {
       case 4:
-        return "#00E5FF";
+        return appleColors.accent; // #6366F1
       case 3:
-        return "rgba(0, 229, 255, 0.75)";
+        return "rgba(99, 102, 241, 0.72)";
       case 2:
-        return "rgba(0, 229, 255, 0.48)";
+        return "rgba(99, 102, 241, 0.45)";
       case 1:
-        return "rgba(0, 229, 255, 0.22)";
+        return "rgba(99, 102, 241, 0.22)";
       default:
         return "rgba(255, 255, 255, 0.05)";
     }
@@ -437,7 +435,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           </View>
         </View>
 
-        {/* Mobbin-style Glass Segmented Timeframe Switcher */}
+        {/* Apple HIG Glass Timeframe Switcher */}
         <View style={styles.timeframeBar}>
           {(["7d", "14d", "30d", "all"] as TimeRangeFilter[]).map((r) => {
             const isActive = timeRange === r;
@@ -471,7 +469,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         </View>
       </View>
 
-      {/* 2. HERO SPOTLIGHT DISPLAY CARD */}
+      {/* 2. HERO SPOTLIGHT CARD */}
       <View style={styles.heroCard}>
         <View style={styles.heroTopRow}>
           <View>
@@ -484,7 +482,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             </View>
           </View>
 
-          {/* Active Streak Glow Pill */}
+          {/* Active Streak Badge */}
           <View style={styles.heroStreakPill}>
             <Text style={styles.heroStreakFlame}>🔥</Text>
             <View>
@@ -520,7 +518,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 
           <View style={styles.heroMetaItem}>
             <Text style={styles.heroMetaLabel}>Completion</Text>
-            <Text style={[styles.heroMetaValue, { color: "#10B981" }]}>
+            <Text style={[styles.heroMetaValue, { color: appleColors.success }]}>
               ✓ {effectiveMetrics.completionRate}%
             </Text>
           </View>
@@ -552,13 +550,13 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
               <View
                 style={[
                   styles.bentoIconBadge,
-                  { backgroundColor: "rgba(0, 229, 255, 0.15)" },
+                  { backgroundColor: "rgba(99, 102, 241, 0.15)" },
                 ]}
               >
-                <Ionicons name="play" size={12} color="#00E5FF" />
+                <Ionicons name="play" size={12} color={appleColors.accentLight} />
               </View>
             </View>
-            <Text style={[styles.bentoNumber, { color: "#00E5FF" }]}>
+            <Text style={[styles.bentoNumber, { color: appleColors.accentLight }]}>
               {effectiveMetrics.inQueue}
             </Text>
             <Text style={styles.bentoSub}>Ready to watch</Text>
@@ -577,16 +575,16 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                   { backgroundColor: "rgba(16, 185, 129, 0.18)" },
                 ]}
               >
-                <Ionicons name="checkmark" size={13} color="#10B981" />
+                <Ionicons name="checkmark" size={13} color={appleColors.success} />
               </View>
             </View>
-            <Text style={[styles.bentoNumber, { color: "#10B981" }]}>
+            <Text style={[styles.bentoNumber, { color: appleColors.success }]}>
               {effectiveMetrics.watched}
             </Text>
             <Text style={styles.bentoSub}>Completed clips</Text>
           </View>
 
-          {/* Card 4: Favorites & AI */}
+          {/* Card 4: Starred & AI */}
           <View style={styles.bentoCard}>
             <View style={styles.bentoCardTop}>
               <Text style={styles.bentoLabel}>STARRED & AI</Text>
@@ -596,10 +594,10 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                   { backgroundColor: "rgba(245, 158, 11, 0.18)" },
                 ]}
               >
-                <Ionicons name="heart" size={12} color="#F59E0B" />
+                <Ionicons name="heart" size={12} color={appleColors.warning} />
               </View>
             </View>
-            <Text style={[styles.bentoNumber, { color: "#F59E0B" }]}>
+            <Text style={[styles.bentoNumber, { color: appleColors.warning }]}>
               {effectiveMetrics.favorites}
             </Text>
             <Text style={styles.bentoSub}>
@@ -609,7 +607,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         </View>
       </View>
 
-      {/* 4. REFINED DAILY ACTIVITY BAR CHART (Copilot / Apple Health style) */}
+      {/* 4. DAILY ACTIVITY BAR CHART */}
       <View style={styles.sectionCard}>
         <View style={styles.cardHeader}>
           <View>
@@ -619,7 +617,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             </Text>
           </View>
 
-          {/* Average Reference Badge */}
           <View style={styles.avgBadge}>
             <Text style={styles.avgBadgeText}>Avg: {averageDailySaves}/d</Text>
           </View>
@@ -633,11 +630,11 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 {selectedBar.displayDate} ({selectedBar.dateKey})
               </Text>
               <Text style={styles.selectedBubbleStats}>
-                <Text style={{ color: "#00E5FF", fontWeight: "800" }}>
+                <Text style={{ color: appleColors.accentLight, fontWeight: "800" }}>
                   {selectedBar.saved} Saved
                 </Text>
                 {"  •  "}
-                <Text style={{ color: "#10B981", fontWeight: "700" }}>
+                <Text style={{ color: appleColors.success, fontWeight: "700" }}>
                   {selectedBar.watched} Watched
                 </Text>
               </Text>
@@ -687,7 +684,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                   setSelectedBar(isSelected ? null : pt);
                 }}
               >
-                {/* Micro count indicator above the capsule */}
                 <Text
                   style={[
                     styles.capsuleBarVal,
@@ -697,14 +693,12 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                   {pt.saved > 0 ? pt.saved : ""}
                 </Text>
 
-                {/* Capsule Pill Track */}
                 <View
                   style={[
                     styles.capsuleTrack,
                     isSelected && styles.capsuleTrackActive,
                   ]}
                 >
-                  {/* Saved Fill Pill */}
                   <View
                     style={[
                       styles.capsuleFill,
@@ -713,12 +707,11 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                         backgroundColor: isSelected
                           ? "#FFFFFF"
                           : pt.saved > 0
-                            ? "#00E5FF"
+                            ? appleColors.accent
                             : "rgba(255, 255, 255, 0.08)",
                       },
                     ]}
                   >
-                    {/* Inner Watched Portion Indicator */}
                     {pt.watched > 0 && !isSelected && (
                       <View
                         style={[
@@ -730,7 +723,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                   </View>
                 </View>
 
-                {/* Day of Week Label */}
                 <Text
                   style={[
                     styles.capsuleDayLabel,
@@ -744,14 +736,14 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           })}
         </View>
 
-        {/* Dual Chart Legend */}
+        {/* Chart Legend */}
         <View style={styles.chartLegendFooter}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: "#00E5FF" }]} />
+            <View style={[styles.legendDot, { backgroundColor: appleColors.accent }]} />
             <Text style={styles.legendLabel}>Saved</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
+            <View style={[styles.legendDot, { backgroundColor: appleColors.success }]} />
             <Text style={styles.legendLabel}>Watched</Text>
           </View>
           <View style={styles.legendItem}>
@@ -761,7 +753,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         </View>
       </View>
 
-      {/* 5. 28-DAY CONSISTENCY HEATMAP (GitHub / Opal style) */}
+      {/* 5. 28-DAY CONSISTENCY HEATMAP */}
       <View style={styles.sectionCard}>
         <View style={styles.cardHeader}>
           <View>
@@ -778,7 +770,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           </View>
         </View>
 
-        {/* Heatmap Tooltip on Cell Tap */}
         {selectedHeatmapCell && (
           <View style={styles.heatmapTooltipHUD}>
             <Text style={styles.heatmapTooltipDate}>
@@ -811,7 +802,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           </View>
         )}
 
-        {/* 28-Day Grid (4 weeks x 7 days) */}
         <View style={styles.heatmapGrid}>
           {effectiveHeatmap.map((cell, idx) => {
             const isSelected =
@@ -835,7 +825,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           })}
         </View>
 
-        {/* Heatmap Scale Legend */}
         <View style={styles.heatmapLegendRow}>
           <Text style={styles.heatmapLegendText}>Less</Text>
           <View style={styles.heatmapScaleBoxes}>
@@ -870,7 +859,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           </View>
         </View>
 
-        {/* Multi-Segment Horizontal Pill Track */}
         <View style={styles.watchSegmentTrack}>
           <View
             style={[
@@ -880,11 +868,10 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           />
         </View>
 
-        {/* Segment Legend Stats */}
         <View style={styles.watchLegendRow}>
           <View style={styles.watchLegendItem}>
             <View
-              style={[styles.watchLegendDot, { backgroundColor: "#10B981" }]}
+              style={[styles.watchLegendDot, { backgroundColor: appleColors.success }]}
             />
             <Text style={styles.watchLegendLabel}>Watched</Text>
             <Text style={styles.watchLegendValue}>
@@ -894,7 +881,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 
           <View style={styles.watchLegendItem}>
             <View
-              style={[styles.watchLegendDot, { backgroundColor: "#00E5FF" }]}
+              style={[styles.watchLegendDot, { backgroundColor: appleColors.accent }]}
             />
             <Text style={styles.watchLegendLabel}>In Queue</Text>
             <Text style={styles.watchLegendValue}>
@@ -905,7 +892,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           {effectiveMetrics.favorites > 0 && (
             <View style={styles.watchLegendItem}>
               <View
-                style={[styles.watchLegendDot, { backgroundColor: "#F59E0B" }]}
+                style={[styles.watchLegendDot, { backgroundColor: appleColors.warning }]}
               />
               <Text style={styles.watchLegendLabel}>Favorites</Text>
               <Text style={styles.watchLegendValue}>
@@ -927,7 +914,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 
         {effectivePlatformStats.length === 0 ? (
           <View style={styles.emptyCardBox}>
-            <Ionicons name="film-outline" size={24} color="#71767B" />
+            <Ionicons name="film-outline" size={24} color={appleColors.twitterMuted} />
             <Text style={styles.emptyCardText}>No clips in this timeframe</Text>
           </View>
         ) : (
@@ -950,7 +937,6 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 </View>
               </View>
 
-              {/* Sleek Horizontal Progress Track */}
               <View style={styles.horizontalBarTrack}>
                 <View
                   style={[
@@ -967,11 +953,11 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         )}
       </View>
 
-      {/* 8. AI MEMORY & RECALL INTELLIGENCE BANNER */}
+      {/* 8. AI INTELLIGENCE BANNER */}
       <View style={styles.aiInsightsCard}>
         <View style={styles.aiInsightsTop}>
           <View style={styles.aiBadgeGlow}>
-            <Ionicons name="sparkles" size={14} color="#00E5FF" />
+            <Ionicons name="sparkles" size={14} color={appleColors.accentLight} />
           </View>
           <Text style={styles.aiInsightsTitle}>Elio AI Intelligence</Text>
         </View>
@@ -991,7 +977,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#070A11",
+    backgroundColor: appleColors.canvas, // #000000 pure OLED black
   },
   content: {
     paddingHorizontal: 16,
@@ -1021,12 +1007,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "#FFFFFF",
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: "800",
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    color: "#8E95A5",
+    color: appleColors.twitterMuted,
     fontSize: 12,
     fontWeight: "500",
     marginTop: 1,
@@ -1038,7 +1024,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 3,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.09)",
+    borderColor: appleColors.borderGlass,
   },
   timeframePill: {
     paddingHorizontal: 9,
@@ -1060,32 +1046,33 @@ const styles = StyleSheet.create({
     }),
   },
   timeframePillText: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 11,
     fontWeight: "700",
   },
   timeframePillTextActive: {
-    color: "#070A11",
+    color: "#000000",
     fontWeight: "800",
   },
 
   // 2. HERO DISPLAY CARD
   heroCard: {
-    backgroundColor: "#0E121E",
+    backgroundColor: "#16161A",
     borderRadius: 22,
     padding: 18,
     borderWidth: 1,
-    borderColor: "rgba(0, 229, 255, 0.22)",
+    borderColor: appleColors.borderGlass,
+    borderTopColor: appleColors.borderSpecularTop,
     marginBottom: 14,
     ...Platform.select({
       ios: {
-        shadowColor: "#00E5FF",
+        shadowColor: "#000000",
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 4,
+        elevation: 3,
       },
     }),
   },
@@ -1095,8 +1082,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   heroPreLabel: {
-    color: "#00E5FF",
-    fontSize: 10,
+    color: appleColors.accentLight,
+    fontSize: 10.5,
     fontWeight: "800",
     letterSpacing: 0.8,
     marginBottom: 2,
@@ -1113,19 +1100,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   heroUnits: {
-    color: "#8E95A5",
+    color: appleColors.textSecondary,
     fontSize: 14,
     fontWeight: "600",
   },
   heroStreakPill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 107, 0, 0.14)",
+    backgroundColor: "rgba(255, 107, 0, 0.12)",
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderWidth: 1,
-    borderColor: "rgba(255, 107, 0, 0.3)",
+    borderColor: "rgba(255, 107, 0, 0.28)",
     gap: 8,
   },
   heroStreakFlame: {
@@ -1156,7 +1143,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   heroMetaLabel: {
-    color: "#71767B",
+    color: appleColors.twitterMuted,
     fontSize: 10,
     fontWeight: "600",
     textTransform: "uppercase",
@@ -1186,12 +1173,12 @@ const styles = StyleSheet.create({
   },
   bentoCard: {
     flex: 1,
-    backgroundColor: "#0E121E",
+    backgroundColor: "#16161A",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.07)",
-    borderTopColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: appleColors.borderGlass,
+    borderTopColor: appleColors.borderSpecularTop,
     ...Platform.select({
       ios: {
         shadowColor: "#000000",
@@ -1211,7 +1198,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   bentoLabel: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 0.5,
@@ -1231,26 +1218,26 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   bentoSub: {
-    color: "#8E95A5",
+    color: appleColors.textSecondary,
     fontSize: 11,
     fontWeight: "500",
     marginTop: 2,
   },
 
-  // SECTION CARDS (Shared Card Container)
+  // SECTION CARDS (Shared Container)
   sectionCard: {
-    backgroundColor: "#0E121E",
+    backgroundColor: "#16161A",
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.07)",
-    borderTopColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: appleColors.borderGlass,
+    borderTopColor: appleColors.borderSpecularTop,
     marginBottom: 14,
     ...Platform.select({
       ios: {
         shadowColor: "#000000",
         shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.35,
         shadowRadius: 8,
       },
       android: {
@@ -1268,10 +1255,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   cardSubtitle: {
-    color: "#8E95A5",
+    color: appleColors.twitterMuted,
     fontSize: 11.5,
     fontWeight: "500",
     marginTop: 2,
@@ -1287,7 +1274,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.1)",
   },
   avgBadgeText: {
-    color: "#8E95A5",
+    color: appleColors.textSecondary,
     fontSize: 10.5,
     fontWeight: "700",
   },
@@ -1313,7 +1300,7 @@ const styles = StyleSheet.create({
   },
   selectedBubbleStats: {
     fontSize: 11,
-    color: "#8E95A5",
+    color: appleColors.textSecondary,
   },
   filterFeedBtn: {
     backgroundColor: "#FFFFFF",
@@ -1322,7 +1309,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   filterFeedBtnText: {
-    color: "#070A11",
+    color: "#000000",
     fontSize: 11,
     fontWeight: "800",
   },
@@ -1340,14 +1327,14 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   capsuleBarVal: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 10,
     fontWeight: "700",
     height: 14,
     marginBottom: 4,
   },
   capsuleBarValActive: {
-    color: "#00E5FF",
+    color: "#FFFFFF",
     fontWeight: "900",
   },
   capsuleTrack: {
@@ -1360,7 +1347,7 @@ const styles = StyleSheet.create({
   },
   capsuleTrackActive: {
     borderWidth: 1,
-    borderColor: "#00E5FF",
+    borderColor: "#FFFFFF",
   },
   capsuleFill: {
     width: "100%",
@@ -1369,11 +1356,11 @@ const styles = StyleSheet.create({
   },
   capsuleWatchedSubFill: {
     width: "100%",
-    backgroundColor: "#10B981",
+    backgroundColor: appleColors.success,
     borderRadius: 7,
   },
   capsuleDayLabel: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 10.5,
     fontWeight: "600",
     marginTop: 6,
@@ -1390,7 +1377,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.05)",
+    borderTopColor: "rgba(255, 255, 255, 0.06)",
   },
   legendItem: {
     flexDirection: "row",
@@ -1403,7 +1390,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   legendLabel: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 10.5,
     fontWeight: "600",
   },
@@ -1435,23 +1422,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   heatmapTooltipDate: {
-    color: "#8E95A5",
+    color: appleColors.textSecondary,
     fontSize: 11.5,
     fontWeight: "600",
   },
   heatmapTooltipCount: {
-    color: "#00E5FF",
+    color: appleColors.accentLight,
     fontSize: 12,
     fontWeight: "800",
   },
   heatmapFilterBtn: {
-    backgroundColor: "#00E5FF",
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 9,
     paddingVertical: 3.5,
     borderRadius: 7,
   },
   heatmapFilterBtnText: {
-    color: "#070A11",
+    color: "#000000",
     fontSize: 10.5,
     fontWeight: "800",
   },
@@ -1479,7 +1466,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   heatmapLegendText: {
-    color: "#71767B",
+    color: appleColors.twitterMuted,
     fontSize: 10,
     fontWeight: "600",
   },
@@ -1503,7 +1490,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(16, 185, 129, 0.25)",
   },
   completionPillText: {
-    color: "#10B981",
+    color: appleColors.success,
     fontSize: 11,
     fontWeight: "800",
   },
@@ -1518,7 +1505,7 @@ const styles = StyleSheet.create({
   watchSegmentFillWatched: {
     height: "100%",
     borderRadius: 4.5,
-    backgroundColor: "#10B981",
+    backgroundColor: appleColors.success,
   },
   watchLegendRow: {
     flexDirection: "row",
@@ -1536,7 +1523,7 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   watchLegendLabel: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 11,
     fontWeight: "500",
   },
@@ -1572,7 +1559,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   platformCountText: {
-    color: "#7E8698",
+    color: appleColors.twitterMuted,
     fontSize: 11,
     fontWeight: "600",
   },
@@ -1599,17 +1586,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   emptyCardText: {
-    color: "#71767B",
+    color: appleColors.twitterMuted,
     fontSize: 12,
   },
 
   // 8. AI INTELLIGENCE BANNER
   aiInsightsCard: {
-    backgroundColor: "rgba(0, 229, 255, 0.05)",
+    backgroundColor: "rgba(99, 102, 241, 0.08)",
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: "rgba(0, 229, 255, 0.18)",
+    borderColor: "rgba(99, 102, 241, 0.22)",
     marginBottom: 14,
   },
   aiInsightsTop: {
@@ -1622,17 +1609,17 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(0, 229, 255, 0.15)",
+    backgroundColor: "rgba(99, 102, 241, 0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
   aiInsightsTitle: {
-    color: "#00E5FF",
+    color: appleColors.accentLight,
     fontSize: 13,
     fontWeight: "800",
   },
   aiInsightsBody: {
-    color: "#A4B0C7",
+    color: appleColors.textSecondary,
     fontSize: 11.5,
     lineHeight: 17,
     fontWeight: "500",
