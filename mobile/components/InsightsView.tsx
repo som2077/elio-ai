@@ -140,8 +140,18 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
     const now = new Date();
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const monthNames = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
 
     for (let i = days - 1; i >= 0; i--) {
@@ -186,7 +196,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
         key,
         count,
         pct: total > 0 ? Math.round((count / total) * 100) : 0,
-        label: PLATFORM_NAMES[key] || key.charAt(0).toUpperCase() + key.slice(1),
+        label:
+          PLATFORM_NAMES[key] || key.charAt(0).toUpperCase() + key.slice(1),
         color: PLATFORM_BRAND_COLORS[key] || "#FFFFFF",
       }))
       .filter((item) => item.count > 0)
@@ -194,12 +205,32 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   }, [inRangeVideos]);
 
   // Pre-computed metrics from backend RPC if available, fallback to client memo
-  const effectiveMetrics = backendInsights?.metrics || metrics;
+  const effectiveMetrics = useMemo(() => {
+    const m = backendInsights?.metrics;
+    if (!m) return metrics;
+    return {
+      totalSaved: m.totalSaved ?? m.total_saved ?? metrics.totalSaved ?? 0,
+      watched: m.watched ?? metrics.watched ?? 0,
+      inQueue: m.inQueue ?? m.in_queue ?? metrics.inQueue ?? 0,
+      favorites: m.favorites ?? metrics.favorites ?? 0,
+      completionRate:
+        m.completionRate ?? m.completion_rate ?? metrics.completionRate ?? 0,
+    };
+  }, [backendInsights?.metrics, metrics]);
+
   const effectiveDailyPoints: DailyBarPoint[] = useMemo(() => {
-    if (backendInsights?.dailyPoints && Array.isArray(backendInsights.dailyPoints)) {
-      return backendInsights.dailyPoints.map((p: any) => ({
-        dateKey: p.dateKey,
-        displayDate: p.displayDate || p.display_date || p.dateKey,
+    if (
+      backendInsights?.dailyPoints &&
+      Array.isArray(backendInsights.dailyPoints)
+    ) {
+      return backendInsights.dailyPoints.map((p: any, idx: number) => ({
+        dateKey: p.dateKey || p.date_key || `day-${idx}`,
+        displayDate:
+          p.displayDate ||
+          p.display_date ||
+          p.dateKey ||
+          p.date_key ||
+          `Day ${idx + 1}`,
         saved: p.saved ?? p.saved_count ?? 0,
         watched: p.watched ?? p.watched_count ?? 0,
       }));
@@ -213,14 +244,23 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   }, [effectiveDailyPoints]);
 
   const effectivePlatformStats = useMemo(() => {
-    if (backendInsights?.platformStats && Array.isArray(backendInsights.platformStats)) {
-      return backendInsights.platformStats.map((p: any) => ({
-        key: p.platform,
-        count: p.count,
-        pct: p.percentage,
-        label: p.label || PLATFORM_NAMES[p.platform] || p.platform,
-        color: p.color || PLATFORM_BRAND_COLORS[p.platform] || "#FFFFFF",
-      }));
+    if (
+      backendInsights?.platformStats &&
+      Array.isArray(backendInsights.platformStats)
+    ) {
+      return backendInsights.platformStats.map((p: any, idx: number) => {
+        const platformKey = p.key || p.platform || `platform-${idx}`;
+        return {
+          key: platformKey,
+          count: p.count ?? p.p_count ?? 0,
+          pct: p.pct ?? p.percentage ?? 0,
+          label:
+            p.label ||
+            PLATFORM_NAMES[platformKey] ||
+            platformKey.charAt(0).toUpperCase() + platformKey.slice(1),
+          color: p.color || PLATFORM_BRAND_COLORS[platformKey] || "#FFFFFF",
+        };
+      });
     }
     return platformStats;
   }, [backendInsights?.platformStats, platformStats]);
@@ -302,7 +342,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 <PikaIcon name="film" size={12} color="#FFFFFF" />
               </View>
             </View>
-            <Text style={styles.bentoNumber}>{effectiveMetrics.totalSaved}</Text>
+            <Text style={styles.bentoNumber}>
+              {effectiveMetrics.totalSaved}
+            </Text>
             <Text style={styles.bentoSub}>Clips added</Text>
           </View>
 
@@ -348,7 +390,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 <Ionicons name="pie-chart" size={11} color="#FFFFFF" />
               </View>
             </View>
-            <Text style={styles.bentoNumber}>{effectiveMetrics.completionRate}%</Text>
+            <Text style={styles.bentoNumber}>
+              {effectiveMetrics.completionRate}%
+            </Text>
             <Text style={styles.bentoSub}>
               {effectiveMetrics.favorites > 0
                 ? `${effectiveMetrics.favorites} favorites`
@@ -384,7 +428,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 
         {/* Capsule Columns Row */}
         <View style={styles.capsuleBarsRow}>
-          {effectiveDailyPoints.map((pt) => {
+          {effectiveDailyPoints.map((pt, idx) => {
             const isSelected = selectedBar?.dateKey === pt.dateKey;
             const barHeightPct = Math.max(
               Math.round((pt.saved / effectiveMaxDailyVal) * 100),
@@ -393,7 +437,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
 
             return (
               <TouchableOpacity
-                key={pt.dateKey}
+                key={pt.dateKey || `daily-bar-${idx}`}
                 activeOpacity={0.75}
                 style={styles.capsuleBarCol}
                 onPress={() => {
@@ -421,8 +465,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                         backgroundColor: isSelected
                           ? "#FFFFFF"
                           : pt.saved > 0
-                          ? "rgba(255, 255, 255, 0.85)"
-                          : "rgba(255, 255, 255, 0.08)",
+                            ? "rgba(255, 255, 255, 0.85)"
+                            : "rgba(255, 255, 255, 0.08)",
                       },
                     ]}
                   />
@@ -449,7 +493,8 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           <View>
             <Text style={styles.cardTitle}>Watch Ratio</Text>
             <Text style={styles.cardSubtitle}>
-              {effectiveMetrics.watched} of {effectiveMetrics.totalSaved} clips watched
+              {effectiveMetrics.watched} of {effectiveMetrics.totalSaved} clips
+              watched
             </Text>
           </View>
           <View style={styles.completionPill}>
@@ -476,7 +521,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
               style={[styles.watchLegendDot, { backgroundColor: "#10B981" }]}
             />
             <Text style={styles.watchLegendLabel}>Watched</Text>
-            <Text style={styles.watchLegendValue}>{effectiveMetrics.watched}</Text>
+            <Text style={styles.watchLegendValue}>
+              {effectiveMetrics.watched}
+            </Text>
           </View>
 
           <View style={styles.watchLegendItem}>
@@ -487,7 +534,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
               ]}
             />
             <Text style={styles.watchLegendLabel}>In Queue</Text>
-            <Text style={styles.watchLegendValue}>{effectiveMetrics.inQueue}</Text>
+            <Text style={styles.watchLegendValue}>
+              {effectiveMetrics.inQueue}
+            </Text>
           </View>
 
           {effectiveMetrics.favorites > 0 && (
@@ -496,7 +545,9 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
                 style={[styles.watchLegendDot, { backgroundColor: "#EAB308" }]}
               />
               <Text style={styles.watchLegendLabel}>Favorites</Text>
-              <Text style={styles.watchLegendValue}>{effectiveMetrics.favorites}</Text>
+              <Text style={styles.watchLegendValue}>
+                {effectiveMetrics.favorites}
+              </Text>
             </View>
           )}
         </View>
@@ -517,8 +568,11 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             <Text style={styles.emptyCardText}>No clips in this timeframe</Text>
           </View>
         ) : (
-          effectivePlatformStats.map((item) => (
-            <View key={item.key} style={styles.platformItemRow}>
+          effectivePlatformStats.map((item, idx) => (
+            <View
+              key={item.key || `platform-item-${idx}`}
+              style={styles.platformItemRow}
+            >
               <View style={styles.platformTopMeta}>
                 <View style={styles.platformLeftTitle}>
                   <PlatformIcon platform={item.key} size={16} />

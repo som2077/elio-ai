@@ -1113,7 +1113,7 @@ export default function HomeScreen() {
         contentContainerStyle={{ width: screenWidth * 3, height: "100%" }}
       >
         {/* PAGE 0: WATCHLIST FEED */}
-        <View style={{ width: screenWidth, height: "100%" }}>
+        <View key="pager-page-feed" style={{ width: screenWidth, height: "100%" }}>
           <View style={styles.tabContentContainer}>
             {loading ? (
               <View key="feed-loading-container" style={{ flex: 1 }}>
@@ -1146,7 +1146,7 @@ export default function HomeScreen() {
                   key="list-view-1-col"
                   data={feedVideos}
                   numColumns={1}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item, index) => item.id || `video-${index}`}
                   removeClippedSubviews={false}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
@@ -1249,7 +1249,7 @@ export default function HomeScreen() {
         </View>
 
         {/* PAGE 1: ACTIVITY & INSIGHTS (ALL DATA TELEMETRY) */}
-        <View style={{ width: screenWidth, height: "100%" }}>
+        <View key="pager-page-insights" style={{ width: screenWidth, height: "100%" }}>
           <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
             <InsightsView
               videos={videos}
@@ -1267,7 +1267,7 @@ export default function HomeScreen() {
         </View>
 
         {/* PAGE 2: DEVICES & PC SYNC */}
-        <View style={{ width: screenWidth, height: "100%" }}>
+        <View key="pager-page-devices" style={{ width: screenWidth, height: "100%" }}>
           <View style={[styles.tabContentContainer, { paddingTop: insets.top }]}>
             <DevicesView
               userEmail={session?.user?.email}
