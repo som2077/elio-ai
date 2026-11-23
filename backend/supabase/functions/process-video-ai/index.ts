@@ -16,6 +16,12 @@ import {
   downloadClipMediaStream,
 } from "./audioTranscriber.ts";
 import {
+  fetchSubtitlesViaYtDlp,
+  fetchMetadataViaYtDlp,
+  fetchAudioViaYtDlp,
+  isYtDlpServiceConfigured,
+} from "./ytDlpClient.ts";
+import {
   buildFullContextSystemPrompt,
   buildVideoUserPrompt,
   buildFallbackContextResult,
@@ -242,7 +248,24 @@ Deno.serve(async (req: Request) => {
       video.platform === "youtube" ||
       (video.clean_url && video.clean_url.includes("youtu"));
 
-    // Step 3A: YouTube Captions Extraction (English, Hindi, Urdu, Spanish, auto-captions)
+    const targetUrl = video.clean_url || video.original_url;
+
+    // Step 3A-0: High-fidelity yt-dlp subtitles (Zero-video-download for YouTube, Reels, TikTok, Twitter)
+    if (snippets.length === 0 && isYtDlpServiceConfigured() && targetUrl) {
+      try {
+        const ytdlpSubs = await fetchSubtitlesViaYtDlp(targetUrl);
+        if (ytdlpSubs && ytdlpSubs.snippets.length > 0) {
+          snippets = ytdlpSubs.snippets;
+          detectedLanguage = ytdlpSubs.language;
+          hasSpokenAudio = true;
+          fullContentText = ytdlpSubs.fullTranscript;
+        }
+      } catch (err: any) {
+        console.warn("[process-video-ai] yt-dlp subtitles notice:", err.message);
+      }
+    }
+
+    // Step 3A: YouTube Captions Extraction Fallback (English, Hindi, Urdu, Spanish, auto-captions)
     if (snippets.length === 0 && isYouTube) {
       const ytId =
         extractYouTubeId(video.clean_url) ||
@@ -352,27 +375,17 @@ Deno.serve(async (req: Request) => {
         .update({ processing_stage: "transcribing" as ProcessingStage })
         .eq("video_id", video.id);
 
-      const mediaTargetUrl =
-        socialContent?.extraContext?.match(
-          /https:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/,
-        )?.[0] ||
-        video.clean_url ||
-        video.original_url;
+      const whisperApiKey = groqApiKey || openaiApiKey;
+      const whisperProvider = groqApiKey ? "groq" : "openai";
 
-      if (
-        mediaTargetUrl &&
-        (mediaTargetUrl.includes(".mp4") || body.force_whisper)
-      ) {
+      // 1) High-fidelity yt-dlp audio extractor (downmixed to 32k mono 16kHz MP3 under 25MB)
+      if (isYtDlpServiceConfigured() && targetUrl) {
         try {
-          const media = await downloadClipMediaStream(mediaTargetUrl);
-          if (media) {
-            // Groq Whisper turbo prioritized for speed (< 1s), OpenAI Whisper fallback
-            const whisperApiKey = groqApiKey || openaiApiKey;
-            const whisperProvider = groqApiKey ? "groq" : "openai";
-
+          const ytdlpAudio = await fetchAudioViaYtDlp(targetUrl);
+          if (ytdlpAudio && ytdlpAudio.buffer.byteLength > 0) {
             const transcription = await transcribeAudioBuffer(
-              media.buffer,
-              media.fileName,
+              ytdlpAudio.buffer,
+              ytdlpAudio.fileName,
               whisperApiKey,
               whisperProvider,
             );
@@ -384,11 +397,48 @@ Deno.serve(async (req: Request) => {
               hasSpokenAudio = true;
             }
           }
-        } catch (whisperErr) {
+        } catch (ytAudioErr: any) {
           console.warn(
-            "[process-video-ai] Whisper audio transcription error:",
-            whisperErr,
+            "[process-video-ai] yt-dlp audio extraction notice:",
+            ytAudioErr.message,
           );
+        }
+      }
+
+      // 2) Direct clip stream fallback
+      if (snippets.length === 0) {
+        const mediaTargetUrl =
+          socialContent?.extraContext?.match(
+            /https:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*/,
+          )?.[0] || targetUrl;
+
+        if (
+          mediaTargetUrl &&
+          (mediaTargetUrl.includes(".mp4") || body.force_whisper)
+        ) {
+          try {
+            const media = await downloadClipMediaStream(mediaTargetUrl);
+            if (media) {
+              const transcription = await transcribeAudioBuffer(
+                media.buffer,
+                media.fileName,
+                whisperApiKey,
+                whisperProvider,
+              );
+
+              if (transcription && transcription.snippets.length > 0) {
+                snippets = transcription.snippets;
+                detectedLanguage = transcription.language;
+                fullContentText = transcription.fullTranscript;
+                hasSpokenAudio = true;
+              }
+            }
+          } catch (whisperErr) {
+            console.warn(
+              "[process-video-ai] Whisper audio transcription error:",
+              whisperErr,
+            );
+          }
         }
       }
     }

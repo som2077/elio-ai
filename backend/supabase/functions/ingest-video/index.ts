@@ -250,6 +250,21 @@ Deno.serve(async (req: Request) => {
       { onConflict: "video_id" },
     );
 
+    // Enqueue job into video_extraction_queue for the yt-dlp worker (safe non-blocking)
+    adminClient
+      .from("video_extraction_queue")
+      .insert({
+        video_id: newVideo.id,
+        user_id: userId,
+        url: cleanUrl,
+        platform: platform,
+        status: "queued",
+      })
+      .then(() => {})
+      .catch((err) => {
+        console.warn("[ingest-video] Queue enqueue notice:", err?.message);
+      });
+
     // Non-blocking trigger to process-video-ai edge function
     const shouldTriggerAI = body.trigger_ai !== false;
     if (shouldTriggerAI) {

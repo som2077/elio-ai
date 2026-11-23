@@ -46,6 +46,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Python cache & virtualenvs
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*/.pytest_cache/
+.venv/
+venv/
+
 # Large media & reference assets
 *.mp4
 !mobile/assets/clideo_editor_8a9de444bf414c14be67290583ae58ef.mp4

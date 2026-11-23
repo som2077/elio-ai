@@ -317,3 +317,35 @@ export async function getUserSubscription(): Promise<UserSubscription | null> {
     return null;
   }
 }
+
+/**
+ * Retriggers deep audio/subtitle extraction for a video record via process-video-ai
+ * Utilizing high-fidelity yt-dlp subtitles or Whisper audio extraction
+ */
+export async function retriggerVideoExtraction(
+  videoId: string,
+  forceWhisper: boolean = false,
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke("process-video-ai", {
+      body: {
+        video_id: videoId,
+        force_whisper: forceWhisper,
+      },
+    });
+
+    if (error) {
+      return { success: false, message: error.message };
+    }
+
+    return {
+      success: true,
+      message: data?.message || "Extraction re-triggered successfully.",
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || "Extraction request failed.",
+    };
+  }
+}
